@@ -1,0 +1,19 @@
+{
+  "name": "kpo-notes",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vitepress dev --host 0.0.0.0",
+    "build": "vitepress build",
+    "preview": "vitepress preview --host 0.0.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.0",
+    "typescript": "latest",
+    "vitepress": "latest",
+    "vue": "latest"
+  },
+  "dependencies": {
+    "kotlin-playground": "latest"
+  }
+}
