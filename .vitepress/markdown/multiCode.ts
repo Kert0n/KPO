@@ -1,39 +1,43 @@
 import type MarkdownIt from 'markdown-it'
 import type Token from 'markdown-it/lib/token.mjs'
 import container from 'markdown-it-container'
+import { normalizeLanguage } from '../theme/lib/codeBlockModel'
 
 /**
  * Контейнер ::: multi-code — один пример на нескольких языках.
  *
- * ```md
- * ::: multi-code "Заголовок" {default=kotlin playground=off}
- * ```kotlin … ```
- * ```csharp … ```
- * :::
- * ```
- *
- * Устройство повторяет штатный ::: code-group из VitePress:
- * внутренние fence-блоки остаются обычными fence-токенами и проходят
- * весь стандартный пайплайн (Shiki, номера строк, кнопка копирования,
- * v-pre), а контейнер лишь оборачивает их в <CodeSwitcher>.
- * Блок языка по умолчанию получает маркер " active" — тот же механизм,
- * которым пользуется code-group, — чтобы SSR-разметка сразу показывала
- * нужный язык без мерцания.
+ * Важное разделение:
+ *  - initialLang отвечает за SSR-разметку и первый paint;
+ *  - authorDefaultLang существует только при явном {default=...};
+ *  - глобальный язык читателя применяется уже в CodeSwitcher и только
+ *    если авторский default не задан.
  */
 
-export const languageAliases = new Map<string, string>([
-  ['kt', 'kotlin'],
-  ['kts', 'kotlin'],
-  ['cs', 'csharp'],
-  ['c#', 'csharp'],
-  ['golang', 'go']
-])
+const supportedOptions = new Set(['default', 'playground'])
 
 const languageLabels: Record<string, string> = {
   kotlin: 'Kotlin',
   csharp: 'C#',
   java: 'Java',
   go: 'Go'
+}
+
+export type ContainerInfo = {
+  title: string
+  options: Map<string, string>
+}
+
+export type MultiCodeFence = {
+  token: Token
+  language: string
+}
+
+export type MultiCodeMeta = {
+  languages: string[]
+  labels: string[]
+  initialLang: string
+  authorDefaultLang: string
+  allowPlayground: boolean
 }
 
 /**
@@ -50,7 +54,7 @@ export function langOnlyPlugin(md: MarkdownIt): void {
       if (token.nesting === -1) return '</div>\n'
 
       const raw = token.info.trim().replace(/^only\s*/, '').trim().split(/\s+/)[0] ?? ''
-      const lang = languageAliases.get(raw.toLowerCase()) ?? raw.toLowerCase()
+      const lang = normalizeLanguage(raw)
 
       if (!lang) {
         console.warn('[only] контейнер без языка:', token.info)
@@ -68,28 +72,29 @@ export function multiCodePlugin(md: MarkdownIt): void {
       const token = tokens[index]
       if (token.nesting === -1) return '</CodeSwitcher>\n'
 
-      const { title, options } = parseInfo(token)
-      const languages = collectLanguages(tokens, index)
+      const info = parseContainerInfo(token)
+      warnUnsupportedOptions(info, token)
 
-      if (languages.length === 0) {
+      const fences = collectCodeFences(tokens, index)
+      const meta = resolveMultiCodeMeta(info, fences, token)
+
+      if (meta.languages.length === 0) {
         console.warn('[multi-code] контейнер без блоков кода:', token.info)
-        return '<CodeSwitcher langs="" title="">\n'
+        return `<CodeSwitcher title="${escapeAttribute(info.title)}" langs="">\n`
       }
 
-      const requestedDefault = normalizeLanguage(options.get('default') ?? '')
-      const defaultLang = languages.includes(requestedDefault) ? requestedDefault : languages[0]
-      markDefaultFenceActive(tokens, index, defaultLang)
+      markInitialFenceActive(fences, meta.initialLang)
 
-      const playgroundOff = /^(off|none|false|0)$/i.test(options.get('playground') ?? '')
-      const playground = !playgroundOff && languages.includes('kotlin')
+      const authorDefaultAttribute = meta.authorDefaultLang
+        ? ` author-default-lang="${meta.authorDefaultLang}"`
+        : ''
 
-      const labels = languages.map((lang) => languageLabels[lang] ?? lang)
-
-      return `<CodeSwitcher title="${escapeAttribute(title)}"`
-        + ` langs="${languages.join(',')}"`
-        + ` labels="${escapeAttribute(labels.join(','))}"`
-        + ` default-lang="${defaultLang}"`
-        + ` :playground="${playground}">\n`
+      return `<CodeSwitcher title="${escapeAttribute(info.title)}"`
+        + ` langs="${meta.languages.join(',')}"`
+        + ` labels="${escapeAttribute(meta.labels.join(','))}"`
+        + ` initial-lang="${meta.initialLang}"`
+        + authorDefaultAttribute
+        + ` :allow-playground="${meta.allowPlayground}">\n`
     }
   })
 }
@@ -100,7 +105,7 @@ export function multiCodePlugin(md: MarkdownIt): void {
  * markdown-it-attrs перехватывает конструкцию {…} до нашего рендера
  * и складывает пары в attrs, вырезая их из info.
  */
-function parseInfo(token: Token): { title: string; options: Map<string, string> } {
+export function parseContainerInfo(token: Token): ContainerInfo {
   const title = token.info.match(/"([^"]*)"/)?.[1] ?? ''
   const options = new Map<string, string>()
 
@@ -116,49 +121,89 @@ function parseInfo(token: Token): { title: string; options: Map<string, string> 
   return { title, options }
 }
 
-/** Собирает нормализованные языки fence-блоков внутри контейнера. */
-function collectLanguages(tokens: Token[], openIndex: number): string[] {
-  const languages: string[] = []
+/** Собирает fence-блоки только внутри текущего контейнера. */
+export function collectCodeFences(tokens: Token[], openIndex: number): MultiCodeFence[] {
+  const openToken = tokens[openIndex]
+  const fences: MultiCodeFence[] = []
+  const seen = new Set<string>()
 
-  forEachInnerFence(tokens, openIndex, (fence, lang) => {
-    if (languages.includes(lang)) {
-      console.warn(`[multi-code] повторный блок языка "${lang}" — будет показан вместе с первым.`)
-      return
-    }
-    languages.push(lang)
-  })
-
-  return languages
-}
-
-function markDefaultFenceActive(tokens: Token[], openIndex: number, defaultLang: string): void {
-  let marked = false
-
-  forEachInnerFence(tokens, openIndex, (fence, lang) => {
-    if (!marked && lang === defaultLang && !/ active( |$)/.test(fence.info)) {
-      fence.info += ' active'
-      marked = true
-    }
-  })
-}
-
-function forEachInnerFence(
-  tokens: Token[],
-  openIndex: number,
-  visit: (fence: Token, lang: string) => void
-): void {
   for (let i = openIndex + 1; i < tokens.length; i += 1) {
     const token = tokens[i]
-    if (token.type === 'container_multi-code_close') break
+    if (token.nesting === -1 && token.level === openToken.level) break
     if (token.type !== 'fence') continue
 
-    visit(token, normalizeLanguage(token.info))
+    const language = normalizeLanguage(token.info)
+    if (seen.has(language)) {
+      console.warn(`[multi-code] повторный блок языка "${language}" — будет показан вместе с первым.`)
+    } else {
+      seen.add(language)
+    }
+
+    fences.push({ token, language })
+  }
+
+  return fences
+}
+
+export function resolveMultiCodeMeta(
+  info: ContainerInfo,
+  fences: MultiCodeFence[],
+  token?: Token
+): MultiCodeMeta {
+  const languages = uniqueLanguages(fences)
+  const requestedDefault = normalizeLanguage(info.options.get('default') ?? '')
+  const authorDefaultLang = resolveAuthorDefault(requestedDefault, languages, token)
+  const initialLang = authorDefaultLang || languages[0] || ''
+  const playgroundOff = /^(off|none|false|0)$/i.test(info.options.get('playground') ?? '')
+  const allowPlayground = !playgroundOff && languages.includes('kotlin')
+
+  return {
+    languages,
+    labels: languages.map((lang) => languageLabels[lang] ?? lang),
+    initialLang,
+    authorDefaultLang,
+    allowPlayground
   }
 }
 
-function normalizeLanguage(info: string): string {
-  const raw = info.trim().split(/\s+/)[0]?.toLowerCase() ?? ''
-  return languageAliases.get(raw) ?? raw
+function uniqueLanguages(fences: MultiCodeFence[]): string[] {
+  const languages: string[] = []
+  for (const fence of fences) {
+    if (!languages.includes(fence.language)) languages.push(fence.language)
+  }
+  return languages
+}
+
+function resolveAuthorDefault(requestedDefault: string, languages: string[], token?: Token): string {
+  if (!requestedDefault) return ''
+  if (languages.includes(requestedDefault)) return requestedDefault
+
+  console.warn(
+    `[multi-code] default="${requestedDefault}" не найден среди языков блока`
+      + (token ? `: ${token.info}` : '')
+  )
+  return ''
+}
+
+function warnUnsupportedOptions(info: ContainerInfo, token: Token): void {
+  for (const key of info.options.keys()) {
+    if (!supportedOptions.has(key)) {
+      console.warn(`[multi-code] неизвестная опция "${key}": ${token.info}`)
+    }
+  }
+}
+
+function markInitialFenceActive(fences: MultiCodeFence[], initialLang: string): void {
+  let marked = false
+
+  for (const fence of fences) {
+    fence.token.info = fence.token.info.replace(/(^|\s)active(?=\s|$)/g, '').trim()
+
+    if (!marked && fence.language === initialLang) {
+      fence.token.info = `${fence.token.info} active`.trim()
+      marked = true
+    }
+  }
 }
 
 function escapeAttribute(value: string): string {

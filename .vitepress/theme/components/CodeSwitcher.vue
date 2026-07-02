@@ -3,6 +3,12 @@ import { computed, onMounted, ref, useTemplateRef, watch } from 'vue'
 import KotlinPlayground from './KotlinPlayground.vue'
 import { useCodeLanguage } from '../composables/useCodeLanguage'
 import { usePlaygroundMode } from '../composables/usePlaygroundMode'
+import {
+  canUsePlayground,
+  isSupportedCodeLanguage,
+  parseCsv,
+  resolveDisplayLanguage
+} from '../lib/codeBlockModel'
 
 /**
  * Переключатель языка для примера кода.
@@ -24,13 +30,15 @@ const props = withDefaults(defineProps<{
   title?: string
   langs: string
   labels?: string
-  defaultLang?: string
-  playground?: boolean
+  initialLang?: string
+  authorDefaultLang?: string
+  allowPlayground?: boolean
 }>(), {
   title: '',
   labels: '',
-  defaultLang: 'kotlin',
-  playground: false
+  initialLang: '',
+  authorDefaultLang: '',
+  allowPlayground: false
 })
 
 const { activeLanguage, setActiveLanguage } = useCodeLanguage()
@@ -38,23 +46,44 @@ const { playgroundMode, setPlaygroundMode } = usePlaygroundMode()
 
 const blocksElement = useTemplateRef('blocks')
 const mounted = ref(false)
+const authorDefaultReleased = ref(false)
+const localUnsupportedLanguage = ref<string | null>(null)
 const playgroundFailed = ref(false)
 const playgroundEverShown = ref(false)
 const kotlinCode = ref('')
 
-const langList = computed(() => props.langs.split(',').filter(Boolean))
-const labelList = computed(() => props.labels.split(',').filter(Boolean))
+const langList = computed(() => parseCsv(props.langs))
+const labelList = computed(() => parseCsv(props.labels))
+const hasKotlin = computed(() => langList.value.includes('kotlin'))
 
-/** Показанный язык: глобальный выбор, при его отсутствии в блоке — default */
+/**
+ * Показанный язык считается одной pure-моделью:
+ * untouched author default > global language > initial.
+ * После первого клика конкретный блок присоединяется к глобальному
+ * выбору, чтобы последующие клики в других блоках переключали и его.
+ */
 const displayLang = computed(() => {
-  if (!mounted.value) return props.defaultLang
-  return langList.value.includes(activeLanguage.value) ? activeLanguage.value : props.defaultLang
+  return resolveDisplayLanguage({
+    languages: langList.value,
+    initialLanguage: props.initialLang,
+    authorDefaultLanguage: props.authorDefaultLang,
+    globalLanguage: mounted.value ? activeLanguage.value : null,
+    authorDefaultProtected: Boolean(props.authorDefaultLang) && !authorDefaultReleased.value,
+    localUnsupportedLanguage: localUnsupportedLanguage.value
+  })
 })
 
+/** Playground возможен: блок им размечен, показан Kotlin, загрузка не падала */
 const playgroundUsable = computed(() => {
-  return displayLang.value === 'kotlin' && !playgroundFailed.value
+  return mounted.value && canUsePlayground({
+    allowPlayground: props.allowPlayground,
+    displayLanguage: displayLang.value,
+    playgroundFailed: playgroundFailed.value,
+    hasKotlinCode: kotlinCode.value !== ''
+  })
 })
 
+/** Playground показан: возможен + включён читателем + есть исходник */
 const playgroundActive = computed(() => {
   return mounted.value && playgroundUsable.value && playgroundMode.value && kotlinCode.value !== ''
 })
@@ -66,7 +95,9 @@ const playgroundTitle = computed(() => {
 })
 
 onMounted(() => {
-  kotlinCode.value = extractKotlinCode()
+  if (props.allowPlayground && hasKotlin.value) {
+    kotlinCode.value = extractKotlinCode()
+  }
   mounted.value = true
 })
 
@@ -101,6 +132,18 @@ function tabLabel(index: number): string {
   return labelList.value[index] ?? langList.value[index]
 }
 
+function selectLanguage(lang: string): void {
+  authorDefaultReleased.value = true
+
+  if (isSupportedCodeLanguage(lang)) {
+    localUnsupportedLanguage.value = null
+    setActiveLanguage(lang)
+    return
+  }
+
+  localUnsupportedLanguage.value = lang
+}
+
 function onTabsKeydown(event: KeyboardEvent): void {
   const langs = langList.value
   const current = Math.max(0, langs.indexOf(displayLang.value))
@@ -115,7 +158,7 @@ function onTabsKeydown(event: KeyboardEvent): void {
   if (next === undefined) return
 
   event.preventDefault()
-  setActiveLanguage(langs[(next + langs.length) % langs.length])
+  selectLanguage(langs[(next + langs.length) % langs.length])
 }
 </script>
 
@@ -126,7 +169,7 @@ function onTabsKeydown(event: KeyboardEvent): void {
 
       <div class="kpo-switcher__controls">
         <button
-          v-if="playground"
+          v-if="allowPlayground"
           type="button"
           class="kpo-switcher__playground-toggle"
           :disabled="!playgroundUsable"
@@ -155,7 +198,7 @@ function onTabsKeydown(event: KeyboardEvent): void {
             :class="{ 'kpo-switcher__tab--active': lang === displayLang }"
             :aria-selected="lang === displayLang"
             :tabindex="lang === displayLang ? 0 : -1"
-            @click="setActiveLanguage(lang)"
+            @click="selectLanguage(lang)"
           >
             {{ tabLabel(index) }}
           </button>

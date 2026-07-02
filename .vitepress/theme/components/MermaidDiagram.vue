@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useData } from 'vitepress'
-import { onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 
 /**
  * Диаграммы Mermaid. Рендер только на клиенте (динамический import),
@@ -11,20 +11,26 @@ import { onMounted, ref, watch } from 'vue'
 const props = defineProps<{
   /** Код диаграммы в URL-кодировке (см. markdown/mermaid.ts) */
   code: string
+  diagramId?: string
 }>()
 
 const { isDark } = useData()
 
+const decodedCode = computed(() => decodeURIComponent(props.code))
 const svg = ref('')
 const failed = ref(false)
+const errorMessage = ref('')
 
 let renderCounter = 0
-const instanceId = `kpo-mermaid-${Math.random().toString(36).slice(2, 8)}`
+const instanceId = props.diagramId ?? `kpo-mermaid-${stableHash(decodedCode.value)}`
 
 onMounted(render)
 watch(isDark, render)
 
 async function render(): Promise<void> {
+  failed.value = false
+  errorMessage.value = ''
+
   try {
     const { default: mermaid } = await import('mermaid')
 
@@ -37,21 +43,36 @@ async function render(): Promise<void> {
     renderCounter += 1
     const { svg: rendered } = await mermaid.render(
       `${instanceId}-${renderCounter}`,
-      decodeURIComponent(props.code)
+      decodedCode.value
     )
     svg.value = rendered
-    failed.value = false
   } catch (error) {
     console.warn('[mermaid] не удалось отрисовать диаграмму:', error)
+    errorMessage.value = error instanceof Error ? error.message : String(error)
     failed.value = true
   }
+}
+
+function stableHash(value: string): string {
+  let hash = 5381
+  for (let i = 0; i < value.length; i += 1) {
+    hash = (hash * 33) ^ value.charCodeAt(i)
+  }
+  return (hash >>> 0).toString(36)
 }
 </script>
 
 <template>
   <div class="kpo-mermaid">
     <div v-if="svg" class="kpo-mermaid__canvas" v-html="svg" />
-    <pre v-else-if="failed" class="kpo-mermaid__fallback">{{ decodeURIComponent(code) }}</pre>
+    <div v-else-if="failed" class="kpo-mermaid__error">
+      <p class="kpo-mermaid__error-title">Диаграмма не отрисовалась</p>
+      <p class="kpo-mermaid__error-message">{{ errorMessage }}</p>
+      <details class="kpo-mermaid__source">
+        <summary>Исходник Mermaid</summary>
+        <pre class="kpo-mermaid__fallback">{{ decodedCode }}</pre>
+      </details>
+    </div>
     <div v-else class="kpo-mermaid__loading">Загрузка диаграммы…</div>
   </div>
 </template>

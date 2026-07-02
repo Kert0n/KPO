@@ -19,6 +19,7 @@ type PersistentStateOptions<T> = {
   initial: T
   encode: (value: T) => string
   decode: (raw: string) => T
+  validate?: (value: T) => boolean
   /** Побочный эффект на каждое изменение (например, атрибут на <html>) */
   onChange?: (value: T) => void
 }
@@ -26,6 +27,7 @@ type PersistentStateOptions<T> = {
 type PersistentState<T> = {
   state: Ref<T>
   set: (value: T) => void
+  initialize: () => void
   /** Вызывать в composable: регистрирует инициализацию после монтирования */
   setupOnMounted: () => void
 }
@@ -40,29 +42,73 @@ export function createPersistentState<T>(options: PersistentStateOptions<T>): Pe
   }
 
   function set(value: T): void {
+    if (!isValid(value)) return
+
     apply(value)
-    window.localStorage.setItem(options.key, options.encode(value))
+    try {
+      window.localStorage.setItem(options.key, options.encode(value))
+    } catch (error) {
+      console.warn(`[persistentState] не удалось сохранить "${options.key}":`, error)
+    }
   }
 
   function initialize(): void {
     if (initialized) return
     initialized = true
 
-    const raw = window.localStorage.getItem(options.key)
-    if (raw !== null) apply(options.decode(raw))
-    else options.onChange?.(state.value)
+    apply(readStoredValue())
 
     window.addEventListener('storage', (event) => {
-      if (event.key === options.key && event.newValue !== null) {
-        apply(options.decode(event.newValue))
-      }
+      if (event.key === options.key) apply(readStorageEventValue(event.newValue))
     })
   }
 
   return {
     state,
     set,
+    initialize,
     setupOnMounted: () => onMounted(initialize)
+  }
+
+  function readStoredValue(): T {
+    try {
+      const raw = window.localStorage.getItem(options.key)
+      if (raw === null) return options.initial
+
+      return decodeStoredValue(raw)
+    } catch (error) {
+      console.warn(`[persistentState] не удалось прочитать "${options.key}":`, error)
+      return options.initial
+    }
+  }
+
+  function readStorageEventValue(raw: string | null): T {
+    if (raw === null) return options.initial
+    return decodeStoredValue(raw)
+  }
+
+  function decodeStoredValue(raw: string): T {
+    try {
+      const value = options.decode(raw)
+      if (isValid(value)) return value
+    } catch (error) {
+      console.warn(`[persistentState] некорректное значение "${options.key}":`, error)
+    }
+
+    removeInvalidStoredValue()
+    return options.initial
+  }
+
+  function isValid(value: T): boolean {
+    return options.validate?.(value) ?? true
+  }
+
+  function removeInvalidStoredValue(): void {
+    try {
+      window.localStorage.removeItem(options.key)
+    } catch {
+      // Ignore storage cleanup failures: the in-memory state is already reset.
+    }
   }
 }
 

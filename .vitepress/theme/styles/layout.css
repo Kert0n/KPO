@@ -56,19 +56,6 @@
     padding-left: 0 !important;
   }
 
-  /* На страницах с сайдбаром зона заголовка тянется на его ширину,
-     а кнопка скрытия прижата к её правому краю — ровно над границей
-     сайдбара. Ширина питается от --kpo-sidebar-width, которую скрытие
-     сайдбара НЕ обнуляет (в отличие от --vp-sidebar-width), поэтому
-     кнопка-якорь не двигается никогда. */
-  .VPNavBar.has-sidebar .container > .title {
-    width: calc(var(--kpo-sidebar-width) - var(--kpo-nav-inline-pad)) !important;
-  }
-
-  .VPNavBar .VPNavBarTitle,
-  .VPNavBar .VPNavBarTitle .title {
-    width: 100%;
-  }
 
   /* ---- Поиск: компактный контрол в правом кластере ----
      Высота — общая для всех контролов (--kpo-control-height),
@@ -166,14 +153,18 @@
 
 /* ---------- Кнопка скрытия сайдбара ----------
 
-   Неподвижный якорь у правого края зоны заголовка. Существует только
-   на десктопе и только на страницах с сайдбаром (на главной её нет,
-   на мобильных у VitePress своё меню). Позиция не зависит от того,
-   скрыт сайдбар или показан. */
+   Неподвижный якорь ровно над границей сайдбара: позиционируется
+   абсолютно от контейнера навбара через переменные и не зависит ни от
+   ширины логотипа, ни от состояния сайдбара. Существует только на
+   десктопе и только на страницах с сайдбаром (на главной её нет,
+   на мобильных у VitePress своё меню). Живёт в content-слоте навбара,
+   а не внутри ссылки-логотипа — клик не может превратиться в переход. */
 
 .kpo-sidebar-toggle {
   display: none;
-  margin-left: auto;
+  box-sizing: border-box;
+  width: var(--kpo-toggle-size);
+  height: var(--kpo-toggle-size);
   padding: 4px;
   border: 0;
   border-radius: 6px;
@@ -185,8 +176,16 @@
 
 @media (min-width: 960px) {
   .VPNavBar.has-sidebar .kpo-sidebar-toggle {
+    /* Навбар зафиксирован у верхней кромки, поэтому координаты кнопки
+       считаются от вьюпорта: правый край — ровно на границе сайдбара */
+    position: fixed;
+    top: calc(var(--vp-nav-height) / 2);
+    left: calc(var(--kpo-sidebar-width) - var(--kpo-toggle-size));
+    z-index: 2;
     display: inline-flex;
     align-items: center;
+    justify-content: center;
+    transform: translateY(-50%);
   }
 }
 

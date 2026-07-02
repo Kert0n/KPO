@@ -2,20 +2,29 @@
   "name": "kpo-notes",
   "private": true,
   "type": "module",
+  "engines": {
+    "node": ">=24 <25"
+  },
   "scripts": {
     "dev": "vitepress dev --host 0.0.0.0",
     "build": "vitepress build",
-    "preview": "vitepress preview --host 0.0.0.0"
+    "preview": "vitepress preview --host 0.0.0.0",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:ui": "playwright test"
   },
   "devDependencies": {
+    "@playwright/test": "^1.61.1",
     "@types/markdown-it": "14.1.2",
     "@types/markdown-it-container": "2.0.10",
-    "@types/node": "26.1.0",
+    "@types/node": "^24.13.2",
     "gray-matter": "4.0.3",
+    "markdown-it": "^14.1.0",
     "markdown-it-container": "4.0.0",
     "shiki": "2.5.0",
     "typescript": "5.9.3",
     "vitepress": "1.6.4",
+    "vitest": "^4.1.9",
     "vue": "3.5.39"
   },
   "dependencies": {

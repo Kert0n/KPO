@@ -18,7 +18,11 @@ export default {
   extends: DefaultTheme,
   Layout() {
     return h(DefaultTheme.Layout, null, {
-      'nav-bar-title-after': () => h(SidebarToggle)
+      // Кнопка сайдбара живёт в content-слоте, а НЕ в nav-bar-title-after:
+      // тот рендерится внутри <a> логотипа, и до завершения гидрации клик
+      // по кнопке проваливался в ссылку и уводил на главную.
+      // Позиционируется абсолютно над границей сайдбара (layout.css).
+      'nav-bar-content-before': () => h(SidebarToggle)
     })
   },
   enhanceApp({ app }) {

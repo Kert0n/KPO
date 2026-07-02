@@ -721,7 +721,7 @@ flowchart LR
 **Слайд 65: p u b l i c U s e r [ ] GetWhoCommentedArticleInProject(Guid p r o j e c t I d )**
 ```mermaid
 flowchart TD
-    Method[GetWhoCommentedArticleInProject(projectId)] --> UserRepository[UserRepository]
+    Method["GetWhoCommentedArticleInProject(projectId)"] --> UserRepository[UserRepository]
     Method --> ProjectRepository[ProjectRepository]
     Method --> Unknown[???]
     Method --> DataProvider[DataProvider]
