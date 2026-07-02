@@ -2,8 +2,7 @@ import { defineConfig } from 'vitepress'
 import { getNav, getRewrites, getSidebar } from './lib/content'
 import { paletteCss } from './lib/paletteCss'
 import { kpoDark, kpoLight } from './lib/shikiThemes'
-import { mermaidPlugin } from './markdown/mermaid'
-import { langOnlyPlugin, multiCodePlugin } from './markdown/multiCode'
+import { applyMarkdownExtensions } from './markdown'
 
 export default defineConfig({
   lang: 'ru-RU',
@@ -32,16 +31,14 @@ export default defineConfig({
     ['style', {}, paletteCss()],
     // Выбранный язык применяется до отрисовки, чтобы секции ::: only /
     // <LangOnly> не мигали (приём тёмной темы VitePress)
-    ['script', {}, ';(function(){try{document.documentElement.dataset.kpoLang=localStorage.getItem("kpo:code-language")||"kotlin"}catch(e){}})()']
+    ['script', {}, ';(function(){try{var l=localStorage.getItem("kpo:code-language");if(!/^(kotlin|csharp|java|go)$/.test(l||""))l="kotlin";document.documentElement.dataset.kpoLang=l}catch(e){document.documentElement.dataset.kpoLang="kotlin"}})()']
   ],
 
   markdown: {
     lineNumbers: true,
     theme: { light: kpoLight, dark: kpoDark },
     config(md) {
-      md.use(multiCodePlugin)
-      md.use(langOnlyPlugin)
-      md.use(mermaidPlugin)
+      applyMarkdownExtensions(md)
     }
   },
 
@@ -89,7 +86,16 @@ export default defineConfig({
     sidebarMenuLabel: 'Меню',
     returnToTopLabel: 'Наверх',
     lastUpdated: {
-      text: 'Обновлено'
+      text: 'Обновлено',
+      formatOptions: {
+        forceLocale: true,
+        day: '2-digit',
+        month: '2-digit',
+        year: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true
+      }
     },
     notFound: {
       title: 'Страница не найдена',

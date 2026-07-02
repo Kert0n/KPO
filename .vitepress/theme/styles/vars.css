@@ -21,6 +21,7 @@
   --kpo-nav-inline-pad: 24px;
   --kpo-control-height: 28px;
   --kpo-chip-height: 18px;
+  --kpo-toggle-size: 24px;
 
   /* Поверхности: контент — «редактор», панели — «тулбары» */
   --vp-c-bg: #ffffff;

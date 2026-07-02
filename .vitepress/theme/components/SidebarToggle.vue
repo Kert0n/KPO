@@ -2,6 +2,12 @@
 import { useSidebarVisibility } from '../composables/useSidebarVisibility'
 
 const { sidebarHidden, setSidebarHidden } = useSidebarVisibility()
+
+function toggleSidebar(event: MouseEvent): void {
+  event.preventDefault()
+  event.stopPropagation()
+  setSidebarHidden(!sidebarHidden.value)
+}
 </script>
 
 <template>
@@ -11,7 +17,7 @@ const { sidebarHidden, setSidebarHidden } = useSidebarVisibility()
     :aria-pressed="!sidebarHidden"
     :title="sidebarHidden ? 'Показать боковую панель' : 'Скрыть боковую панель'"
     aria-label="Боковая панель"
-    @click.prevent.stop="setSidebarHidden(!sidebarHidden)"
+    @click="toggleSidebar"
   >
     <svg viewBox="0 0 16 16" aria-hidden="true">
       <rect x="1.5" y="2.5" width="13" height="11" rx="2" fill="none" stroke="currentColor" />

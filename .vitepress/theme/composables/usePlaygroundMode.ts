@@ -10,6 +10,7 @@ import { booleanCodec, createPersistentState } from './persistentState'
 const mode = createPersistentState<boolean>({
   key: 'kpo:playground-mode',
   initial: true,
+  validate: (value) => typeof value === 'boolean',
   ...booleanCodec
 })
 

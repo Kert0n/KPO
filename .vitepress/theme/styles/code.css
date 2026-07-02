@@ -32,6 +32,7 @@
 
 .kpo-switcher__title {
   min-width: 0;
+  overflow-wrap: anywhere;
   color: var(--vp-c-text-1);
   font-size: 0.875rem;
   font-weight: 600;
@@ -42,6 +43,7 @@
   display: flex;
   align-items: center;
   gap: 0.5rem;
+  min-width: 0;
   margin-left: auto;
 }
 
@@ -51,6 +53,7 @@
    при переключении языка. */
 .kpo-switcher__tabs {
   display: flex;
+  min-width: 0;
   height: var(--kpo-control-height);
   padding: 2px;
   border-radius: 7px;
@@ -58,6 +61,7 @@
 }
 
 .kpo-switcher__tab {
+  min-width: 0;
   padding: 0 12px;
   border: 0;
   border-radius: 5px;
@@ -67,6 +71,7 @@
   font-size: 0.75rem;
   font-weight: 600;
   line-height: 1.4;
+  white-space: nowrap;
   cursor: pointer;
   transition: color 0.15s, background-color 0.15s, box-shadow 0.15s;
 }
@@ -206,24 +211,60 @@ html:not([data-kpo-lang]) .kpo-only--kotlin {
   font-size: 0.8125rem;
 }
 
+.kpo-mermaid__error {
+  min-width: 0;
+  width: 100%;
+  color: var(--vp-c-text-2);
+  font-size: 0.8125rem;
+}
+
+.kpo-mermaid__error-title {
+  margin: 0 0 0.25rem;
+  color: var(--vp-c-text-1);
+  font-weight: 600;
+}
+
+.kpo-mermaid__error-message {
+  margin: 0 0 0.5rem;
+  overflow-wrap: anywhere;
+}
+
+.kpo-mermaid__source summary {
+  cursor: pointer;
+  color: var(--vp-c-text-2);
+}
+
 .kpo-mermaid__fallback {
-  margin: 0;
+  margin: 0.5rem 0 0;
   color: var(--vp-c-text-2);
   font-family: var(--vp-font-family-mono);
   font-size: var(--vp-code-font-size);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 @media (max-width: 639px) {
+  .kpo-switcher__header {
+    align-items: stretch;
+  }
+
   .kpo-switcher__controls {
     margin-left: 0;
     width: 100%;
+    flex-wrap: wrap;
   }
 
   .kpo-switcher__tabs {
     flex: 1;
+    min-width: min(100%, 12rem);
   }
 
   .kpo-switcher__tab {
     flex: 1;
+    padding: 0 8px;
+  }
+
+  .kpo-switcher__playground-toggle {
+    flex: 0 0 auto;
   }
 }
