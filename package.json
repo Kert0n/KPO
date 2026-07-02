@@ -2,6 +2,9 @@
   "name": "kpo-notes",
   "private": true,
   "type": "module",
+  "engines": {
+    "node": ">=24 <25"
+  },
   "scripts": {
     "dev": "vitepress dev --host 0.0.0.0",
     "build": "vitepress build",
@@ -14,7 +17,7 @@
     "@playwright/test": "^1.61.1",
     "@types/markdown-it": "14.1.2",
     "@types/markdown-it-container": "2.0.10",
-    "@types/node": "26.1.0",
+    "@types/node": "^24.13.2",
     "gray-matter": "4.0.3",
     "markdown-it": "^14.1.0",
     "markdown-it-container": "4.0.0",

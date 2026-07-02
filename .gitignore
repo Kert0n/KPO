@@ -2,6 +2,7 @@
 node_modules/
 .vitepress/cache/
 .vitepress/dist/
+test-results/
 
 # Системное, IDE и логи
 .DS_Store
