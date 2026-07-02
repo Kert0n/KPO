@@ -1,0 +1,285 @@
+/**
+ * Макет: единый топбар, скрытие сайдбара, типографика контента.
+ *
+ * Про !important: стили компонентов темы VitePress — scoped (селекторы
+ * с [data-v-*] атрибутом), их специфичность не перебить обычным
+ * селектором. Каждый !important ниже существует только по этой причине;
+ * правила против глобальных стилей (DocSearch, vp-doc) обходятся без него.
+ * Все размеры — из переменных vars.css (--kpo-*), литералов нет.
+ */
+
+/* ---------- Единый топбар (десктоп) ----------
+
+   Тема по умолчанию делает навбар прозрачным над контентом, привязывает
+   зону логотипа к сайдбару и центрирует контент по-разному на главной
+   и на страницах документации — при нашей «двухцветной» палитре это
+   давало швы и прыжки. Здесь у навбара одна раскладка ВЕЗДЕ:
+   сплошной фон на всю ширину, непрерывная линия снизу, логотип
+   в потоке слева, поиск и меню справа. Ничто в баре не меняет позицию
+   от состояния сайдбара или типа страницы. */
+
+@media (min-width: 960px) {
+  .VPNavBar:not(.home.top) {
+    background-color: var(--vp-nav-bg-color) !important;
+  }
+
+  .VPNavBar:not(.home.top) .content-body {
+    background-color: transparent !important;
+  }
+
+  /* Линия под топбаром — сплошная, без отступа на ширину сайдбара */
+  .VPNavBar .divider {
+    padding-left: 0 !important;
+  }
+
+  /* Дублирующая линия под логотипом не нужна */
+  .VPNavBarTitle.has-sidebar .title {
+    border-bottom-color: transparent !important;
+  }
+
+  .VPNavBar .wrapper {
+    padding: 0 var(--kpo-nav-inline-pad) !important;
+  }
+
+  .VPNavBar .container {
+    max-width: 100% !important;
+  }
+
+  .VPNavBar .container > .title {
+    position: static !important;
+    width: auto !important;
+    padding: 0 !important;
+  }
+
+  .VPNavBar .container > .content {
+    padding-right: 0 !important;
+    padding-left: 0 !important;
+  }
+
+  /* На страницах с сайдбаром зона заголовка тянется на его ширину,
+     а кнопка скрытия прижата к её правому краю — ровно над границей
+     сайдбара. Ширина питается от --kpo-sidebar-width, которую скрытие
+     сайдбара НЕ обнуляет (в отличие от --vp-sidebar-width), поэтому
+     кнопка-якорь не двигается никогда. */
+  .VPNavBar.has-sidebar .container > .title {
+    width: calc(var(--kpo-sidebar-width) - var(--kpo-nav-inline-pad)) !important;
+  }
+
+  .VPNavBar .VPNavBarTitle,
+  .VPNavBar .VPNavBarTitle .title {
+    width: 100%;
+  }
+
+  /* ---- Поиск: компактный контрол в правом кластере ----
+     Высота — общая для всех контролов (--kpo-control-height),
+     текст 13px под масштаб меню. DocSearch-стили глобальные,
+     поэтому !important не нужен. */
+  .VPNavBar .VPNavBarSearch {
+    flex-grow: 0 !important;
+    padding-left: 0 !important;
+    margin-right: 12px;
+  }
+
+  .VPNavBar .DocSearch-Button {
+    height: var(--kpo-control-height);
+    margin: 0;
+    padding: 0 8px 0 10px;
+    border: 0;
+    border-radius: 6px;
+    background: var(--kpo-control-bg);
+    color: var(--vp-c-text-2);
+    transition: color 0.15s;
+  }
+
+  .VPNavBar .DocSearch-Button:hover,
+  .VPNavBar .DocSearch-Button:focus-visible {
+    color: var(--vp-c-text-1);
+    background: var(--kpo-control-bg);
+    box-shadow: none;
+  }
+
+  .VPNavBar .DocSearch-Button .DocSearch-Search-Icon {
+    width: 14px;
+    height: 14px;
+  }
+
+  .VPNavBar .DocSearch-Button-Placeholder {
+    padding: 0 12px 0 8px;
+    font-size: 13px;
+    font-weight: 500;
+  }
+
+  /* Шорткат ⌘K — один цельный чип: рамка на контейнере. Тема рисует
+     его как две половинки <kbd> со своими рамками, сдвигами margin 2px
+     и асимметричными паддингами (селекторы вида
+     `.DocSearch-Button .DocSearch-Button-Key + .DocSearch-Button-Key`) —
+     из-за них символы обрезались. Селекторы ниже длиннее родных,
+     чтобы гарантированно их перекрыть. */
+  .VPNavBar .DocSearch-Button .DocSearch-Button-Keys {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    min-width: 0;
+    height: var(--kpo-chip-height);
+    padding: 0 5px;
+    border: 1px solid var(--vp-c-border);
+    border-radius: 4px;
+  }
+
+  .VPNavBar .DocSearch-Button .DocSearch-Button-Key,
+  .VPNavBar .DocSearch-Button .DocSearch-Button-Key + .DocSearch-Button-Key {
+    position: static;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: auto;
+    min-width: 0;
+    height: auto;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+    color: var(--vp-c-text-3);
+    font-size: 11px;
+    line-height: 1;
+  }
+
+  /* Символ ⌘/Ctrl тема подставляет псевдоэлементом — приводим к тому же
+     размеру и цвету, что и «K» */
+  .VPNavBar .DocSearch-Button .DocSearch-Button-Key:first-child::after {
+    color: var(--vp-c-text-3);
+    font-size: 11px;
+    line-height: 1;
+  }
+
+  /* Иконка луны/солнца в тумблере темы — строго по центру кружка.
+     Тема позиционирует её top/left: 3px — на дробных DPR это даёт
+     видимый сдвиг; transform-центрирование устойчиво к округлению */
+  .VPSwitch .check .icon [class^='vpi-'] {
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+  }
+}
+
+/* ---------- Кнопка скрытия сайдбара ----------
+
+   Неподвижный якорь у правого края зоны заголовка. Существует только
+   на десктопе и только на страницах с сайдбаром (на главной её нет,
+   на мобильных у VitePress своё меню). Позиция не зависит от того,
+   скрыт сайдбар или показан. */
+
+.kpo-sidebar-toggle {
+  display: none;
+  margin-left: auto;
+  padding: 4px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--vp-c-text-2);
+  cursor: pointer;
+  transition: color 0.15s, background-color 0.15s;
+}
+
+@media (min-width: 960px) {
+  .VPNavBar.has-sidebar .kpo-sidebar-toggle {
+    display: inline-flex;
+    align-items: center;
+  }
+}
+
+.kpo-sidebar-toggle:hover {
+  color: var(--vp-c-text-1);
+  background: var(--vp-c-bg-soft);
+}
+
+.kpo-sidebar-toggle:focus-visible {
+  outline: 2px solid var(--vp-c-brand-1);
+}
+
+.kpo-sidebar-toggle svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* ---------- Скрытие сайдбара ----------
+
+   Состояние живёт в памяти сессии (useSidebarVisibility): любая
+   загрузка страницы начинается с видимым сайдбаром. Сайдбар сохраняет
+   ширину (--kpo-sidebar-width) и плавно уезжает влево, а обнуление
+   --vp-sidebar-width анимированно схлопывает отступы контента. */
+
+@media (min-width: 960px) {
+  .VPSidebar {
+    width: var(--kpo-sidebar-width) !important;
+    border-right: 1px solid var(--vp-c-divider);
+    transition: transform 0.3s ease, opacity 0.3s ease, visibility 0.3s !important;
+  }
+
+  html.kpo-sidebar-hidden {
+    --vp-sidebar-width: 0px;
+  }
+
+  html.kpo-sidebar-hidden .VPSidebar {
+    transform: translateX(-100%) !important;
+    opacity: 0 !important;
+    visibility: hidden;
+    pointer-events: none;
+  }
+
+  .VPContent.has-sidebar,
+  .VPLocalNav.has-sidebar {
+    transition: padding-left 0.3s ease;
+  }
+}
+
+/* На широких экранах (≥1440) тема «центрирует» сайдбар, раздувая его
+   padding-left формулой от ширины окна — с фиксированной шириной это
+   сжимает содержимое в ноль, а край сайдбара уезжает от кнопки-якоря.
+   Отменяем: сайдбар одинаков на любой десктопной ширине, контент
+   начинается сразу за ним (колонка текста центрируется самим VPDoc). */
+@media (min-width: 1440px) {
+  .VPSidebar {
+    padding-left: 32px !important;
+  }
+
+  .VPContent.has-sidebar {
+    padding-right: 0 !important;
+    padding-left: var(--vp-sidebar-width) !important;
+  }
+}
+
+/* ---------- Типографика контента ---------- */
+
+/* Длинные лекции: чуть более свободный текст */
+.vp-doc p,
+.vp-doc li {
+  line-height: 1.75;
+}
+
+.vp-doc h1,
+.vp-doc h2,
+.vp-doc h3 {
+  letter-spacing: -0.01em;
+}
+
+/* Цитаты в духе JetBrains: акцентная полоса + мягкая подложка */
+.vp-doc blockquote {
+  border-left: 3px solid var(--vp-c-brand-1);
+  border-radius: 0 6px 6px 0;
+  padding: 0.75rem 1rem;
+  background: var(--vp-c-bg-soft);
+  color: var(--vp-c-text-2);
+}
+
+.vp-doc blockquote > p {
+  margin: 0;
+}
+
+/* Таблицы на всю ширину текста */
+.vp-doc table {
+  display: table;
+  width: 100%;
+}

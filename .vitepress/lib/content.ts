@@ -1,163 +1,185 @@
 import type { DefaultTheme } from 'vitepress'
-import { existsSync, readdirSync, readFileSync } from 'node:fs'
-import { join, posix, relative, resolve, sep } from 'node:path'
+import { existsSync, readFileSync, readdirSync } from 'node:fs'
+import { join, resolve } from 'node:path'
+import matter from 'gray-matter'
 
-export type SidebarPage = {
+/**
+ * Автоматическое построение сайдбара, навигации и rewrites
+ * из файловой системы.
+ *
+ * Элемент раздела — одно из двух:
+ *  - плоский файл `NN.md` (например, extras/01.md);
+ *  - папка с публикуемой страницей `vitepress.md` (например,
+ *    lectures/Lec1/vitepress.md) — остальное содержимое папки
+ *    (черновики, транскрипты, видео) принадлежит редактору
+ *    и в сборку не попадает (см. srcExclude в config.mts).
+ *
+ * Папочные страницы через rewrites получают чистые URL вида
+ * /lectures/01 — те же, что у плоских файлов.
+ *
+ * Порядок: frontmatter `order` → число в имени (Lec7 → 7, 03.md → 3).
+ * Заголовок: frontmatter `title` → первый H1 → «Лекция NN»/«Дополнение NN».
+ * Добавление и удаление лекций не требует правок конфига.
+ */
+
+type Page = {
   text: string
   link: string
   order: number
-  file: string
-}
-
-type Frontmatter = {
-  title?: string
-  order?: number
+  /** Для папочных страниц: исходный путь → переписанный (для rewrites) */
+  rewrite?: { from: string; to: string }
 }
 
 const root = process.cwd()
 
-export function getLecturePages(): SidebarPage[] {
-  return getPages('lectures')
-}
-
-export function getExtraPages(): SidebarPage[] {
-  return getPages('extras', { ignoreIndex: true })
-}
-
-export function getFirstLectureLink(): string {
-  return getLecturePages()[0]?.link ?? '/intro'
-}
+const sections = [
+  { directory: 'lectures', fallback: 'Лекция' },
+  { directory: 'extras', fallback: 'Дополнение' }
+] as const
 
 export function getSidebar(): DefaultTheme.Sidebar {
-  return [
+  const sidebar: DefaultTheme.SidebarItem[] = [
     {
       text: 'Начало',
-      items: [
-        { text: 'Введение', link: '/intro' },
-        { text: 'Hello World', link: '/hello-world' }
-      ]
+      items: [{ text: 'Введение', link: '/intro' }]
     },
     {
       text: 'Лекции',
-      items: getLecturePages()
-    },
-    {
-      text: 'Дополнительные материалы',
-      items: getExtraPages()
-    },
-    {
-      text: 'Финал',
-      items: [{ text: 'Заключение', link: '/conclusion' }]
+      collapsed: false,
+      items: scanPages('lectures')
     }
   ]
+
+  const extras = scanPages('extras')
+  if (extras.length > 0) {
+    sidebar.push({
+      text: 'Дополнения',
+      collapsed: false,
+      items: [{ text: 'О дополнениях', link: '/extras/' }, ...extras]
+    })
+  }
+
+  sidebar.push({
+    text: 'Финал',
+    items: [{ text: 'Заключение', link: '/conclusion' }]
+  })
+
+  return sidebar
 }
 
-function getPages(directory: string, options: { ignoreIndex?: boolean } = {}): SidebarPage[] {
-  const directoryPath = resolve(root, directory)
+export function getNav(): DefaultTheme.NavItem[] {
+  const nav: DefaultTheme.NavItem[] = [
+    { text: 'Введение', link: '/intro' },
+    { text: 'Лекции', link: getFirstLectureLink(), activeMatch: '/lectures/' }
+  ]
 
-  if (!existsSync(directoryPath)) {
-    return []
+  if (scanPages('extras').length > 0) {
+    nav.push({ text: 'Дополнения', link: '/extras/', activeMatch: '/extras/' })
   }
+
+  nav.push({ text: 'Заключение', link: '/conclusion' })
+
+  return nav
+}
+
+/** Карта rewrites для папочных страниц: lectures/Lec1/vitepress.md → lectures/01.md */
+export function getRewrites(): Record<string, string> {
+  const rewrites: Record<string, string> = {}
+
+  for (const section of sections) {
+    for (const page of scanPages(section.directory)) {
+      if (page.rewrite) rewrites[page.rewrite.from] = page.rewrite.to
+    }
+  }
+
+  return rewrites
+}
+
+export function getFirstLectureLink(): string {
+  return scanPages('lectures')[0]?.link ?? '/intro'
+}
+
+function scanPages(directory: (typeof sections)[number]['directory']): Page[] {
+  const directoryPath = resolve(root, directory)
+  if (!existsSync(directoryPath)) return []
+
+  const fallback = sections.find((s) => s.directory === directory)!.fallback
 
   const pages = readdirSync(directoryPath, { withFileTypes: true })
-    .filter((entry) => entry.isFile())
-    .map((entry) => entry.name)
-    .filter((file) => file.endsWith('.md'))
-    .filter((file) => !file.startsWith('_'))
-    .filter((file) => file !== 'README.md')
-    .filter((file) => !(options.ignoreIndex && file === 'index.md'))
-    .map((file) => toSidebarPage(directory, file))
+    .filter((entry) => !entry.name.startsWith('_') && !entry.name.startsWith('.'))
+    .map((entry) => toPage(directory, entry, fallback))
+    .filter((page): page is Page => page !== null)
+    .sort((a, b) => a.order - b.order || a.link.localeCompare(b.link, 'ru'))
 
-  assertUniqueLinks(pages)
+  assertUniqueLinks(directory, pages)
 
-  return pages.sort((a, b) => {
-    if (a.order !== b.order) return a.order - b.order
-    return a.file.localeCompare(b.file, 'ru')
-  })
+  return pages
 }
 
-function toSidebarPage(directory: string, file: string): SidebarPage {
-  const absoluteFile = join(root, directory, file)
-  const source = readFileSync(absoluteFile, 'utf8')
-  const { frontmatter, body } = parseFrontmatter(source)
-  const numericPrefix = Number(file.match(/^(\d+)[-_]/)?.[1])
-  const order: number = typeof frontmatter.order === 'number' && Number.isFinite(frontmatter.order)
-    ? frontmatter.order
-    : Number.isFinite(numericPrefix)
-      ? numericPrefix
-      : Number.MAX_SAFE_INTEGER
+function toPage(
+  directory: string,
+  entry: { name: string; isFile(): boolean; isDirectory(): boolean },
+  fallback: string
+): Page | null {
+  if (entry.isFile()) {
+    if (!entry.name.endsWith('.md') || entry.name === 'index.md') return null
 
-  return {
-    text: frontmatter.title ?? extractH1(body) ?? humanizeFileName(file),
-    link: toCleanLink(absoluteFile),
-    order,
-    file: normalizePath(relative(root, absoluteFile))
-  }
-}
-
-function parseFrontmatter(source: string): { frontmatter: Frontmatter; body: string } {
-  const match = source.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?/)
-
-  if (!match) {
-    return { frontmatter: {}, body: source }
-  }
-
-  const frontmatter: Frontmatter = {}
-  const raw = match[1]
-
-  for (const line of raw.split(/\r?\n/)) {
-    const [, key, value] = line.match(/^([A-Za-z0-9_-]+):\s*(.*)$/) ?? []
-
-    if (!key) continue
-
-    const normalizedValue = value.trim().replace(/^['"]|['"]$/g, '')
-
-    if (key === 'title') {
-      frontmatter.title = normalizedValue
-    }
-
-    if (key === 'order') {
-      const order = Number(normalizedValue)
-      if (Number.isFinite(order)) frontmatter.order = order
+    const order = extractNumber(entry.name)
+    return {
+      text: extractTitle(join(root, directory, entry.name), fallback, order),
+      link: `/${directory}/${entry.name.replace(/\.md$/, '')}`,
+      order
     }
   }
 
-  return {
-    frontmatter,
-    body: source.slice(match[0].length)
+  if (entry.isDirectory()) {
+    const source = join(root, directory, entry.name, 'vitepress.md')
+    if (!existsSync(source)) return null
+
+    const order = extractNumber(entry.name)
+    const slug = Number.isFinite(order) ? String(order).padStart(2, '0') : entry.name
+
+    return {
+      text: extractTitle(source, fallback, order),
+      link: `/${directory}/${slug}`,
+      order,
+      rewrite: {
+        from: `${directory}/${entry.name}/vitepress.md`,
+        to: `${directory}/${slug}.md`
+      }
+    }
   }
+
+  return null
 }
 
-function extractH1(source: string): string | undefined {
-  return source.match(/^#\s+(.+)$/m)?.[1]?.trim()
+/** Число из имени: «Lec7» → 7, «03.md» → 3; без числа — в конец списка */
+function extractNumber(name: string): number {
+  const match = name.match(/(\d+)/)
+  return match ? Number.parseInt(match[1], 10) : Number.MAX_SAFE_INTEGER
 }
 
-function humanizeFileName(file: string): string {
-  return file
-    .replace(/\.md$/, '')
-    .replace(/^\d+[-_]/, '')
-    .replace(/[-_]+/g, ' ')
-    .replace(/\b\p{L}/gu, (letter) => letter.toLocaleUpperCase('ru-RU'))
+function extractTitle(file: string, fallback: string, order: number): string {
+  const { data, content } = matter(readFileSync(file, 'utf8'))
+
+  if (typeof data.title === 'string' && data.title.trim() !== '') {
+    return data.title.trim()
+  }
+
+  const h1 = content.match(/^#\s+(.+?)\s*$/m)?.[1]
+  if (h1) return h1
+
+  return order === Number.MAX_SAFE_INTEGER
+    ? fallback
+    : `${fallback} ${String(order).padStart(2, '0')}`
 }
 
-function toCleanLink(absoluteFile: string): string {
-  const relativeFile = normalizePath(relative(root, absoluteFile))
-  return `/${relativeFile.replace(/\.md$/, '')}`
-}
-
-function normalizePath(filePath: string): string {
-  return filePath.split(sep).join(posix.sep)
-}
-
-function assertUniqueLinks(pages: SidebarPage[]): void {
-  const links = new Map<string, string>()
-
+function assertUniqueLinks(directory: string, pages: Page[]): void {
+  const seen = new Set<string>()
   for (const page of pages) {
-    const duplicate = links.get(page.link)
-    if (duplicate) {
-      throw new Error(`Duplicate VitePress link "${page.link}" for "${duplicate}" and "${page.file}".`)
+    if (seen.has(page.link)) {
+      throw new Error(`Дублирующаяся ссылка "${page.link}" в каталоге "${directory}".`)
     }
-
-    links.set(page.link, page.file)
+    seen.add(page.link)
   }
 }

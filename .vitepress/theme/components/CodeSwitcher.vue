@@ -1,319 +1,177 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, onMounted, ref, useTemplateRef, watch } from 'vue'
 import KotlinPlayground from './KotlinPlayground.vue'
-import { usePlayground } from '../composables/usePlayground'
-import { useCodeLanguage, type CodeLanguage } from '../composables/useCodeLanguage'
+import { useCodeLanguage } from '../composables/useCodeLanguage'
+import { usePlaygroundMode } from '../composables/usePlaygroundMode'
 
-type Language = CodeLanguage
-
-type CodeBlock = {
-  lang: Language
-  label: string
-  code: string
-  highlightedHtml: string
-}
+/**
+ * Переключатель языка для примера кода.
+ *
+ * Fence-блоки приходят в слот уже отрендеренными штатным пайплайном
+ * VitePress (Shiki, номера строк, кнопка копирования), поэтому компонент
+ * не трогает их содержимое — только переключает класс `active` на блоке
+ * выбранного языка, как это делает встроенный ::: code-group.
+ *
+ * Гидрация: SSR-разметка показывает язык по умолчанию (класс `active`
+ * ставит markdown-плагин), к глобально выбранному языку компонент
+ * синхронизируется после монтирования (см. mounted).
+ *
+ * Геометрия шапки постоянна: кнопка Playground не исчезает при смене
+ * языка или сбое инициализации, а лишь деактивируется.
+ */
 
 const props = withDefaults(defineProps<{
   title?: string
-  defaultLang?: Language
-  playgroundLang?: 'kotlin' | ''
-  blocks?: CodeBlock[]
-  blocksJson?: string
+  langs: string
+  labels?: string
+  defaultLang?: string
+  playground?: boolean
 }>(), {
   title: '',
+  labels: '',
   defaultLang: 'kotlin',
-  playgroundLang: '',
-  blocks: () => [],
-  blocksJson: ''
+  playground: false
 })
 
-const parsedBlocks = computed<CodeBlock[]>(() => {
-  if (props.blocks.length > 0) return props.blocks
-  if (!props.blocksJson) return []
+const { activeLanguage, setActiveLanguage } = useCodeLanguage()
+const { playgroundMode, setPlaygroundMode } = usePlaygroundMode()
 
-  try {
-    return JSON.parse(decodeURIComponent(props.blocksJson)) as CodeBlock[]
-  } catch {
-    return []
-  }
-})
-
-const languages = computed<Language[]>(() => parsedBlocks.value.map((block) => block.lang))
-const hasMountedPlayground = ref(false)
+const blocksElement = useTemplateRef('blocks')
+const mounted = ref(false)
 const playgroundFailed = ref(false)
-const { playgroundEnabled } = usePlayground()
-const {
-  resolveLanguage,
-  setActiveLanguage,
-  registerPlayableKotlinSwitcher,
-  unregisterPlayableKotlinSwitcher
-} = useCodeLanguage()
+const playgroundEverShown = ref(false)
+const kotlinCode = ref('')
 
-const resolvedActiveLanguage = computed<Language>(() => {
-  return resolveLanguage(props.defaultLang, languages.value)
-})
-const activeIndex = computed(() => Math.max(0, languages.value.indexOf(resolvedActiveLanguage.value)))
-const activeBlock = computed(() => {
-  return parsedBlocks.value.find((block) => block.lang === resolvedActiveLanguage.value) ?? parsedBlocks.value[0]
+const langList = computed(() => props.langs.split(',').filter(Boolean))
+const labelList = computed(() => props.labels.split(',').filter(Boolean))
+
+/** Показанный язык: глобальный выбор, при его отсутствии в блоке — default */
+const displayLang = computed(() => {
+  if (!mounted.value) return props.defaultLang
+  return langList.value.includes(activeLanguage.value) ? activeLanguage.value : props.defaultLang
 })
 
-const isPlayableKotlin = computed(() => {
-  return activeBlock.value?.lang === 'kotlin'
-    && props.playgroundLang === 'kotlin'
-    && playgroundEnabled.value
-    && !playgroundFailed.value
+const playgroundUsable = computed(() => {
+  return displayLang.value === 'kotlin' && !playgroundFailed.value
 })
 
-watch(isPlayableKotlin, (enabled) => {
-  if (enabled) hasMountedPlayground.value = true
-}, { immediate: true })
+const playgroundActive = computed(() => {
+  return mounted.value && playgroundUsable.value && playgroundMode.value && kotlinCode.value !== ''
+})
+
+const playgroundTitle = computed(() => {
+  if (displayLang.value !== 'kotlin') return 'Playground доступен для Kotlin'
+  if (playgroundFailed.value) return 'Playground недоступен'
+  return playgroundMode.value ? 'Выключить интерактивный режим' : 'Включить интерактивный режим'
+})
 
 onMounted(() => {
-  if (props.playgroundLang === 'kotlin') {
-    registerPlayableKotlinSwitcher()
-  }
+  kotlinCode.value = extractKotlinCode()
+  mounted.value = true
 })
 
-onUnmounted(() => {
-  if (props.playgroundLang === 'kotlin') {
-    unregisterPlayableKotlinSwitcher()
-  }
-})
+watch([displayLang, mounted], syncActiveBlock)
 
-function setLanguage(language: Language): void {
-  setActiveLanguage(language)
+watch(playgroundActive, (active) => {
+  if (active) playgroundEverShown.value = true
+}, { immediate: true })
+
+/** Переключает класс active на fence-блоке выбранного языка */
+function syncActiveBlock(): void {
+  const blocks = blocksElement.value?.querySelectorAll(':scope > [class*="language-"]') ?? []
+  for (const block of blocks) {
+    block.classList.toggle('active', blockLanguage(block) === displayLang.value)
+  }
 }
 
-function move(delta: number): void {
-  if (languages.value.length === 0) return
-  const nextIndex = (activeIndex.value + delta + languages.value.length) % languages.value.length
-  setActiveLanguage(languages.value[nextIndex])
+function blockLanguage(block: Element): string {
+  for (const name of block.classList) {
+    if (name.startsWith('language-')) return name.slice('language-'.length)
+  }
+  return ''
 }
 
-function onKeydown(event: KeyboardEvent): void {
-  if (event.key === 'ArrowLeft') {
-    event.preventDefault()
-    move(-1)
+/** Исходник для playground: textContent Shiki-разметки — это ровно код */
+function extractKotlinCode(): string {
+  const code = blocksElement.value?.querySelector(':scope > .language-kotlin pre code')
+  return code?.textContent?.replace(/\n$/, '') ?? ''
+}
+
+function tabLabel(index: number): string {
+  return labelList.value[index] ?? langList.value[index]
+}
+
+function onTabsKeydown(event: KeyboardEvent): void {
+  const langs = langList.value
+  const current = Math.max(0, langs.indexOf(displayLang.value))
+  const moves: Record<string, number> = {
+    ArrowLeft: current - 1,
+    ArrowRight: current + 1,
+    Home: 0,
+    End: langs.length - 1
   }
 
-  if (event.key === 'ArrowRight') {
-    event.preventDefault()
-    move(1)
-  }
+  const next = moves[event.key]
+  if (next === undefined) return
 
-  if (event.key === 'Home') {
-    event.preventDefault()
-    if (languages.value[0]) setActiveLanguage(languages.value[0])
-  }
-
-  if (event.key === 'End') {
-    event.preventDefault()
-    const lastLanguage = languages.value[languages.value.length - 1]
-    if (lastLanguage) setActiveLanguage(lastLanguage)
-  }
+  event.preventDefault()
+  setActiveLanguage(langs[(next + langs.length) % langs.length])
 }
 </script>
 
 <template>
-  <section class="code-switcher">
-    <header class="code-switcher__header">
-      <span v-if="title" class="code-switcher__title">{{ title }}</span>
-      <div
-        class="code-switcher__tabs"
-        role="tablist"
-        aria-label="Язык примера"
-        @keydown="onKeydown"
-      >
-        <span
-          class="code-switcher__indicator"
-          :style="{
-            width: `${100 / Math.max(languages.length, 1)}%`,
-            transform: `translateX(${activeIndex * 100}%)`
-          }"
-        />
+  <section class="kpo-switcher">
+    <header class="kpo-switcher__header">
+      <span v-if="title" class="kpo-switcher__title">{{ title }}</span>
+
+      <div class="kpo-switcher__controls">
         <button
-          v-for="block in parsedBlocks"
-          :key="block.lang"
-          class="code-switcher__tab"
-          :class="{ 'code-switcher__tab--active': block.lang === resolvedActiveLanguage }"
+          v-if="playground"
           type="button"
-          role="tab"
-          :aria-selected="block.lang === resolvedActiveLanguage"
-          @click="setLanguage(block.lang)"
+          class="kpo-switcher__playground-toggle"
+          :disabled="!playgroundUsable"
+          :aria-pressed="playgroundActive"
+          :title="playgroundTitle"
+          @click="setPlaygroundMode(!playgroundMode)"
         >
-          {{ block.label }}
+          <svg class="kpo-switcher__play-icon" viewBox="0 0 12 12" aria-hidden="true">
+            <path d="M2.5 1.5 L10 6 L2.5 10.5 Z" />
+          </svg>
+          Playground
         </button>
+
+        <div
+          class="kpo-switcher__tabs"
+          role="tablist"
+          aria-label="Язык примера"
+          @keydown="onTabsKeydown"
+        >
+          <button
+            v-for="(lang, index) in langList"
+            :key="lang"
+            type="button"
+            role="tab"
+            class="kpo-switcher__tab"
+            :class="{ 'kpo-switcher__tab--active': lang === displayLang }"
+            :aria-selected="lang === displayLang"
+            :tabindex="lang === displayLang ? 0 : -1"
+            @click="setActiveLanguage(lang)"
+          >
+            {{ tabLabel(index) }}
+          </button>
+        </div>
       </div>
     </header>
 
-    <div v-if="activeBlock" class="code-switcher__body">
-      <KotlinPlayground
-        v-if="hasMountedPlayground && activeBlock.lang === 'kotlin' && playgroundLang === 'kotlin' && playgroundEnabled && !playgroundFailed"
-        v-show="isPlayableKotlin"
-        :code="activeBlock.code"
-        @failed="playgroundFailed = true"
-      />
-
-      <div
-        v-if="!isPlayableKotlin"
-        class="code-switcher__static"
-        v-html="activeBlock.highlightedHtml"
-      />
-
-      <p v-if="activeBlock.lang === 'kotlin' && playgroundFailed" class="code-switcher__fallback-note">
-        Playground недоступен
-      </p>
-      <p v-else-if="activeBlock.lang === 'kotlin' && playgroundLang === 'kotlin' && !playgroundEnabled" class="code-switcher__fallback-note">
-        Playground выключен
-      </p>
+    <div ref="blocks" v-show="!playgroundActive" class="kpo-switcher__blocks">
+      <slot />
     </div>
+
+    <KotlinPlayground
+      v-if="playgroundEverShown"
+      v-show="playgroundActive"
+      :code="kotlinCode"
+      @failed="playgroundFailed = true"
+    />
   </section>
 </template>
-
-<style scoped>
-.code-switcher {
-  margin: 1.5rem 0;
-  border: 1px solid var(--vp-c-divider);
-  border-radius: 8px;
-  overflow: hidden;
-  background: var(--vp-code-bg);
-}
-
-.code-switcher__header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  padding: 0.625rem 0.75rem;
-  border-bottom: 1px solid var(--vp-c-divider);
-  background: var(--kpo-surface-soft);
-}
-
-.code-switcher__title {
-  min-width: 0;
-  color: var(--vp-c-text-1);
-  font-size: 0.875rem;
-  font-weight: 650;
-  line-height: 1.35;
-}
-
-.code-switcher__tabs {
-  position: relative;
-  display: grid;
-  grid-auto-flow: column;
-  grid-auto-columns: minmax(3.625rem, 1fr);
-  min-width: min(17.875rem, 100%);
-  padding: 0.1875rem;
-  border: 1px solid var(--vp-c-divider);
-  border-radius: 7px;
-  background: var(--kpo-control-bg);
-}
-
-.code-switcher__indicator {
-  position: absolute;
-  top: 0.1875rem;
-  bottom: 0.1875rem;
-  left: 0.1875rem;
-  width: 25%;
-  border-radius: 5px;
-  background: var(--kpo-control-active);
-  box-shadow: 0 1px 4px rgb(0 0 0 / 12%);
-  transition: transform 160ms ease;
-}
-
-.code-switcher__tab {
-  position: relative;
-  z-index: 1;
-  min-height: 1.875rem;
-  padding: 0 0.625rem;
-  border: 0;
-  border-radius: 5px;
-  color: var(--vp-c-text-2);
-  background: transparent;
-  font-size: 0.8125rem;
-  font-weight: 650;
-  line-height: 1;
-  cursor: pointer;
-}
-
-.code-switcher__tab--active {
-  color: var(--vp-c-text-1);
-}
-
-.code-switcher__tab:focus-visible {
-  outline: 2px solid var(--vp-c-brand-1);
-  outline-offset: 2px;
-}
-
-.code-switcher__body {
-  position: relative;
-  max-width: 100%;
-  overflow-x: auto;
-  background: var(--vp-code-bg);
-}
-
-.code-switcher__static {
-  min-width: 100%;
-  background: var(--vp-code-bg);
-}
-
-.code-switcher__static :deep(pre) {
-  width: max-content;
-  min-width: 100%;
-  margin: 0;
-  padding: 1rem 0;
-  border-radius: 0;
-  background: var(--vp-code-bg);
-  font-size: var(--kpo-code-font-size);
-  line-height: var(--kpo-code-line-height);
-}
-
-.code-switcher__static :deep(code) {
-  display: block;
-  box-sizing: border-box;
-  min-width: 100%;
-  padding: 0 1.125rem 0 0;
-  font-family: var(--vp-font-family-mono);
-  font-size: var(--kpo-code-font-size);
-  line-height: var(--kpo-code-line-height);
-  counter-reset: kpo-code-line;
-}
-
-.code-switcher__static :deep(.line) {
-  display: inline-block;
-  min-height: var(--kpo-code-line-height);
-  min-width: 100%;
-}
-
-.code-switcher__static :deep(.line::before) {
-  counter-increment: kpo-code-line;
-  content: counter(kpo-code-line);
-  display: inline-block;
-  width: 3.2em;
-  padding-right: 1.1em;
-  color: var(--vp-c-text-3);
-  text-align: right;
-  user-select: none;
-}
-
-.code-switcher__fallback-note {
-  margin: 0;
-  padding: 0.5rem 0.75rem;
-  border-top: 1px solid var(--vp-c-divider);
-  color: var(--vp-c-text-2);
-  background: var(--kpo-surface-soft);
-  font-size: 0.75rem;
-}
-
-@media (max-width: 640px) {
-  .code-switcher__header {
-    align-items: stretch;
-    flex-direction: column;
-  }
-
-  .code-switcher__tabs {
-    min-width: 0;
-    width: 100%;
-  }
-}
-</style>

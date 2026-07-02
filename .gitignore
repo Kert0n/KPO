@@ -1,5 +1,22 @@
+# Зависимости и артефакты сборки
 node_modules/
 .vitepress/cache/
 .vitepress/dist/
+
+# Системное, IDE и логи
 .DS_Store
+.idea/
+.claude/settings.local.json
 npm-debug.log*
+
+# Материалы редактора в папках лекций и дополнений:
+# публикуются (и коммитятся) только vitepress.md и его ресурсы (assets/).
+# Черновики, заметки, транскрипты, видео и PDF живут только локально.
+lectures/*/*
+!lectures/*/vitepress.md
+!lectures/*/assets/
+!lectures/*/assets/**
+extras/*/*
+!extras/*/vitepress.md
+!extras/*/assets/
+!extras/*/assets/**

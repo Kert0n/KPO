@@ -1,43 +1,26 @@
-import { computed, onMounted, ref } from 'vue'
+import { ref, type Ref } from 'vue'
 
-const storageKey = 'kpo:sidebar-hidden'
+/**
+ * Видимость сайдбара на десктопе.
+ *
+ * Состояние живёт только в памяти сессии: переживает SPA-переходы,
+ * но любая загрузка страницы начинается с видимым сайдбаром
+ * (решение пользователя — «по дефолту страница открывается с сайдбаром»).
+ * Поэтому ни localStorage, ни head-скрипта здесь нет.
+ *
+ * Класс kpo-sidebar-hidden на <html> управляет вёрсткой (layout.css).
+ */
+
 const sidebarHidden = ref(false)
-let initialized = false
 
-export function useSidebarVisibility() {
-  onMounted(initialize)
-
-  const label = computed(() => sidebarHidden.value ? 'Показать сайдбар' : 'Скрыть сайдбар')
-
-  function toggle(): void {
-    setSidebarHidden(!sidebarHidden.value)
-  }
-
-  function setSidebarHidden(value: boolean): void {
-    sidebarHidden.value = value
-
-    if (typeof window !== 'undefined') {
-      window.localStorage.setItem(storageKey, value ? '1' : '0')
-      applySidebarState(value)
-    }
-  }
-
-  return {
-    sidebarHidden,
-    label,
-    toggle,
-    setSidebarHidden
-  }
+export function useSidebarVisibility(): {
+  sidebarHidden: Ref<boolean>
+  setSidebarHidden: (value: boolean) => void
+} {
+  return { sidebarHidden, setSidebarHidden }
 }
 
-function initialize(): void {
-  if (initialized || typeof window === 'undefined') return
-
-  initialized = true
-  sidebarHidden.value = window.localStorage.getItem(storageKey) === '1'
-  applySidebarState(sidebarHidden.value)
-}
-
-function applySidebarState(value: boolean): void {
+function setSidebarHidden(value: boolean): void {
+  sidebarHidden.value = value
   document.documentElement.classList.toggle('kpo-sidebar-hidden', value)
 }

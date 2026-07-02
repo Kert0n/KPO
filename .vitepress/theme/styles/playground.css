@@ -1,0 +1,187 @@
+/**
+ * Kotlin Playground (CodeMirror 5) в цветах общей палитры.
+ *
+ * Атрибут theme плагину не передаётся, поэтому активна встроенная тема
+ * CodeMirror `default` (селекторы вида `.cm-s-default .cm-keyword`,
+ * специфичность 0,2,0). Наши селекторы `.kpo-playground .CodeMirror .cm-*`
+ * имеют специфичность 0,3,0 и перекрывают её без !important.
+ * Все цвета — переменные, переключающиеся классом .dark: смена темы
+ * сайта не требует пере-инициализации редактора.
+ */
+
+.kpo-playground {
+  background: var(--vp-code-block-bg);
+}
+
+.kpo-playground__skeleton {
+  padding: 0.75rem 1rem;
+  color: var(--vp-c-text-2);
+  font-size: 0.8125rem;
+}
+
+/* Убираем собственные рамки и отступы плейграунда: внешнюю «карточку»
+   даёт .kpo-switcher, метрики совпадают со статическими блоками */
+.kpo-playground .executable-fragment-wrapper {
+  margin: 0;
+  border: 0;
+}
+
+.kpo-playground .executable-fragment {
+  border: 0;
+}
+
+/* --- Редактор --- */
+
+.kpo-playground .CodeMirror {
+  height: auto;
+  background: var(--vp-code-block-bg);
+  color: var(--kpo-code-fg);
+  font-family: var(--vp-font-family-mono);
+  font-size: var(--vp-code-font-size);
+  line-height: var(--vp-code-line-height);
+}
+
+/* Вертикальные отступы как у статических блоков VitePress (20px) */
+.kpo-playground .CodeMirror-lines {
+  padding: 20px 0;
+}
+
+.kpo-playground .CodeMirror pre.CodeMirror-line,
+.kpo-playground .CodeMirror pre.CodeMirror-line-like {
+  padding: 0 24px 0 16px;
+}
+
+.kpo-playground .CodeMirror-gutters {
+  border-right: 1px solid var(--vp-code-block-divider-color);
+  background: var(--vp-code-block-bg);
+}
+
+.kpo-playground .CodeMirror-linenumber {
+  color: var(--kpo-code-line-number);
+  font-family: var(--vp-font-family-mono);
+  font-size: var(--vp-code-font-size);
+}
+
+.kpo-playground .CodeMirror-cursor {
+  border-left: 2px solid var(--kpo-code-cursor);
+}
+
+.kpo-playground .CodeMirror-selected,
+.kpo-playground .CodeMirror-focused .CodeMirror-selected {
+  background: var(--kpo-code-selection);
+}
+
+.kpo-playground .CodeMirror-activeline-background {
+  background: var(--vp-c-bg-soft);
+}
+
+.kpo-playground .CodeMirror-matchingbracket {
+  color: var(--kpo-code-fg);
+  text-decoration: underline;
+}
+
+/* --- Токены: те же цвета, что у Shiki-тем --- */
+
+.kpo-playground .CodeMirror .cm-keyword,
+.kpo-playground .CodeMirror .cm-atom {
+  color: var(--kpo-code-keyword);
+}
+
+.kpo-playground .CodeMirror .cm-string,
+.kpo-playground .CodeMirror .cm-string-2 {
+  color: var(--kpo-code-string);
+}
+
+.kpo-playground .CodeMirror .cm-number {
+  color: var(--kpo-code-number);
+}
+
+.kpo-playground .CodeMirror .cm-comment {
+  color: var(--kpo-code-comment);
+  font-style: italic;
+}
+
+.kpo-playground .CodeMirror .cm-def {
+  color: var(--kpo-code-function);
+}
+
+.kpo-playground .CodeMirror .cm-variable-2,
+.kpo-playground .CodeMirror .cm-property {
+  color: var(--kpo-code-field);
+}
+
+.kpo-playground .CodeMirror .cm-variable-3,
+.kpo-playground .CodeMirror .cm-type {
+  color: var(--kpo-code-type);
+}
+
+.kpo-playground .CodeMirror .cm-operator,
+.kpo-playground .CodeMirror .cm-variable,
+.kpo-playground .CodeMirror .cm-punctuation {
+  color: var(--kpo-code-fg);
+}
+
+.kpo-playground .CodeMirror .cm-meta {
+  color: var(--kpo-code-annotation);
+}
+
+/* --- Служебный UI плейграунда --- */
+
+.kpo-playground .run-button {
+  background-size: 50%;
+}
+
+/* Пустой контейнер вывода рисует светлую линию под редактором — убираем;
+   при появлении вывода разделитель даёт .output-wrapper */
+.kpo-playground .js-code-output-executor {
+  border-top: 0;
+}
+
+/* Инфо-строка компилятора у плагина позиционирована абсолютно и вылезает
+   за карточку (обрезается overflow). Ставим её в поток — аккуратный
+   футер со ссылкой «Open in Playground» внутри блока */
+.kpo-playground .compiler-info {
+  position: static;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 12px;
+  padding: 4px 12px;
+  border-top: 1px solid var(--vp-c-divider);
+  color: var(--vp-c-text-3);
+  font-family: var(--vp-font-family-base);
+  font-size: 0.6875rem;
+}
+
+.kpo-playground .compiler-info__open-editor {
+  color: var(--vp-c-text-2);
+}
+
+.kpo-playground .output-wrapper {
+  border-top: 1px solid var(--vp-c-divider);
+  background: var(--vp-c-bg-alt);
+  color: var(--vp-c-text-1);
+  font-family: var(--vp-font-family-mono);
+  font-size: var(--vp-code-font-size);
+  line-height: var(--vp-code-line-height);
+}
+
+.kpo-playground .code-output {
+  color: var(--vp-c-text-1);
+}
+
+/* Плагин красит текст вывода фиксированными цветами своей темы
+   (.standard-output.default — чёрный), что нечитаемо на тёмном фоне.
+   Перекрываем переменными палитры. */
+.kpo-playground .output-wrapper .standard-output {
+  color: var(--vp-c-text-1);
+}
+
+.kpo-playground .output-wrapper .error-output,
+.kpo-playground .output-wrapper .test-fail {
+  color: var(--vp-c-danger-1);
+}
+
+.kpo-playground .output-wrapper .test-passed {
+  color: var(--vp-c-success-1, var(--vp-c-tip-1));
+}
