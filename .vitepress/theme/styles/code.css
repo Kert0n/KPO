@@ -1,0 +1,229 @@
+/**
+ * Блоки кода и переключалка языков (CodeSwitcher).
+ * Fence-блоки внутри переключалки — обычная разметка VitePress,
+ * поэтому здесь только рамка-«карточка», шапка и правила видимости.
+ */
+
+/* Обычные fence-блоки: рамка как у панели редактора */
+.vp-doc div[class*='language-'] {
+  border: 1px solid var(--vp-c-divider);
+}
+
+/* ---------- CodeSwitcher ---------- */
+
+.kpo-switcher {
+  margin: 1.25rem 0;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 8px;
+  background: var(--vp-code-block-bg);
+  overflow: hidden;
+}
+
+.kpo-switcher__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--vp-c-divider);
+  background: var(--vp-c-bg-alt);
+}
+
+.kpo-switcher__title {
+  min-width: 0;
+  color: var(--vp-c-text-1);
+  font-size: 0.875rem;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.kpo-switcher__controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-left: auto;
+}
+
+/* Сегментированный контрол в духе IntelliJ New UI.
+   Высота контролов — общая переменная (--kpo-control-height, как у
+   поиска в топбаре): шапка одинакова у всех блоков и не меняется
+   при переключении языка. */
+.kpo-switcher__tabs {
+  display: flex;
+  height: var(--kpo-control-height);
+  padding: 2px;
+  border-radius: 7px;
+  background: var(--kpo-control-bg);
+}
+
+.kpo-switcher__tab {
+  padding: 0 12px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--vp-c-text-2);
+  font-family: var(--vp-font-family-base);
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.4;
+  cursor: pointer;
+  transition: color 0.15s, background-color 0.15s, box-shadow 0.15s;
+}
+
+.kpo-switcher__tab:hover {
+  color: var(--vp-c-text-1);
+}
+
+.kpo-switcher__tab--active {
+  background: var(--kpo-control-active);
+  color: var(--vp-c-text-1);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+}
+
+.kpo-switcher__tab:focus-visible,
+.kpo-switcher__playground-toggle:focus-visible {
+  outline: 2px solid var(--vp-c-brand-1);
+  outline-offset: 1px;
+}
+
+/* Кнопка Playground на блоке */
+.kpo-switcher__playground-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  box-sizing: border-box;
+  height: var(--kpo-control-height);
+  padding: 0 10px;
+  border: 1px solid var(--vp-c-border);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--vp-c-text-2);
+  font-family: var(--vp-font-family-base);
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.4;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s, background-color 0.15s;
+}
+
+.kpo-switcher__playground-toggle:hover {
+  color: var(--vp-c-text-1);
+  border-color: var(--vp-c-text-3);
+}
+
+/* Выбран не Kotlin: кнопка остаётся на месте, но неактивна —
+   геометрия шапки не меняется при переключении языка */
+.kpo-switcher__playground-toggle:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.kpo-switcher__playground-toggle:disabled:hover {
+  color: var(--vp-c-text-2);
+  border-color: var(--vp-c-border);
+}
+
+.kpo-switcher__playground-toggle[aria-pressed='true'] {
+  color: var(--vp-c-brand-1);
+  border-color: var(--vp-c-brand-1);
+  background: var(--vp-c-brand-soft);
+}
+
+.kpo-switcher__play-icon {
+  width: 10px;
+  height: 10px;
+  fill: currentColor;
+}
+
+/* Блоки кода внутри переключалки: показан только активный язык,
+   собственная рамка блока убирается — её даёт .kpo-switcher.
+   Префикс .vp-doc обязателен: правило темы для соседних блоков
+   (`div[class*='language-'] + div[class*='language-']` c margin -8px)
+   иначе перебивает наш margin: 0 и затаскивает код под шапку. */
+.vp-doc .kpo-switcher__blocks > div[class*='language-'] {
+  display: none;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+}
+
+/* Отдельное правило только про margin: у темы селектор соседних блоков
+   (div + div, специфичность 0,3,2) сильнее базового и ставит -8px */
+.vp-doc .kpo-switcher__blocks > div[class*='language-'] + div[class*='language-'] {
+  margin: 0;
+}
+
+.vp-doc .kpo-switcher__blocks > div[class*='language-'].active {
+  display: block;
+}
+
+/* Язык показан в табах — дублирующий ярлык VitePress не нужен */
+.kpo-switcher__blocks div[class*='language-'] .lang {
+  display: none;
+}
+
+/* ---------- Секции для конкретного языка ----------
+
+   ::: only <язык> (блок) и <LangOnly lang="..."> (в строке) видимы,
+   только когда выбран их язык. Управляется атрибутом html[data-kpo-lang]
+   (его ставит скрипт в <head> и useCodeLanguage) — чистый CSS,
+   без гидрации и мерцаний. display: contents убирает обёртку из
+   раскладки, поэтому работает и для абзацев, и внутри предложения. */
+
+.kpo-only {
+  display: none;
+}
+
+html[data-kpo-lang='kotlin'] .kpo-only--kotlin,
+html[data-kpo-lang='csharp'] .kpo-only--csharp,
+html[data-kpo-lang='java'] .kpo-only--java,
+html[data-kpo-lang='go'] .kpo-only--go,
+html:not([data-kpo-lang]) .kpo-only--kotlin {
+  display: contents;
+}
+
+/* ---------- Диаграммы Mermaid ---------- */
+
+.kpo-mermaid {
+  display: flex;
+  justify-content: center;
+  margin: 1.25rem 0;
+  padding: 1rem;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 8px;
+  background: var(--vp-c-bg);
+  overflow-x: auto;
+}
+
+.kpo-mermaid__canvas svg {
+  max-width: 100%;
+  height: auto;
+}
+
+.kpo-mermaid__loading {
+  color: var(--vp-c-text-2);
+  font-size: 0.8125rem;
+}
+
+.kpo-mermaid__fallback {
+  margin: 0;
+  color: var(--vp-c-text-2);
+  font-family: var(--vp-font-family-mono);
+  font-size: var(--vp-code-font-size);
+}
+
+@media (max-width: 639px) {
+  .kpo-switcher__controls {
+    margin-left: 0;
+    width: 100%;
+  }
+
+  .kpo-switcher__tabs {
+    flex: 1;
+  }
+
+  .kpo-switcher__tab {
+    flex: 1;
+  }
+}
