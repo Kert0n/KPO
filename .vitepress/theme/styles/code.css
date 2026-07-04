@@ -6,12 +6,16 @@
 
 /* Обычные fence-блоки: рамка как у панели редактора */
 .vp-doc div[class*='language-'] {
+  max-width: 100%;
   border: 1px solid var(--vp-c-divider);
 }
 
 /* ---------- CodeSwitcher ---------- */
 
 .kpo-switcher {
+  box-sizing: border-box;
+  max-width: 100%;
+  min-width: 0;
   margin: 1.25rem 0;
   border: 1px solid var(--vp-c-divider);
   border-radius: 8px;
@@ -191,18 +195,32 @@ html:not([data-kpo-lang]) .kpo-only--kotlin {
 /* ---------- Диаграммы Mermaid ---------- */
 
 .kpo-mermaid {
-  display: flex;
-  justify-content: center;
+  --kpo-mermaid-mobile-min-width: 720px;
+  --kpo-mermaid-mobile-min-height: 120px;
+  --kpo-mermaid-max-mobile-height: 70vh;
+
+  box-sizing: border-box;
+  display: block;
+  max-width: 100%;
+  min-width: 0;
   margin: 1.25rem 0;
   padding: 1rem;
   border: 1px solid var(--vp-c-divider);
   border-radius: 8px;
   background: var(--vp-c-bg);
-  overflow-x: auto;
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.kpo-mermaid__canvas {
+  box-sizing: border-box;
+  width: max-content;
+  margin-inline: auto;
 }
 
 .kpo-mermaid__canvas svg {
-  max-width: 100%;
+  display: block;
+  max-width: none !important;
   height: auto;
 }
 
@@ -244,6 +262,14 @@ html:not([data-kpo-lang]) .kpo-only--kotlin {
 }
 
 @media (max-width: 639px) {
+  .kpo-mermaid {
+    max-height: var(--kpo-mermaid-max-mobile-height);
+  }
+
+  .kpo-mermaid__canvas svg {
+    width: var(--kpo-mermaid-readable-width, var(--kpo-mermaid-view-width, auto)) !important;
+  }
+
   .kpo-switcher__header {
     align-items: stretch;
   }
@@ -266,5 +292,11 @@ html:not([data-kpo-lang]) .kpo-only--kotlin {
 
   .kpo-switcher__playground-toggle {
     flex: 0 0 auto;
+  }
+}
+
+@media (min-width: 640px) {
+  .kpo-mermaid__canvas svg {
+    width: var(--kpo-mermaid-view-width, auto) !important;
   }
 }

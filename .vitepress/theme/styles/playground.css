@@ -10,7 +10,10 @@
  */
 
 .kpo-playground {
+  max-width: 100%;
+  min-width: 0;
   background: var(--vp-code-block-bg);
+  overflow: auto;
 }
 
 .kpo-playground__skeleton {
@@ -33,6 +36,7 @@
 /* --- Редактор --- */
 
 .kpo-playground .CodeMirror {
+  max-width: 100%;
   height: auto;
   background: var(--vp-code-block-bg);
   color: var(--kpo-code-fg);
