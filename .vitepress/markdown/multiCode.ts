@@ -30,6 +30,7 @@ export type ContainerInfo = {
 export type MultiCodeFence = {
   token: Token
   language: string
+  playgroundOnly: boolean
 }
 
 export type MultiCodeMeta = {
@@ -38,6 +39,7 @@ export type MultiCodeMeta = {
   initialLang: string
   authorDefaultLang: string
   allowPlayground: boolean
+  playgroundCode: string
 }
 
 /**
@@ -88,12 +90,16 @@ export function multiCodePlugin(md: MarkdownIt): void {
       const authorDefaultAttribute = meta.authorDefaultLang
         ? ` author-default-lang="${meta.authorDefaultLang}"`
         : ''
+      const playgroundCodeAttribute = meta.playgroundCode
+        ? ` playground-code="${encodeURIComponent(meta.playgroundCode)}"`
+        : ''
 
       return `<CodeSwitcher title="${escapeAttribute(info.title)}"`
         + ` langs="${meta.languages.join(',')}"`
         + ` labels="${escapeAttribute(meta.labels.join(','))}"`
         + ` initial-lang="${meta.initialLang}"`
         + authorDefaultAttribute
+        + playgroundCodeAttribute
         + ` :allow-playground="${meta.allowPlayground}">\n`
     }
   })
@@ -133,13 +139,16 @@ export function collectCodeFences(tokens: Token[], openIndex: number): MultiCode
     if (token.type !== 'fence') continue
 
     const language = normalizeLanguage(token.info)
+    const playgroundOnly = isPlaygroundFence(token)
     if (seen.has(language)) {
-      console.warn(`[multi-code] повторный блок языка "${language}" — будет показан вместе с первым.`)
+      if (!playgroundOnly) {
+        console.warn(`[multi-code] повторный блок языка "${language}" — будет показан вместе с первым.`)
+      }
     } else {
       seen.add(language)
     }
 
-    fences.push({ token, language })
+    fences.push({ token, language, playgroundOnly })
   }
 
   return fences
@@ -155,23 +164,49 @@ export function resolveMultiCodeMeta(
   const authorDefaultLang = resolveAuthorDefault(requestedDefault, languages, token)
   const initialLang = authorDefaultLang || languages[0] || ''
   const playgroundOff = /^(off|none|false|0)$/i.test(info.options.get('playground') ?? '')
+  const playgroundCode = playgroundOff ? '' : playgroundFenceCode(fences)
   const allowPlayground = !playgroundOff && languages.includes('kotlin')
+
+  hidePlaygroundOnlyFences(fences)
 
   return {
     languages,
     labels: languages.map((lang) => languageLabels[lang] ?? lang),
     initialLang,
     authorDefaultLang,
-    allowPlayground
+    allowPlayground,
+    playgroundCode
   }
 }
 
 function uniqueLanguages(fences: MultiCodeFence[]): string[] {
   const languages: string[] = []
   for (const fence of fences) {
+    if (fence.playgroundOnly) continue
     if (!languages.includes(fence.language)) languages.push(fence.language)
   }
   return languages
+}
+
+function playgroundFenceCode(fences: MultiCodeFence[]): string {
+  return fences.find((fence) => fence.language === 'kotlin' && fence.playgroundOnly)?.token.content ?? ''
+}
+
+function hidePlaygroundOnlyFences(fences: MultiCodeFence[]): void {
+  for (const fence of fences) {
+    if (!fence.playgroundOnly) continue
+
+    fence.token.type = 'html_block'
+    fence.token.tag = ''
+    fence.token.info = ''
+    fence.token.content = ''
+    fence.token.children = null
+  }
+}
+
+function isPlaygroundFence(token: Token): boolean {
+  const parts = token.info.trim().toLowerCase().split(/\s+/)
+  return normalizeLanguage(token.info) === 'kotlin' && parts.includes('playground')
 }
 
 function resolveAuthorDefault(requestedDefault: string, languages: string[], token?: Token): string {
@@ -197,6 +232,7 @@ function markInitialFenceActive(fences: MultiCodeFence[], initialLang: string): 
   let marked = false
 
   for (const fence of fences) {
+    if (fence.playgroundOnly) continue
     fence.token.info = fence.token.info.replace(/(^|\s)active(?=\s|$)/g, '').trim()
 
     if (!marked && fence.language === initialLang) {

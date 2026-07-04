@@ -33,12 +33,14 @@ const props = withDefaults(defineProps<{
   initialLang?: string
   authorDefaultLang?: string
   allowPlayground?: boolean
+  playgroundCode?: string
 }>(), {
   title: '',
   labels: '',
   initialLang: '',
   authorDefaultLang: '',
-  allowPlayground: false
+  allowPlayground: false,
+  playgroundCode: ''
 })
 
 const { activeLanguage, setActiveLanguage } = useCodeLanguage()
@@ -96,7 +98,7 @@ const playgroundTitle = computed(() => {
 
 onMounted(() => {
   if (props.allowPlayground && hasKotlin.value) {
-    kotlinCode.value = extractKotlinCode()
+    kotlinCode.value = decodePlaygroundCode() || extractKotlinCode()
   }
   mounted.value = true
 })
@@ -126,6 +128,16 @@ function blockLanguage(block: Element): string {
 function extractKotlinCode(): string {
   const code = blocksElement.value?.querySelector(':scope > .language-kotlin pre code')
   return code?.textContent?.replace(/\n$/, '') ?? ''
+}
+
+function decodePlaygroundCode(): string {
+  if (!props.playgroundCode) return ''
+
+  try {
+    return decodeURIComponent(props.playgroundCode).replace(/\n$/, '')
+  } catch {
+    return props.playgroundCode.replace(/\n$/, '')
+  }
 }
 
 function tabLabel(index: number): string {

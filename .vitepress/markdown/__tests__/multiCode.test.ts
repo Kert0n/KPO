@@ -74,6 +74,30 @@ fun two() {}
     expect(warn).toHaveBeenCalledWith(expect.stringContaining('повторный блок языка "kotlin"'))
   })
 
+  it('uses kotlin playground fence as hidden interactive source', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    const html = render(`
+::: multi-code "Example"
+\`\`\`kotlin
+class User
+\`\`\`
+\`\`\`kotlin playground
+fun main() {
+  println("interactive")
+}
+\`\`\`
+\`\`\`go
+package main
+\`\`\`
+:::
+`)
+
+    expect(html).toContain('langs="kotlin,go"')
+    expect(html).toContain('playground-code=')
+    expect(html).not.toContain('println(&quot;interactive&quot;)')
+    expect(warn).not.toHaveBeenCalledWith(expect.stringContaining('повторный блок языка "kotlin"'))
+  })
+
   it('does not collect following fences after the container closes', () => {
     const html = render(`
 ::: multi-code "Example"
