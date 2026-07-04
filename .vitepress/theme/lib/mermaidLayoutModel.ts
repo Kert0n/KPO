@@ -15,6 +15,25 @@ export type ResolveMermaidManualScaleInput = {
   mode: MermaidViewportMode
 }
 
+export type MermaidOverflowState = {
+  hasOverflowX: boolean
+  hasOverflowY: boolean
+}
+
+export type ResolveMermaidOverflowInput = {
+  clientWidth: number
+  scrollWidth: number
+  clientHeight: number
+  scrollHeight: number
+  epsilon?: number
+}
+
+export type ShouldShowMermaidToolbarInput = MermaidOverflowState & {
+  hasManualScale: boolean
+  isHovered: boolean
+  isFocusWithin: boolean
+}
+
 export function readSvgViewBox(rendered: string): { width: number | null; height: number | null } {
   const match = rendered.match(/\sviewBox="([^"]+)"/)
   if (!match) return { width: null, height: null }
@@ -60,6 +79,40 @@ export function resolveMermaidRenderedWidth(width: number | null | undefined, sc
   const viewWidth = positive(width)
   if (!viewWidth) return null
   return Math.ceil(viewWidth * scale)
+}
+
+export function resolveMermaidOverflow(input: ResolveMermaidOverflowInput): MermaidOverflowState {
+  const epsilon = input.epsilon ?? 1
+
+  return {
+    hasOverflowX: input.scrollWidth > input.clientWidth + epsilon,
+    hasOverflowY: input.scrollHeight > input.clientHeight + epsilon
+  }
+}
+
+export function resolveCenteredScrollLeft(input: {
+  clientWidth: number
+  scrollWidth: number
+}): number {
+  return Math.max(0, Math.round((input.scrollWidth - input.clientWidth) / 2))
+}
+
+export function resolveScrollLeftForCenterRatio(input: {
+  centerRatio: number
+  clientWidth: number
+  scrollWidth: number
+}): number {
+  const maxScrollLeft = Math.max(0, input.scrollWidth - input.clientWidth)
+  const targetCenter = input.centerRatio * input.scrollWidth
+  return clamp(Math.round(targetCenter - input.clientWidth / 2), 0, maxScrollLeft)
+}
+
+export function shouldShowMermaidToolbar(input: ShouldShowMermaidToolbarInput): boolean {
+  return input.hasOverflowX
+    || input.hasOverflowY
+    || input.hasManualScale
+    || input.isHovered
+    || input.isFocusWithin
 }
 
 function positive(value: number | null | undefined): number | null {

@@ -9,6 +9,7 @@ import {
   parseCsv,
   resolveDisplayLanguage
 } from '../lib/codeBlockModel'
+import { preserveViewportAnchor } from '../lib/viewportAnchor'
 
 /**
  * Переключатель языка для примера кода.
@@ -44,6 +45,7 @@ const props = withDefaults(defineProps<{
 const { activeLanguage, setActiveLanguage } = useCodeLanguage()
 const { playgroundMode, setPlaygroundMode } = usePlaygroundMode()
 
+const rootElement = useTemplateRef('root')
 const blocksElement = useTemplateRef('blocks')
 const mounted = ref(false)
 const authorDefaultReleased = ref(false)
@@ -132,16 +134,24 @@ function tabLabel(index: number): string {
   return labelList.value[index] ?? langList.value[index]
 }
 
-function selectLanguage(lang: string): void {
-  authorDefaultReleased.value = true
+async function selectLanguage(lang: string): Promise<void> {
+  await preserveViewportAnchor(rootElement.value, () => {
+    authorDefaultReleased.value = true
 
-  if (isSupportedCodeLanguage(lang)) {
-    localUnsupportedLanguage.value = null
-    setActiveLanguage(lang)
-    return
-  }
+    if (isSupportedCodeLanguage(lang)) {
+      localUnsupportedLanguage.value = null
+      setActiveLanguage(lang)
+      return
+    }
 
-  localUnsupportedLanguage.value = lang
+    localUnsupportedLanguage.value = lang
+  })
+}
+
+async function togglePlayground(): Promise<void> {
+  await preserveViewportAnchor(rootElement.value, () => {
+    setPlaygroundMode(!playgroundMode.value)
+  }, { frames: 3 })
 }
 
 function onTabsKeydown(event: KeyboardEvent): void {
@@ -158,12 +168,12 @@ function onTabsKeydown(event: KeyboardEvent): void {
   if (next === undefined) return
 
   event.preventDefault()
-  selectLanguage(langs[(next + langs.length) % langs.length])
+  void selectLanguage(langs[(next + langs.length) % langs.length])
 }
 </script>
 
 <template>
-  <section class="kpo-switcher">
+  <section ref="root" class="kpo-switcher">
     <header class="kpo-switcher__header">
       <span v-if="title" class="kpo-switcher__title">{{ title }}</span>
 
@@ -175,7 +185,7 @@ function onTabsKeydown(event: KeyboardEvent): void {
           :disabled="!playgroundUsable"
           :aria-pressed="playgroundActive"
           :title="playgroundTitle"
-          @click="setPlaygroundMode(!playgroundMode)"
+          @click="togglePlayground"
         >
           <svg class="kpo-switcher__play-icon" viewBox="0 0 12 12" aria-hidden="true">
             <path d="M2.5 1.5 L10 6 L2.5 10.5 Z" />
@@ -198,7 +208,7 @@ function onTabsKeydown(event: KeyboardEvent): void {
             :class="{ 'kpo-switcher__tab--active': lang === displayLang }"
             :aria-selected="lang === displayLang"
             :tabindex="lang === displayLang ? 0 : -1"
-            @click="selectLanguage(lang)"
+            @click="void selectLanguage(lang)"
           >
             {{ tabLabel(index) }}
           </button>

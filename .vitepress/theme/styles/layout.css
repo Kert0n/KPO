@@ -321,6 +321,7 @@
 
 /* Широкие таблицы скроллятся локально и не расширяют страницу. */
 .vp-doc table {
+  box-sizing: border-box;
   display: block;
   max-width: 100%;
   margin: 20px 0;
@@ -372,6 +373,18 @@
     max-width: var(--kpo-wide-width);
     margin-left: auto;
     margin-right: auto;
+  }
+
+  html.kpo-sidebar-hidden .VPDoc.has-aside .vp-doc table {
+    width: min(100%, var(--kpo-wide-width));
+    margin-left: auto;
+    margin-right: auto;
+  }
+}
+
+@media (max-width: 639px) {
+  .vp-doc table {
+    width: 100%;
   }
 }
 
