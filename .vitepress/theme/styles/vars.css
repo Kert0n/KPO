@@ -22,6 +22,15 @@
   --kpo-control-height: 28px;
   --kpo-chip-height: 18px;
   --kpo-toggle-size: 24px;
+  --kpo-prose-width: 688px;
+  --kpo-wide-width: 960px;
+
+  /* Mermaid: авто-масштаб старается вписать диаграмму, но не делает её нечитаемой. */
+  --kpo-mermaid-desktop-min-scale: 0.72;
+  --kpo-mermaid-mobile-min-scale: 0.4;
+  --kpo-mermaid-mobile-min-width: 680px;
+  --kpo-mermaid-min-height: 120px;
+  --kpo-mermaid-max-mobile-height: 70vh;
 
   /* Поверхности: контент — «редактор», панели — «тулбары» */
   --vp-c-bg: #ffffff;

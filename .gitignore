@@ -21,3 +21,4 @@ extras/*/*
 !extras/*/vitepress.md
 !extras/*/assets/
 !extras/*/assets/**
+/.lecture-tree/
