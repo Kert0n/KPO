@@ -58,6 +58,21 @@ async function expectNoPageOverflowFromVpDoc(page: Page): Promise<void> {
   expect(result.overflow, JSON.stringify(result.offenders, null, 2)).toBe(0)
 }
 
+async function expectNoGlobalOverflowMask(page: Page): Promise<void> {
+  const result = await page.evaluate(() => {
+    const html = getComputedStyle(document.documentElement)
+    const body = getComputedStyle(document.body)
+
+    return {
+      htmlOverflowX: html.overflowX,
+      bodyOverflowX: body.overflowX
+    }
+  })
+
+  expect(result.htmlOverflowX).not.toBe('hidden')
+  expect(result.bodyOverflowX).not.toBe('hidden')
+}
+
 async function getMermaidMetrics(page: Page): Promise<Array<{
   index: number
   containerClientWidth: number
@@ -142,17 +157,22 @@ async function measureFirstWidth(page: Page, selector: string): Promise<number> 
 test('code switchers without author defaults follow the latest global language', async ({ page }) => {
   await clearStorage(page)
   await page.goto('lectures/02')
+  await waitForMermaid(page)
+  await expectNoGlobalOverflowMask(page)
+  await expectNoPageOverflowFromVpDoc(page)
 
   const switchers = page.locator('.kpo-switcher')
   await expect.poll(async () => switchers.count()).toBeGreaterThan(3)
 
   await switchers.nth(0).getByRole('tab', { name: 'Java' }).click()
+  await expectNoPageOverflowFromVpDoc(page)
 
   await expectActiveTab(switchers.nth(0), 'Java')
   await expectActiveTab(switchers.nth(1), 'Java')
   await expectActiveTab(switchers.nth(2), 'Java')
 
   await switchers.nth(1).getByRole('tab', { name: 'Kotlin' }).click()
+  await expectNoPageOverflowFromVpDoc(page)
 
   await expectActiveTab(switchers.nth(0), 'Kotlin')
   await expectActiveTab(switchers.nth(1), 'Kotlin')
@@ -169,11 +189,14 @@ test('author default beats restored language until that block is clicked', async
   const switcher = page.locator('.kpo-switcher').first()
   await expectActiveTab(switcher, 'Go')
   await expect(page.locator('.kpo-playground')).toHaveCount(0)
+  await expectNoPageOverflowFromVpDoc(page)
 
   await switcher.getByRole('tab', { name: 'Kotlin' }).click()
+  await expectNoPageOverflowFromVpDoc(page)
 
   await expectActiveTab(switcher, 'Kotlin')
   await expect(page.locator('.kpo-playground')).toHaveCount(1)
+  await expectNoPageOverflowFromVpDoc(page)
 })
 
 test('lecture 13 renders mermaid and keeps playground disabled for marked blocks', async ({ page }) => {
@@ -216,6 +239,7 @@ test('sidebar toggle does not navigate away from the current page', async ({ pag
   await expect.poll(async () => {
     return html.evaluate((node) => node.classList.contains('kpo-sidebar-hidden'))
   }).toBe(!wasHidden)
+  await expectNoPageOverflowFromVpDoc(page)
 })
 
 test('last updated footer uses european date with AM PM time', async ({ page }) => {
@@ -235,6 +259,7 @@ test('hidden sidebar expands wide content lane but keeps prose narrow', async ({
   const beforeUrl = page.url()
 
   await hideSidebar(page)
+  await expectNoPageOverflowFromVpDoc(page)
 
   const hidden = await measureWideLane(page)
 
@@ -252,6 +277,7 @@ test('moderately wide mermaid diagrams fit the expanded lane when sidebar is hid
   const openMetrics = await getMermaidMetrics(page)
 
   await hideSidebar(page)
+  await expectNoPageOverflowFromVpDoc(page)
 
   const hiddenMetrics = await getMermaidMetrics(page)
   const fitted = hiddenMetrics.filter((item) => {
@@ -274,6 +300,7 @@ test('very wide mermaid diagrams stay readable and scroll locally on desktop', a
   await page.goto('lectures/02')
   await waitForMermaid(page)
   await hideSidebar(page)
+  await expectNoPageOverflowFromVpDoc(page)
 
   const metrics = await getMermaidMetrics(page)
   const veryWide = metrics.filter((item) => {
@@ -307,14 +334,37 @@ test('mermaid zoom controls adjust scale without page overflow', async ({ page }
 
   await diagram.getByRole('button', { name: 'Увеличить диаграмму' }).click()
   await expect.poll(width).toBeGreaterThan(autoWidth)
+  await expectNoPageOverflowFromVpDoc(page)
 
   const zoomedWidth = await width()
   await diagram.getByRole('button', { name: 'Уменьшить диаграмму' }).click()
   await expect.poll(width).toBeLessThan(zoomedWidth)
+  await expectNoPageOverflowFromVpDoc(page)
 
   await diagram.getByRole('button', { name: 'Сбросить масштаб диаграммы' }).click()
   await expect.poll(width).toBeCloseTo(autoWidth, 0)
 
+  await expectNoPageOverflowFromVpDoc(page)
+})
+
+test('theme switch does not create page overflow or rely on global overflow masking', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await page.goto('lectures/01')
+  await waitForMermaid(page)
+
+  await expectNoGlobalOverflowMask(page)
+  await expectNoPageOverflowFromVpDoc(page)
+
+  await page.locator('.VPSwitchAppearance').first().click()
+  await page.waitForTimeout(500)
+
+  await expectNoGlobalOverflowMask(page)
+  await expectNoPageOverflowFromVpDoc(page)
+
+  await page.locator('.VPSwitchAppearance').first().click()
+  await page.waitForTimeout(500)
+
+  await expectNoGlobalOverflowMask(page)
   await expectNoPageOverflowFromVpDoc(page)
 })
 
