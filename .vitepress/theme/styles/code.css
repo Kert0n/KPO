@@ -195,10 +195,6 @@ html:not([data-kpo-lang]) .kpo-only--kotlin {
 /* ---------- Диаграммы Mermaid ---------- */
 
 .kpo-mermaid {
-  --kpo-mermaid-mobile-min-width: 720px;
-  --kpo-mermaid-mobile-min-height: 120px;
-  --kpo-mermaid-max-mobile-height: 70vh;
-
   box-sizing: border-box;
   display: block;
   max-width: 100%;
@@ -208,6 +204,57 @@ html:not([data-kpo-lang]) .kpo-only--kotlin {
   border: 1px solid var(--vp-c-divider);
   border-radius: 8px;
   background: var(--vp-c-bg);
+}
+
+.kpo-mermaid__toolbar {
+  display: flex;
+  justify-content: flex-end;
+  gap: 4px;
+  margin: 0 0 0.75rem;
+}
+
+.kpo-mermaid__zoom-button,
+.kpo-mermaid__zoom-reset {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 28px;
+  min-width: 28px;
+  padding: 0 8px;
+  border: 1px solid var(--vp-c-border);
+  border-radius: 6px;
+  background: var(--vp-c-bg-soft);
+  color: var(--vp-c-text-2);
+  font: inherit;
+  font-size: 0.8125rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.kpo-mermaid__zoom-button:hover,
+.kpo-mermaid__zoom-reset:hover:not(:disabled) {
+  color: var(--vp-c-text-1);
+  border-color: var(--vp-c-brand-1);
+}
+
+.kpo-mermaid__zoom-button:focus-visible,
+.kpo-mermaid__zoom-reset:focus-visible {
+  outline: 2px solid var(--vp-c-brand-1);
+  outline-offset: 2px;
+}
+
+.kpo-mermaid__zoom-reset {
+  min-width: 48px;
+  font-variant-numeric: tabular-nums;
+}
+
+.kpo-mermaid__zoom-reset:disabled {
+  cursor: default;
+  opacity: 0.72;
+}
+
+.kpo-mermaid__viewport {
+  max-width: 100%;
   overflow: auto;
   -webkit-overflow-scrolling: touch;
 }
@@ -220,6 +267,7 @@ html:not([data-kpo-lang]) .kpo-only--kotlin {
 
 .kpo-mermaid__canvas svg {
   display: block;
+  width: var(--kpo-mermaid-render-width, auto) !important;
   max-width: none !important;
   height: auto;
 }
@@ -262,12 +310,8 @@ html:not([data-kpo-lang]) .kpo-only--kotlin {
 }
 
 @media (max-width: 639px) {
-  .kpo-mermaid {
+  .kpo-mermaid__viewport {
     max-height: var(--kpo-mermaid-max-mobile-height);
-  }
-
-  .kpo-mermaid__canvas svg {
-    width: var(--kpo-mermaid-readable-width, var(--kpo-mermaid-view-width, auto)) !important;
   }
 
   .kpo-switcher__header {
@@ -292,11 +336,5 @@ html:not([data-kpo-lang]) .kpo-only--kotlin {
 
   .kpo-switcher__playground-toggle {
     flex: 0 0 auto;
-  }
-}
-
-@media (min-width: 640px) {
-  .kpo-mermaid__canvas svg {
-    width: var(--kpo-mermaid-view-width, auto) !important;
   }
 }

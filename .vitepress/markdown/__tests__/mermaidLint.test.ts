@@ -1,7 +1,8 @@
 import { readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
+import MarkdownIt from 'markdown-it'
 import { describe, expect, it } from 'vitest'
-import { lintMermaidCode } from '../mermaid'
+import { lintMermaidCode, mermaidPlugin } from '../mermaid'
 
 function extractMermaidBlocks(markdown: string): string[] {
   return [...markdown.matchAll(/```mermaid\n([\s\S]*?)```/g)].map((match) => match[1])
@@ -20,6 +21,16 @@ function markdownFiles(directory: string): string[] {
 }
 
 describe('mermaid lint', () => {
+  it('wraps rendered diagrams as wide blocks', () => {
+    const md = new MarkdownIt()
+    md.use(mermaidPlugin)
+
+    const html = md.render('```mermaid\nflowchart LR\n  A --> B\n```\n')
+
+    expect(html).toContain('<div class="kpo-wide-block kpo-wide-block--mermaid">')
+    expect(html).toContain('<MermaidDiagram')
+  })
+
   it('catches unquoted labels with parens', () => {
     expect(lintMermaidCode('flowchart TD\n  Node[Method(x)] --> Other[Ok]')).toEqual([
       expect.objectContaining({

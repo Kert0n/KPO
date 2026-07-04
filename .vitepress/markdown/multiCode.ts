@@ -70,7 +70,7 @@ export function multiCodePlugin(md: MarkdownIt): void {
   md.use(container, 'multi-code', {
     render(tokens: Token[], index: number) {
       const token = tokens[index]
-      if (token.nesting === -1) return '</CodeSwitcher>\n'
+      if (token.nesting === -1) return '</CodeSwitcher>\n</div>\n'
 
       const info = parseContainerInfo(token)
       warnUnsupportedOptions(info, token)
@@ -80,7 +80,8 @@ export function multiCodePlugin(md: MarkdownIt): void {
 
       if (meta.languages.length === 0) {
         console.warn('[multi-code] контейнер без блоков кода:', token.info)
-        return `<CodeSwitcher title="${escapeAttribute(info.title)}" langs="">\n`
+        return '<div class="kpo-wide-block kpo-wide-block--code">\n'
+          + `<CodeSwitcher title="${escapeAttribute(info.title)}" langs="">\n`
       }
 
       markInitialFenceActive(fences, meta.initialLang)
@@ -89,7 +90,8 @@ export function multiCodePlugin(md: MarkdownIt): void {
         ? ` author-default-lang="${meta.authorDefaultLang}"`
         : ''
 
-      return `<CodeSwitcher title="${escapeAttribute(info.title)}"`
+      return '<div class="kpo-wide-block kpo-wide-block--code">\n'
+        + `<CodeSwitcher title="${escapeAttribute(info.title)}"`
         + ` langs="${meta.languages.join(',')}"`
         + ` labels="${escapeAttribute(meta.labels.join(','))}"`
         + ` initial-lang="${meta.initialLang}"`
