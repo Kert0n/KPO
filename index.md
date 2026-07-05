@@ -27,7 +27,4 @@ features:
   - icon: ⚡️
     title: Интерактивный Kotlin
     details: Примеры на Kotlin запускаются прямо на странице через Kotlin Playground — код можно менять и выполнять.
-  - icon: 🎨
-    title: Темы JetBrains
-    details: Светлая и тёмная темы в духе IntelliJ IDEA — единая палитра для текста, кода и редактора.
 ---
