@@ -1,7 +1,7 @@
 import type MarkdownIt from 'markdown-it'
 import type Token from 'markdown-it/lib/token.mjs'
 
-const TABLE_OPEN = '<div class="kpo-content-block kpo-content-block--table kpo-content-block--wide">\n'
+const TABLE_OPEN = '<div class="kpo-content-block kpo-content-block--table kpo-content-block--wide" data-kpo-content-kind="table">\n'
 const TABLE_CLOSE = '</div>\n'
 const CODE_OPEN = '<div class="kpo-content-block kpo-content-block--code kpo-content-block--wide">\n'
 const CODE_CLOSE = '</div>\n'

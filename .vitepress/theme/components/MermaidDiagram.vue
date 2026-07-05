@@ -58,6 +58,7 @@ const scaleConfig = ref({
 let renderCounter = 0
 let resizeObserver: ResizeObserver | null = null
 let isProgrammaticScroll = false
+let programmaticScrollLeft: number | null = null
 const instanceId = props.diagramId ?? `kpo-mermaid-${stableHash(decodedCode.value)}`
 
 onMounted(() => {
@@ -291,13 +292,26 @@ function setViewportScrollLeft(scrollLeft: number): void {
 
   isProgrammaticScroll = true
   element.scrollLeft = scrollLeft
+  programmaticScrollLeft = element.scrollLeft
   window.requestAnimationFrame(() => {
     isProgrammaticScroll = false
+    programmaticScrollLeft = null
   })
 }
 
 function onViewportScroll(): void {
-  if (isProgrammaticScroll) return
+  const element = viewport.value
+  if (
+    isProgrammaticScroll &&
+    element &&
+    programmaticScrollLeft !== null &&
+    Math.abs(element.scrollLeft - programmaticScrollLeft) <= 2
+  ) {
+    return
+  }
+
+  isProgrammaticScroll = false
+  programmaticScrollLeft = null
   userScrolledViewport.value = true
 }
 

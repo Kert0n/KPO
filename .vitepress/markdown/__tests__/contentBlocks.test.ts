@@ -17,6 +17,7 @@ describe('contentBlocksPlugin', () => {
     const html = render('| A | B |\n| - | - |\n| 1 | 2 |\n')
 
     expect(html).toContain('kpo-content-block kpo-content-block--table kpo-content-block--wide')
+    expect(html).toContain('data-kpo-content-kind="table"')
     expect(html).toContain('<table>')
     expect(html).toContain('</table>\n</div>')
   })

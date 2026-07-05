@@ -7,6 +7,8 @@ const ANCHOR_TOLERANCE_PX = 4
 const DESKTOP_PROSE_TOLERANCE_PX = 12
 const MIN_READABLE_MERMAID_HEIGHT_PX = CONTENT_LAYOUT_TOKENS.mermaidMinHeight
 
+type AdaptiveTableMode = 'fit' | 'wrap' | 'scroll'
+
 async function clearStorage(page: Page): Promise<void> {
   await page.addInitScript(() => {
     localStorage.clear()
@@ -30,6 +32,17 @@ async function waitForMermaid(page: Page): Promise<void> {
     const diagrams = [...document.querySelectorAll('.kpo-mermaid')]
     return diagrams.every((diagram) => {
       return diagram.querySelector('svg') || diagram.querySelector('.kpo-mermaid__error')
+    })
+  })
+}
+
+async function waitForAdaptiveTables(page: Page): Promise<void> {
+  await page.waitForFunction(() => {
+    const tableBlocks = [...document.querySelectorAll('.kpo-content-block--table')]
+    return tableBlocks.every((block) => {
+      return block.classList.contains('kpo-table--fit') ||
+        block.classList.contains('kpo-table--wrap') ||
+        block.classList.contains('kpo-table--scroll')
     })
   })
 }
@@ -63,6 +76,54 @@ async function expectNoPageOverflowFromVpDoc(page: Page): Promise<void> {
   })
 
   expect(result.overflow, JSON.stringify(result.offenders, null, 2)).toBe(0)
+}
+
+async function getAdaptiveTableStates(page: Page): Promise<Array<{
+  mode: AdaptiveTableMode | 'none'
+  display: string
+  tableLayout: string
+  cellOverflowWrap: string
+  blockOverflowX: string
+  blockScrollWidth: number
+  blockClientWidth: number
+  hasLocalScroll: boolean
+  right: number
+  viewport: number
+  columnCount: number
+}>> {
+  return page.locator('.kpo-content-block--table').evaluateAll((nodes) => {
+    return nodes.map((node) => {
+      const block = node as HTMLElement
+      const table = block.querySelector('table') as HTMLTableElement | null
+      const firstCell = table?.querySelector('th, td') as HTMLElement | null
+      const rect = block.getBoundingClientRect()
+      const mode = block.classList.contains('kpo-table--fit')
+        ? 'fit'
+        : block.classList.contains('kpo-table--wrap')
+          ? 'wrap'
+          : block.classList.contains('kpo-table--scroll')
+            ? 'scroll'
+            : 'none'
+      const row = table?.tHead?.rows.item(0) ?? table?.rows.item(0) ?? null
+      const columnCount = row
+        ? [...row.cells].reduce((count, cell) => count + Math.max(1, cell.colSpan || 1), 0)
+        : 0
+
+      return {
+        mode,
+        display: table ? getComputedStyle(table).display : '',
+        tableLayout: table ? getComputedStyle(table).tableLayout : '',
+        cellOverflowWrap: firstCell ? getComputedStyle(firstCell).overflowWrap : '',
+        blockOverflowX: getComputedStyle(block).overflowX,
+        blockScrollWidth: block.scrollWidth,
+        blockClientWidth: block.clientWidth,
+        hasLocalScroll: block.scrollWidth > block.clientWidth + 1,
+        right: Math.round(rect.right),
+        viewport: document.documentElement.clientWidth,
+        columnCount
+      }
+    })
+  })
 }
 
 async function expectNoGlobalOverflowMask(page: Page): Promise<void> {
@@ -742,7 +803,9 @@ test('wide tables are centered in the hidden-sidebar wide lane', async ({ page }
   for (const route of ['lectures/12', 'lectures/14']) {
     await page.goto(route)
     await waitForMermaid(page)
+    await waitForAdaptiveTables(page)
     await hideSidebar(page)
+    await waitForAdaptiveTables(page)
 
     const tableBlocks = page.locator('.kpo-content-block--table')
     const states = await tableBlocks.evaluateAll((nodes) => {
@@ -784,10 +847,12 @@ test('wide elements use the expanded lane when sidebar is hidden', async ({ page
   for (const item of cases) {
     await page.goto(item.route)
     await waitForMermaid(page)
+    await waitForAdaptiveTables(page)
 
     if (item.playground) {
       await page.evaluate(() => localStorage.setItem('kpo:playground-mode', '1'))
       await page.reload()
+      await waitForAdaptiveTables(page)
       await page.locator('.kpo-switcher').first().getByRole('tab', { name: 'Kotlin' }).click()
     }
 
@@ -828,42 +893,129 @@ test('content pages do not create horizontal page overflow on mobile', async ({ 
   ]) {
     await page.goto(route)
     await waitForMermaid(page)
+    await waitForAdaptiveTables(page)
     await expectNoPageOverflowFromVpDoc(page)
   }
 })
 
-test('wide markdown tables scroll locally on mobile', async ({ page }) => {
+test('published markdown tables all use the adaptive table contract on mobile', async ({ page }) => {
   await page.setViewportSize(LAYOUT_VIEWPORTS.mobilePhone)
 
-  for (const route of ['lectures/12', 'lectures/14']) {
+  for (const route of [
+    'intro',
+    'lectures/01',
+    'lectures/02',
+    'lectures/03',
+    'lectures/04',
+    'lectures/05',
+    'lectures/06',
+    'lectures/07',
+    'lectures/08',
+    'lectures/09',
+    'lectures/10',
+    'lectures/11',
+    'lectures/12',
+    'lectures/13',
+    'lectures/14',
+    'extras/',
+    'extras/01',
+    'extras/02',
+    'conclusion'
+  ]) {
     await page.goto(route)
     await waitForMermaid(page)
+    await waitForAdaptiveTables(page)
 
-    const states = await page.locator('.kpo-content-block--table').evaluateAll((nodes) => {
-      return nodes.map((node) => {
-        const block = node as HTMLElement
-        const rect = block.getBoundingClientRect()
-        const style = getComputedStyle(block)
-        return {
-          display: style.display,
-          overflowX: style.overflowX,
-          right: Math.round(rect.right),
-          viewport: document.documentElement.clientWidth,
-          hasLocalScroll: block.scrollWidth > block.clientWidth + 1
-        }
-      })
+    const result = await page.evaluate(() => {
+      const orphanTables = [...document.querySelectorAll('.vp-doc table')]
+        .filter((table) => !table.closest('.kpo-content-block--table'))
+        .map((table) => String(table.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 120))
+
+      const unresolvedTables = [...document.querySelectorAll('.kpo-content-block--table')]
+        .filter((block) => {
+          return !block.classList.contains('kpo-table--fit') &&
+            !block.classList.contains('kpo-table--wrap') &&
+            !block.classList.contains('kpo-table--scroll')
+        })
+        .map((block) => String(block.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 120))
+
+      return { orphanTables, unresolvedTables }
     })
 
-    expect(states.length).toBeGreaterThan(0)
-
-    for (const state of states) {
-      expect(state.display).toBe('block')
-      expect(['auto', 'scroll']).toContain(state.overflowX)
-      expect(state.right).toBeLessThanOrEqual(state.viewport)
-    }
-
+    expect(result, route).toEqual({
+      orphanTables: [],
+      unresolvedTables: []
+    })
     await expectNoPageOverflowFromVpDoc(page)
   }
+})
+
+test('markdown tables wrap before falling back to local scroll on mobile', async ({ page }) => {
+  await page.setViewportSize(LAYOUT_VIEWPORTS.mobilePhone)
+
+  await page.goto('lectures/14')
+  await waitForMermaid(page)
+  await waitForAdaptiveTables(page)
+
+  const states = await getAdaptiveTableStates(page)
+  const wrapped = states.filter((state) => state.mode === 'wrap')
+
+  expect(states.length).toBeGreaterThan(0)
+  expect(wrapped.length, JSON.stringify(states, null, 2)).toBeGreaterThan(0)
+
+  for (const state of wrapped) {
+    expect(state.display).toBe('table')
+    expect(state.tableLayout).toBe('fixed')
+    expect(state.cellOverflowWrap).toBe('anywhere')
+    expect(state.hasLocalScroll, JSON.stringify(state)).toBe(false)
+    expect(state.blockScrollWidth).toBeLessThanOrEqual(state.blockClientWidth + CONTENT_LAYOUT_TOKENS.tableOverflowEpsilon)
+  }
+
+  for (const state of states) {
+    expect(['auto', 'scroll']).toContain(state.blockOverflowX)
+    expect(state.right).toBeLessThanOrEqual(state.viewport)
+  }
+
+  await expectNoPageOverflowFromVpDoc(page)
+})
+
+test('dense markdown tables keep overflow local after wrap is not readable', async ({ page }) => {
+  await page.setViewportSize(LAYOUT_VIEWPORTS.mobilePhone)
+  await page.goto('lectures/01')
+  await waitForMermaid(page)
+  await waitForAdaptiveTables(page)
+
+  const states = await getAdaptiveTableStates(page)
+  const dense = states.filter((state) => state.mode === 'scroll')
+
+  expect(dense.length, JSON.stringify(states, null, 2)).toBeGreaterThan(0)
+
+  for (const state of dense) {
+    expect(state.display).toBe('table')
+    expect(state.tableLayout).toBe('auto')
+    expect(state.hasLocalScroll, JSON.stringify(state)).toBe(true)
+    expect(state.columnCount * CONTENT_LAYOUT_TOKENS.tableDenseMinColumnWidth)
+      .toBeGreaterThan(state.blockClientWidth)
+  }
+
+  await expectNoPageOverflowFromVpDoc(page)
+})
+
+test('markdown tables preserve native table display in every adaptive mode', async ({ page }) => {
+  await page.setViewportSize(LAYOUT_VIEWPORTS.mobilePhone)
+  await page.goto('lectures/14')
+  await waitForMermaid(page)
+  await waitForAdaptiveTables(page)
+
+  const states = await getAdaptiveTableStates(page)
+
+  expect(states.length).toBeGreaterThan(0)
+  for (const state of states) {
+    expect(state.mode).not.toBe('none')
+    expect(state.display).toBe('table')
+  }
+
+  await expectNoPageOverflowFromVpDoc(page)
 })
 
 test('wide mermaid diagrams keep readable size and scroll locally on mobile', async ({ page }) => {

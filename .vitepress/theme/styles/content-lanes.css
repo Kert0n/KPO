@@ -29,6 +29,7 @@
 
 .kpo-content-block--table {
   display: block;
+  max-width: 100%;
   margin: 20px auto;
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
@@ -36,9 +37,38 @@
 
 .vp-doc .kpo-content-block--table > table {
   display: table;
+  margin: 0;
+}
+
+.vp-doc .kpo-table--fit > table {
+  width: 100%;
+  min-width: 100%;
+  table-layout: auto;
+}
+
+.vp-doc .kpo-table--wrap > table {
+  width: 100%;
+  min-width: 100%;
+  table-layout: fixed;
+}
+
+.vp-doc .kpo-table--scroll > table {
   width: max-content;
   min-width: 100%;
-  margin: 0;
+  table-layout: auto;
+}
+
+.vp-doc .kpo-table--wrap th,
+.vp-doc .kpo-table--wrap td {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: normal;
+  hyphens: auto;
+}
+
+.vp-doc .kpo-table--scroll th,
+.vp-doc .kpo-table--scroll td {
+  overflow-wrap: anywhere;
 }
 
 .vp-doc > table {

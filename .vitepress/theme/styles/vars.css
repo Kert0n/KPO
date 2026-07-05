@@ -33,6 +33,8 @@
   --kpo-mermaid-wide-diagram-min-width: 680px;
   --kpo-mermaid-min-height: 120px;
   --kpo-mermaid-max-mobile-height: 70vh;
+  --kpo-table-min-readable-column-width: 112px;
+  --kpo-table-dense-min-column-width: 88px;
 
   /* Поверхности: контент — «редактор», панели — «тулбары» */
   --vp-c-bg: #ffffff;

@@ -12,7 +12,10 @@ export const CONTENT_LAYOUT_TOKENS = {
   mermaidManualMobileMinScale: 0.35,
   mermaidManualMaxScale: 1.5,
   mermaidMinHeight: 120,
-  mermaidWideDiagramMinWidth: 680
+  mermaidWideDiagramMinWidth: 680,
+  tableMinReadableColumnWidth: 112,
+  tableDenseMinColumnWidth: 88,
+  tableOverflowEpsilon: 1
 } as const
 
 export const LAYOUT_VIEWPORTS = {

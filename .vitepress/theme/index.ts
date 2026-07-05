@@ -5,6 +5,7 @@ import CodeSwitcher from './components/CodeSwitcher.vue'
 import LangOnly from './components/LangOnly.vue'
 import MermaidDiagram from './components/MermaidDiagram.vue'
 import SidebarToggle from './components/SidebarToggle.vue'
+import { installAdaptiveTables } from './lib/adaptiveTables'
 
 import '@fontsource-variable/inter'
 import '@fontsource-variable/jetbrains-mono'
@@ -27,9 +28,10 @@ export default {
       'nav-bar-content-before': () => h(SidebarToggle)
     })
   },
-  enhanceApp({ app }) {
+  enhanceApp({ app, router }) {
     app.component('CodeSwitcher', CodeSwitcher)
     app.component('LangOnly', LangOnly)
     app.component('MermaidDiagram', MermaidDiagram)
+    installAdaptiveTables(router)
   }
 } satisfies Theme
