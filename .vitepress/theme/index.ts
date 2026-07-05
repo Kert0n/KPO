@@ -11,6 +11,8 @@ import '@fontsource-variable/jetbrains-mono'
 
 import './styles/vars.css'
 import './styles/layout.css'
+import './styles/vitepress-adapter.css'
+import './styles/content-lanes.css'
 import './styles/code.css'
 import './styles/playground.css'
 

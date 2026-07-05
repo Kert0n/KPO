@@ -34,7 +34,7 @@ export function mermaidPlugin(md: MarkdownIt): void {
       })
 
       const diagramId = `kpo-mermaid-${stableHash(`${lineOffset}:${token.content}`)}`
-      return '<div class="kpo-wide-block kpo-wide-block--mermaid">\n'
+      return '<div class="kpo-content-block kpo-content-block--mermaid kpo-content-block--wide kpo-wide-block kpo-wide-block--mermaid">\n'
         + `<MermaidDiagram code="${encodeURIComponent(token.content)}" diagram-id="${diagramId}"></MermaidDiagram>\n`
         + '</div>\n'
     }

@@ -1,0 +1,21 @@
+/**
+ * Adapter for VitePress default-theme internals. This is the only stylesheet
+ * that should know about .VPDoc/.content-container/.aside structure.
+ */
+
+@media (min-width: 960px) {
+  html.kpo-sidebar-hidden .VPDoc.has-aside > .container > .aside {
+    display: none !important;
+  }
+
+  html.kpo-sidebar-hidden .VPDoc.has-aside > .container > .content {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  html.kpo-sidebar-hidden .VPDoc.has-aside > .container > .content > .content-container {
+    max-width: min(100%, var(--kpo-wide-width)) !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+  }
+}

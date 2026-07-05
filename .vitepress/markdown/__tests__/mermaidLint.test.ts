@@ -27,7 +27,8 @@ describe('mermaid lint', () => {
 
     const html = md.render('```mermaid\nflowchart LR\n  A --> B\n```\n')
 
-    expect(html).toContain('<div class="kpo-wide-block kpo-wide-block--mermaid">')
+    expect(html).toContain('kpo-content-block--mermaid')
+    expect(html).toContain('kpo-wide-block--mermaid')
     expect(html).toContain('<MermaidDiagram')
   })
 
