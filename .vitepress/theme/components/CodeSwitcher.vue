@@ -9,7 +9,7 @@ import {
   parseCsv,
   resolveDisplayLanguage
 } from '../lib/codeBlockModel'
-import { preserveViewportAnchor } from '../lib/viewportAnchor'
+import { preserveBlockViewportPosition } from '../lib/interactiveBlockTransaction'
 
 /**
  * Переключатель языка для примера кода.
@@ -135,7 +135,7 @@ function tabLabel(index: number): string {
 }
 
 async function selectLanguage(lang: string): Promise<void> {
-  await preserveViewportAnchor(rootElement.value, () => {
+  await preserveBlockViewportPosition(rootElement.value, () => {
     authorDefaultReleased.value = true
 
     if (isSupportedCodeLanguage(lang)) {
@@ -149,7 +149,7 @@ async function selectLanguage(lang: string): Promise<void> {
 }
 
 async function togglePlayground(): Promise<void> {
-  await preserveViewportAnchor(rootElement.value, () => {
+  await preserveBlockViewportPosition(rootElement.value, () => {
     setPlaygroundMode(!playgroundMode.value)
   }, { frames: 3 })
 }
