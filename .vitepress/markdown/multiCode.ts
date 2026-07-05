@@ -82,7 +82,7 @@ export function multiCodePlugin(md: MarkdownIt): void {
 
       if (meta.languages.length === 0) {
         console.warn('[multi-code] контейнер без блоков кода:', token.info)
-        return '<div class="kpo-wide-block kpo-wide-block--code">\n'
+        return '<div class="kpo-content-block kpo-content-block--multi-code kpo-content-block--wide kpo-wide-block kpo-wide-block--code">\n'
           + `<CodeSwitcher title="${escapeAttribute(info.title)}" langs="">\n`
       }
 
@@ -95,7 +95,7 @@ export function multiCodePlugin(md: MarkdownIt): void {
         ? ` playground-code="${encodeURIComponent(meta.playgroundCode)}"`
         : ''
 
-      return '<div class="kpo-wide-block kpo-wide-block--code">\n'
+      return '<div class="kpo-content-block kpo-content-block--multi-code kpo-content-block--wide kpo-wide-block kpo-wide-block--code">\n'
         + `<CodeSwitcher title="${escapeAttribute(info.title)}"`
         + ` langs="${meta.languages.join(',')}"`
         + ` labels="${escapeAttribute(meta.labels.join(','))}"`

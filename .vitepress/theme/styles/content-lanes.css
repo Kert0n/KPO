@@ -1,0 +1,178 @@
+/**
+ * Content lanes define how authored Markdown participates in the document
+ * layout. Prose stays readable; wide blocks get a page-centered lane and own
+ * any necessary local scrolling.
+ */
+
+.vp-doc {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.vp-doc > * {
+  max-width: 100%;
+}
+
+.kpo-content-block,
+.kpo-wide-block {
+  box-sizing: border-box;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.kpo-content-block--wide,
+.kpo-wide-block {
+  width: 100%;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.kpo-content-block--table {
+  display: block;
+  max-width: 100%;
+  margin: 20px auto;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.vp-doc .kpo-content-block--table > table {
+  display: table;
+  margin: 0;
+}
+
+.vp-doc .kpo-table--fit > table {
+  width: 100%;
+  min-width: 100%;
+  table-layout: auto;
+}
+
+.vp-doc .kpo-table--wrap > table {
+  width: 100%;
+  min-width: 100%;
+  table-layout: fixed;
+}
+
+.vp-doc .kpo-table--scroll > table {
+  width: max-content;
+  min-width: 100%;
+  table-layout: auto;
+}
+
+.vp-doc .kpo-table--wrap th,
+.vp-doc .kpo-table--wrap td {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: normal;
+  hyphens: auto;
+}
+
+.vp-doc .kpo-table--scroll th,
+.vp-doc .kpo-table--scroll td {
+  overflow-wrap: anywhere;
+}
+
+.vp-doc > table {
+  box-sizing: border-box;
+  display: block;
+  max-width: 100%;
+  margin: 20px 0;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.vp-doc p,
+.vp-doc li {
+  line-height: 1.75;
+}
+
+.vp-doc h1,
+.vp-doc h2,
+.vp-doc h3 {
+  letter-spacing: -0.01em;
+}
+
+.vp-doc blockquote {
+  border-left: 3px solid var(--vp-c-brand-1);
+  border-radius: 0 6px 6px 0;
+  padding: 0.75rem 1rem;
+  background: var(--vp-c-bg-soft);
+  color: var(--vp-c-text-2);
+}
+
+.vp-doc blockquote > p {
+  margin: 0;
+}
+
+.vp-doc p,
+.vp-doc li,
+.vp-doc h1,
+.vp-doc h2,
+.vp-doc h3,
+.vp-doc h4,
+.vp-doc h5,
+.vp-doc h6,
+.vp-doc blockquote,
+.vp-doc .custom-block,
+.vp-doc .custom-block p,
+.vp-doc .custom-block li,
+.vp-doc th,
+.vp-doc td {
+  min-width: 0;
+  overflow-wrap: break-word;
+}
+
+.vp-doc a,
+.vp-doc code:not(pre code),
+.vp-doc .kpo-lang-only {
+  overflow-wrap: anywhere;
+}
+
+.vp-doc img,
+.vp-doc video {
+  max-width: 100%;
+  height: auto;
+}
+
+.vp-doc div[class*='language-'] {
+  max-width: 100%;
+}
+
+@media (min-width: 960px) {
+  html.kpo-sidebar-hidden .VPDoc.has-aside .vp-doc > div {
+    max-width: 100%;
+  }
+
+  html.kpo-sidebar-hidden .VPDoc.has-aside .vp-doc :where(
+    p:not(:has(> img:only-child)),
+    ul,
+    ol,
+    blockquote,
+    .custom-block,
+    h1,
+    h2,
+    h3,
+    h4,
+    h5,
+    h6
+  ) {
+    max-width: var(--kpo-prose-width);
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  html.kpo-sidebar-hidden .VPDoc.has-aside .vp-doc :where(
+    .kpo-content-block--wide,
+    .kpo-wide-block,
+    p:has(> img:only-child)
+  ) {
+    max-width: 100%;
+    margin-left: auto;
+    margin-right: auto;
+  }
+}
+
+@media (max-width: 639px) {
+  .kpo-content-block--table {
+    width: 100%;
+  }
+}

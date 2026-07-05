@@ -197,6 +197,7 @@ html:not([data-kpo-lang]) .kpo-only--kotlin {
 .kpo-mermaid {
   box-sizing: border-box;
   display: block;
+  position: relative;
   max-width: 100%;
   min-width: 0;
   margin: 1.25rem 0;
@@ -210,7 +211,18 @@ html:not([data-kpo-lang]) .kpo-only--kotlin {
   display: flex;
   justify-content: flex-end;
   gap: 4px;
+  min-height: 28px;
   margin: 0 0 0.75rem;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+}
+
+.kpo-mermaid:hover .kpo-mermaid__toolbar,
+.kpo-mermaid:focus-within .kpo-mermaid__toolbar,
+.kpo-mermaid--controls-visible .kpo-mermaid__toolbar {
+  opacity: 1;
+  pointer-events: auto;
 }
 
 .kpo-mermaid__zoom-button,
@@ -269,7 +281,38 @@ html:not([data-kpo-lang]) .kpo-only--kotlin {
   display: block;
   width: var(--kpo-mermaid-render-width, auto) !important;
   max-width: none !important;
-  height: auto;
+  height: var(--kpo-mermaid-render-height, auto) !important;
+}
+
+.kpo-mermaid svg p {
+  margin: 0;
+  line-height: inherit;
+}
+
+.kpo-mermaid svg .edgeLabel,
+.kpo-mermaid svg .edgeLabel .label,
+.kpo-mermaid svg .edgeLabel span {
+  background: var(--vp-c-bg) !important;
+  color: var(--vp-c-text-1) !important;
+}
+
+.kpo-mermaid svg .nodeLabel,
+.kpo-mermaid svg .label,
+.kpo-mermaid svg foreignObject,
+.kpo-mermaid svg foreignObject * {
+  color: var(--vp-c-text-1) !important;
+}
+
+.kpo-mermaid svg .labelBkg {
+  fill: var(--vp-c-bg) !important;
+}
+
+.kpo-mermaid svg .node rect,
+.kpo-mermaid svg .node circle,
+.kpo-mermaid svg .node ellipse,
+.kpo-mermaid svg .node polygon,
+.kpo-mermaid svg .node path {
+  stroke: var(--vp-c-border) !important;
 }
 
 .kpo-mermaid__loading {

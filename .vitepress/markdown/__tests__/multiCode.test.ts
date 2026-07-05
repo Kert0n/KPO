@@ -28,7 +28,8 @@ package main
     expect(html).toContain('author-default-lang="go"')
     expect(html).toContain('initial-lang="go"')
     expect(html).toContain('langs="kotlin,go"')
-    expect(html).toContain('<div class="kpo-wide-block kpo-wide-block--code">')
+    expect(html).toContain('kpo-content-block--multi-code')
+    expect(html).toContain('kpo-wide-block--code')
   })
 
   it('warns on invalid default and uses first language', () => {

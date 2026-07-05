@@ -1,4 +1,5 @@
 import type MarkdownIt from 'markdown-it'
+import { contentBlocksPlugin } from './contentBlocks'
 import { mermaidPlugin } from './mermaid'
 import { langOnlyPlugin, multiCodePlugin } from './multiCode'
 
@@ -17,4 +18,5 @@ export function applyMarkdownExtensions(md: MarkdownIt): void {
   md.use(multiCodePlugin)
   md.use(langOnlyPlugin)
   md.use(mermaidPlugin)
+  md.use(contentBlocksPlugin)
 }
