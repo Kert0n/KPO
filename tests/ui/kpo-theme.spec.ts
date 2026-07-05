@@ -1,4 +1,11 @@
 import { expect, test, type Locator, type Page } from '@playwright/test'
+import { CONTENT_LAYOUT_TOKENS, LAYOUT_VIEWPORTS } from '../../.vitepress/theme/lib/contentLayoutTokens'
+
+const CENTER_TOLERANCE_PX = 2
+const SCALE_TOLERANCE = 0.05
+const ANCHOR_TOLERANCE_PX = 4
+const DESKTOP_PROSE_TOLERANCE_PX = 12
+const MIN_READABLE_MERMAID_HEIGHT_PX = CONTENT_LAYOUT_TOKENS.mermaidMinHeight
 
 async function clearStorage(page: Page): Promise<void> {
   await page.addInitScript(() => {
@@ -164,9 +171,25 @@ async function measureViewportRelativeTo(locator: Locator): Promise<number> {
 async function expectViewportAnchorStable(
   before: number,
   after: number,
-  tolerance = 4
+  tolerance = ANCHOR_TOLERANCE_PX
 ): Promise<void> {
   expect(Math.abs(after - before)).toBeLessThanOrEqual(tolerance)
+}
+
+async function expectCenteredAgainstPage(page: Page, locator: Locator): Promise<void> {
+  const result = await locator.evaluate((node) => {
+    const rect = node.getBoundingClientRect()
+    return {
+      centerDelta: Math.abs((rect.left + rect.right) / 2 - document.documentElement.clientWidth / 2),
+      left: rect.left,
+      right: rect.right,
+      viewport: document.documentElement.clientWidth
+    }
+  })
+
+  expect(result.centerDelta, JSON.stringify(result)).toBeLessThanOrEqual(CENTER_TOLERANCE_PX)
+  expect(result.left).toBeGreaterThanOrEqual(-CENTER_TOLERANCE_PX)
+  expect(result.right).toBeLessThanOrEqual(result.viewport + CENTER_TOLERANCE_PX)
 }
 
 test('code switchers without author defaults follow the latest global language', async ({ page }) => {
@@ -229,7 +252,7 @@ test('lecture 13 renders mermaid and keeps playground disabled for marked blocks
 })
 
 test('lecture 02 mobile layout has no pdf text code overflow', async ({ page }) => {
-  await page.setViewportSize({ width: 414, height: 896 })
+  await page.setViewportSize(LAYOUT_VIEWPORTS.mobilePhone)
   await clearStorage(page)
   await page.goto('lectures/02')
   await waitForMermaid(page)
@@ -266,7 +289,7 @@ test('last updated footer uses european date with AM PM time', async ({ page }) 
 })
 
 test('hidden sidebar expands wide content lane but keeps prose narrow', async ({ page }) => {
-  await page.setViewportSize({ width: 1440, height: 900 })
+  await page.setViewportSize(LAYOUT_VIEWPORTS.desktop)
   await page.goto('lectures/02')
   await waitForMermaid(page)
 
@@ -281,37 +304,60 @@ test('hidden sidebar expands wide content lane but keeps prose narrow', async ({
   await expect(page).toHaveURL(beforeUrl)
   expect(hidden.contentContainerWidth).toBeGreaterThan(open.contentContainerWidth + 200)
   expect(hidden.mermaidWideBlockWidth).toBeGreaterThan(open.mermaidWideBlockWidth + 200)
-  expect(hidden.paragraphWidth).toBeLessThanOrEqual(700)
+  expect(hidden.paragraphWidth).toBeLessThanOrEqual(
+    Number.parseInt(CONTENT_LAYOUT_TOKENS.proseWidth, 10) + DESKTOP_PROSE_TOLERANCE_PX
+  )
   await expectNoPageOverflowFromVpDoc(page)
 })
 
 test('moderately wide mermaid diagrams fit the expanded lane when sidebar is hidden', async ({ page }) => {
-  await page.setViewportSize({ width: 1440, height: 900 })
-  await page.goto('lectures/02')
-  await waitForMermaid(page)
-  const openMetrics = await getMermaidMetrics(page)
+  await page.setViewportSize(LAYOUT_VIEWPORTS.desktop)
+  const fitted = []
 
-  await hideSidebar(page)
-  await expectNoPageOverflowFromVpDoc(page)
+  for (const route of ['lectures/02', 'lectures/14']) {
+    await page.goto(route)
+    await waitForMermaid(page)
+    const openMetrics = await getMermaidMetrics(page)
 
-  const hiddenMetrics = await getMermaidMetrics(page)
-  const fitted = hiddenMetrics.filter((item) => {
-    return openMetrics[item.index]?.hasLocalXScroll && !item.hasLocalXScroll
-  })
+    await hideSidebar(page)
+    await expectNoPageOverflowFromVpDoc(page)
+
+    const hiddenMetrics = await getMermaidMetrics(page)
+    fitted.push(...hiddenMetrics.filter((item) => {
+      return openMetrics[item.index]?.hasLocalXScroll && !item.hasLocalXScroll
+    }))
+  }
 
   expect(fitted.length).toBeGreaterThan(0)
 
   for (const item of fitted) {
     expect(item.hasLocalXScroll).toBe(false)
     expect(item.svgWidth).toBeLessThanOrEqual(item.containerClientWidth + 1)
-    expect(Math.abs(item.scaleX - item.scaleY)).toBeLessThan(0.05)
+    expect(Math.abs(item.scaleX - item.scaleY)).toBeLessThan(SCALE_TOLERANCE)
+  }
+
+  await expectNoPageOverflowFromVpDoc(page)
+})
+
+test('small mermaid diagrams are not auto-upscaled on mobile', async ({ page }) => {
+  await page.setViewportSize(LAYOUT_VIEWPORTS.mobilePhone)
+  await page.goto('lectures/01')
+  await expect.poll(async () => page.locator('.kpo-mermaid').count()).toBeGreaterThan(0)
+  await waitForMermaid(page)
+
+  const metrics = await getMermaidMetrics(page)
+  expect(metrics.length).toBeGreaterThan(0)
+
+  for (const item of metrics) {
+    expect(item.scaleX, JSON.stringify(item)).toBeLessThanOrEqual(1 + SCALE_TOLERANCE)
+    expect(Math.abs(item.scaleX - item.scaleY)).toBeLessThan(SCALE_TOLERANCE)
   }
 
   await expectNoPageOverflowFromVpDoc(page)
 })
 
 test('very wide mermaid diagrams stay readable and scroll locally on desktop', async ({ page }) => {
-  await page.setViewportSize({ width: 1440, height: 900 })
+  await page.setViewportSize(LAYOUT_VIEWPORTS.desktop)
   await page.goto('lectures/02')
   await waitForMermaid(page)
   await hideSidebar(page)
@@ -319,23 +365,47 @@ test('very wide mermaid diagrams stay readable and scroll locally on desktop', a
 
   const metrics = await getMermaidMetrics(page)
   const veryWide = metrics.filter((item) => {
-    return item.viewBoxWidth > item.containerClientWidth / 0.72
+    return item.viewBoxWidth > item.containerClientWidth / CONTENT_LAYOUT_TOKENS.mermaidDesktopMinScale
   })
 
   expect(veryWide.length).toBeGreaterThan(0)
 
   for (const item of veryWide) {
-    expect(item.scaleX).toBeGreaterThanOrEqual(0.71)
-    expect(item.svgHeight).toBeGreaterThanOrEqual(120)
-    expect(Math.abs(item.scaleX - item.scaleY)).toBeLessThan(0.05)
+    expect(item.scaleX).toBeGreaterThanOrEqual(CONTENT_LAYOUT_TOKENS.mermaidDesktopMinScale - 0.01)
+    expect(item.svgHeight).toBeGreaterThanOrEqual(MIN_READABLE_MERMAID_HEIGHT_PX)
+    expect(Math.abs(item.scaleX - item.scaleY)).toBeLessThan(SCALE_TOLERANCE)
     expect(item.hasLocalXScroll).toBe(true)
   }
 
   await expectNoPageOverflowFromVpDoc(page)
 })
 
+test('hidden sidebar enters focused-wide mode and removes the outline from layout', async ({ page }) => {
+  await page.setViewportSize(LAYOUT_VIEWPORTS.desktop)
+  await page.goto('lectures/14')
+  await hideSidebar(page)
+
+  const state = await page.evaluate(() => {
+    const aside = document.querySelector('.VPDoc.has-aside > .container > .aside')
+    const contentContainer = document.querySelector('.VPDoc.has-aside > .container > .content > .content-container')
+    const rect = contentContainer?.getBoundingClientRect()
+    const style = aside ? getComputedStyle(aside) : null
+    return {
+      asideDisplay: style?.display ?? null,
+      centerDelta: rect
+        ? Math.abs((rect.left + rect.right) / 2 - document.documentElement.clientWidth / 2)
+        : Number.NaN
+    }
+  })
+
+  expect(state.asideDisplay).toBe('none')
+  expect(state.centerDelta).toBeLessThanOrEqual(CENTER_TOLERANCE_PX)
+  await expectCenteredAgainstPage(page, page.locator('.kpo-content-block--table').first())
+  await expectNoPageOverflowFromVpDoc(page)
+})
+
 test('mermaid zoom controls adjust scale without page overflow', async ({ page }) => {
-  await page.setViewportSize({ width: 1440, height: 900 })
+  await page.setViewportSize(LAYOUT_VIEWPORTS.desktop)
   await page.goto('lectures/02')
   await waitForMermaid(page)
 
@@ -363,7 +433,7 @@ test('mermaid zoom controls adjust scale without page overflow', async ({ page }
 })
 
 test('theme switch does not create page overflow or rely on global overflow masking', async ({ page }) => {
-  await page.setViewportSize({ width: 1440, height: 900 })
+  await page.setViewportSize(LAYOUT_VIEWPORTS.desktop)
   await page.goto('lectures/01')
   await waitForMermaid(page)
 
@@ -384,7 +454,7 @@ test('theme switch does not create page overflow or rely on global overflow mask
 })
 
 test('language click preserves viewport position inside the interacted code block', async ({ page }) => {
-  await page.setViewportSize({ width: 1440, height: 900 })
+  await page.setViewportSize(LAYOUT_VIEWPORTS.desktop)
   await clearStorage(page)
   await page.goto('lectures/02')
   await waitForMermaid(page)
@@ -403,7 +473,7 @@ test('language click preserves viewport position inside the interacted code bloc
 })
 
 test('keyboard language switch preserves viewport position inside the interacted code block', async ({ page }) => {
-  await page.setViewportSize({ width: 1440, height: 900 })
+  await page.setViewportSize(LAYOUT_VIEWPORTS.desktop)
   await clearStorage(page)
   await page.goto('lectures/02')
   await waitForMermaid(page)
@@ -423,7 +493,7 @@ test('keyboard language switch preserves viewport position inside the interacted
 })
 
 test('playground toggle preserves viewport position inside the interacted code block', async ({ page }) => {
-  await page.setViewportSize({ width: 1440, height: 900 })
+  await page.setViewportSize(LAYOUT_VIEWPORTS.desktop)
   await clearStorage(page)
   await page.goto('lectures/02')
   await waitForMermaid(page)
@@ -443,8 +513,8 @@ test('playground toggle preserves viewport position inside the interacted code b
 
 test('overflowing mermaid diagrams start centered in their local viewport', async ({ page }) => {
   for (const viewport of [
-    { width: 414, height: 896 },
-    { width: 960, height: 900 }
+    LAYOUT_VIEWPORTS.mobilePhone,
+    LAYOUT_VIEWPORTS.narrowDesktop
   ]) {
     await page.setViewportSize(viewport)
     await page.goto('lectures/02')
@@ -474,7 +544,7 @@ test('overflowing mermaid diagrams start centered in their local viewport', asyn
 })
 
 test('manual mermaid scroll is preserved across zoom and reset recenters', async ({ page }) => {
-  await page.setViewportSize({ width: 414, height: 896 })
+  await page.setViewportSize(LAYOUT_VIEWPORTS.mobilePhone)
   await page.goto('lectures/02')
   await waitForMermaid(page)
 
@@ -517,7 +587,7 @@ test('manual mermaid scroll is preserved across zoom and reset recenters', async
 })
 
 test('mermaid zoom controls visibility follows overflow, hover and focus', async ({ page }) => {
-  await page.setViewportSize({ width: 1440, height: 900 })
+  await page.setViewportSize(LAYOUT_VIEWPORTS.desktop)
   await page.goto('lectures/02')
   await waitForMermaid(page)
   await hideSidebar(page)
@@ -541,7 +611,7 @@ test('mermaid zoom controls visibility follows overflow, hover and focus', async
   await expect(toolbar).toHaveCSS('opacity', '1')
   await expectNoPageOverflowFromVpDoc(page)
 
-  await page.setViewportSize({ width: 414, height: 896 })
+  await page.setViewportSize(LAYOUT_VIEWPORTS.mobilePhone)
   await page.goto('lectures/02')
   await waitForMermaid(page)
 
@@ -551,7 +621,7 @@ test('mermaid zoom controls visibility follows overflow, hover and focus', async
 })
 
 test('mermaid dark theme keeps label colors readable and token-based', async ({ page }) => {
-  await page.setViewportSize({ width: 1440, height: 900 })
+  await page.setViewportSize(LAYOUT_VIEWPORTS.desktop)
   await page.goto('lectures/01')
   await waitForMermaid(page)
 
@@ -619,7 +689,7 @@ test('mermaid dark theme keeps label colors readable and token-based', async ({ 
 })
 
 test('mermaid text and foreignObject labels are not clipped', async ({ page }) => {
-  await page.setViewportSize({ width: 1440, height: 900 })
+  await page.setViewportSize(LAYOUT_VIEWPORTS.desktop)
 
   for (const route of ['lectures/01', 'lectures/02', 'lectures/03', 'lectures/11', 'lectures/14']) {
     await page.goto(route)
@@ -667,47 +737,46 @@ test('mermaid text and foreignObject labels are not clipped', async ({ page }) =
 })
 
 test('wide tables are centered in the hidden-sidebar wide lane', async ({ page }) => {
-  await page.setViewportSize({ width: 1440, height: 900 })
+  await page.setViewportSize(LAYOUT_VIEWPORTS.desktop)
 
   for (const route of ['lectures/12', 'lectures/14']) {
     await page.goto(route)
     await waitForMermaid(page)
     await hideSidebar(page)
 
-    const states = await page.locator('.vp-doc table').evaluateAll((nodes) => {
-      const container = document.querySelector('.VPDoc .content-container')?.getBoundingClientRect()
+    const tableBlocks = page.locator('.kpo-content-block--table')
+    const states = await tableBlocks.evaluateAll((nodes) => {
       return nodes.map((node) => {
         const rect = node.getBoundingClientRect()
-        const containerCenter = container ? (container.left + container.right) / 2 : 0
-        const tableCenter = (rect.left + rect.right) / 2
+        const pageCenter = document.documentElement.clientWidth / 2
         return {
-          centerDelta: Math.round(Math.abs(tableCenter - containerCenter)),
+          centerDelta: Math.round(Math.abs((rect.left + rect.right) / 2 - pageCenter)),
           left: Math.round(rect.left),
           right: Math.round(rect.right),
-          containerLeft: Math.round(container?.left ?? 0),
-          containerRight: Math.round(container?.right ?? 0)
+          viewport: document.documentElement.clientWidth,
+          width: Math.round(rect.width)
         }
       })
     })
 
     expect(states.length).toBeGreaterThan(0)
     for (const state of states) {
-      expect(state.centerDelta).toBeLessThanOrEqual(2)
-      expect(state.left).toBeGreaterThanOrEqual(state.containerLeft - 1)
-      expect(state.right).toBeLessThanOrEqual(state.containerRight + 1)
+      expect(state.centerDelta, JSON.stringify(state)).toBeLessThanOrEqual(CENTER_TOLERANCE_PX)
+      expect(state.left).toBeGreaterThanOrEqual(-CENTER_TOLERANCE_PX)
+      expect(state.right).toBeLessThanOrEqual(state.viewport + CENTER_TOLERANCE_PX)
     }
     await expectNoPageOverflowFromVpDoc(page)
   }
 })
 
 test('wide elements use the expanded lane when sidebar is hidden', async ({ page }) => {
-  await page.setViewportSize({ width: 1440, height: 900 })
+  await page.setViewportSize(LAYOUT_VIEWPORTS.desktop)
 
   const cases = [
     { route: 'lectures/02', selector: '.kpo-wide-block--mermaid' },
     { route: 'lectures/02', selector: '.kpo-wide-block--code' },
-    { route: 'lectures/12', selector: '.vp-doc table' },
-    { route: 'lectures/13', selector: '.vp-doc div[class*="language-"]' },
+    { route: 'lectures/12', selector: '.kpo-content-block--table' },
+    { route: 'lectures/13', selector: '.kpo-content-block--code' },
     { route: 'lectures/02', selector: '.vp-doc p:has(> img:only-child)' },
     { route: 'extras/01', selector: '.kpo-playground', playground: true }
   ] as const
@@ -734,7 +803,7 @@ test('wide elements use the expanded lane when sidebar is hidden', async ({ page
 })
 
 test('content pages do not create horizontal page overflow on mobile', async ({ page }) => {
-  await page.setViewportSize({ width: 414, height: 896 })
+  await page.setViewportSize(LAYOUT_VIEWPORTS.mobilePhone)
 
   for (const route of [
     'intro',
@@ -764,23 +833,23 @@ test('content pages do not create horizontal page overflow on mobile', async ({ 
 })
 
 test('wide markdown tables scroll locally on mobile', async ({ page }) => {
-  await page.setViewportSize({ width: 414, height: 896 })
+  await page.setViewportSize(LAYOUT_VIEWPORTS.mobilePhone)
 
   for (const route of ['lectures/12', 'lectures/14']) {
     await page.goto(route)
     await waitForMermaid(page)
 
-    const states = await page.locator('.vp-doc table').evaluateAll((nodes) => {
+    const states = await page.locator('.kpo-content-block--table').evaluateAll((nodes) => {
       return nodes.map((node) => {
-        const table = node as HTMLElement
-        const rect = table.getBoundingClientRect()
-        const style = getComputedStyle(table)
+        const block = node as HTMLElement
+        const rect = block.getBoundingClientRect()
+        const style = getComputedStyle(block)
         return {
           display: style.display,
           overflowX: style.overflowX,
           right: Math.round(rect.right),
           viewport: document.documentElement.clientWidth,
-          hasLocalScroll: table.scrollWidth > table.clientWidth + 1
+          hasLocalScroll: block.scrollWidth > block.clientWidth + 1
         }
       })
     })
@@ -798,7 +867,8 @@ test('wide markdown tables scroll locally on mobile', async ({ page }) => {
 })
 
 test('wide mermaid diagrams keep readable size and scroll locally on mobile', async ({ page }) => {
-  await page.setViewportSize({ width: 414, height: 896 })
+  await page.setViewportSize(LAYOUT_VIEWPORTS.mobilePhone)
+  let checkedWideDiagrams = 0
 
   for (const route of ['lectures/02', 'lectures/11', 'lectures/14']) {
     await page.goto(route)
@@ -807,24 +877,31 @@ test('wide mermaid diagrams keep readable size and scroll locally on mobile', as
     const metrics = await getMermaidMetrics(page)
     const wide = metrics.filter((item) => item.viewBoxWidth > item.containerClientWidth)
 
-    expect(wide.length).toBeGreaterThan(0)
+    checkedWideDiagrams += wide.length
 
     for (const item of wide) {
-      expect(item.svgWidth).toBeGreaterThanOrEqual(680)
-      expect(item.svgHeight).toBeGreaterThanOrEqual(120)
-      expect(Math.abs(item.scaleX - item.scaleY)).toBeLessThan(0.05)
-      expect(item.hasLocalXScroll).toBe(true)
+      expect(item.scaleX).toBeLessThanOrEqual(1 + SCALE_TOLERANCE)
+      expect(item.scaleX).toBeGreaterThanOrEqual(CONTENT_LAYOUT_TOKENS.mermaidMobileMinScale - 0.01)
+      if (item.scaleX < 1 - SCALE_TOLERANCE) {
+        expect(item.svgHeight).toBeGreaterThanOrEqual(MIN_READABLE_MERMAID_HEIGHT_PX)
+      }
+      expect(Math.abs(item.scaleX - item.scaleY)).toBeLessThan(SCALE_TOLERANCE)
+      if (item.svgWidth > item.containerClientWidth + 1) {
+        expect(item.hasLocalXScroll).toBe(true)
+      }
     }
 
     await expectNoPageOverflowFromVpDoc(page)
   }
+
+  expect(checkedWideDiagrams).toBeGreaterThan(0)
 })
 
 test('special content elements are viewport-contained on mobile', async ({ page }) => {
-  await page.setViewportSize({ width: 414, height: 896 })
+  await page.setViewportSize(LAYOUT_VIEWPORTS.mobilePhone)
 
   const cases = [
-    { route: 'lectures/12', selector: '.vp-doc table' },
+    { route: 'lectures/12', selector: '.kpo-content-block--table' },
     { route: 'lectures/13', selector: '.kpo-mermaid' },
     { route: 'lectures/02', selector: '.kpo-switcher' },
     { route: 'extras/01', selector: '.kpo-playground', playground: true },
@@ -832,7 +909,7 @@ test('special content elements are viewport-contained on mobile', async ({ page 
     { route: 'intro', selector: '.vp-doc blockquote' },
     { route: 'lectures/02', selector: '.vp-doc img' },
     { route: 'extras/01', selector: '.vp-doc code:not(pre code)' },
-    { route: 'lectures/13', selector: '.vp-doc div[class*="language-"]' },
+    { route: 'lectures/13', selector: '.kpo-content-block--code' },
     { route: 'lectures/14', selector: '.vp-doc h1, .vp-doc h2, .vp-doc h3' }
   ] as const
 
