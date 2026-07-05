@@ -281,7 +281,7 @@ html:not([data-kpo-lang]) .kpo-only--kotlin {
   display: block;
   width: var(--kpo-mermaid-render-width, auto) !important;
   max-width: none !important;
-  height: auto;
+  height: var(--kpo-mermaid-render-height, auto) !important;
 }
 
 .kpo-mermaid svg p {

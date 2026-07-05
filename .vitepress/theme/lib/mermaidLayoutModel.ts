@@ -3,10 +3,12 @@ export type MermaidViewportMode = 'desktop' | 'mobile'
 export type ResolveMermaidAutoScaleInput = {
   viewBoxWidth?: number | null
   viewBoxHeight?: number | null
+  naturalWidth?: number | null
+  naturalHeight?: number | null
   availableWidth?: number | null
   minScale: number
   minHeight: number
-  minRenderedWidth?: number
+  wideDiagramMinWidth?: number
 }
 
 export type ResolveMermaidManualScaleInput = {
@@ -47,26 +49,28 @@ export function readSvgViewBox(rendered: string): { width: number | null; height
 }
 
 export function resolveMermaidAutoScale(input: ResolveMermaidAutoScaleInput): number {
-  const width = positive(input.viewBoxWidth)
+  const width = positive(input.naturalWidth) ?? positive(input.viewBoxWidth)
   const availableWidth = positive(input.availableWidth)
   if (!width || !availableWidth) return 1
 
-  const height = positive(input.viewBoxHeight)
+  const height = positive(input.naturalHeight) ?? positive(input.viewBoxHeight)
   const minScale = positive(input.minScale) ?? 1
   const fitScale = availableWidth / width
-  let scale = fitScale >= 1 ? 1 : Math.max(fitScale, minScale)
+  if (fitScale >= 1) return 1
+
+  let scale = Math.max(fitScale, minScale)
 
   const minHeight = positive(input.minHeight)
   if (height && minHeight) {
-    scale = Math.max(scale, minHeight / height)
+    scale = Math.max(scale, Math.min(1, minHeight / height))
   }
 
-  const minRenderedWidth = positive(input.minRenderedWidth)
-  if (minRenderedWidth) {
-    scale = Math.max(scale, minRenderedWidth / width)
+  const wideDiagramMinWidth = positive(input.wideDiagramMinWidth)
+  if (wideDiagramMinWidth && width >= wideDiagramMinWidth) {
+    scale = Math.max(scale, wideDiagramMinWidth / width)
   }
 
-  return roundScale(scale)
+  return roundScale(Math.min(1, scale))
 }
 
 export function resolveMermaidManualScale(input: ResolveMermaidManualScaleInput): number {
@@ -79,6 +83,12 @@ export function resolveMermaidRenderedWidth(width: number | null | undefined, sc
   const viewWidth = positive(width)
   if (!viewWidth) return null
   return Math.ceil(viewWidth * scale)
+}
+
+export function resolveMermaidRenderedHeight(height: number | null | undefined, scale: number): number | null {
+  const viewHeight = positive(height)
+  if (!viewHeight) return null
+  return Math.ceil(viewHeight * scale)
 }
 
 export function resolveMermaidOverflow(input: ResolveMermaidOverflowInput): MermaidOverflowState {

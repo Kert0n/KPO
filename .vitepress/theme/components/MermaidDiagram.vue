@@ -1,17 +1,20 @@
 <script setup lang="ts">
 import { useData } from 'vitepress'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { CONTENT_LAYOUT_TOKENS } from '../lib/contentLayoutTokens'
 import {
   readSvgViewBox,
   resolveCenteredScrollLeft,
   resolveMermaidAutoScale,
   resolveMermaidManualScale,
   resolveMermaidOverflow,
+  resolveMermaidRenderedHeight,
   resolveMermaidRenderedWidth,
   resolveScrollLeftForCenterRatio,
   shouldShowMermaidToolbar,
   type MermaidViewportMode
 } from '../lib/mermaidLayoutModel'
+import { createMermaidConfig } from '../lib/mermaidThemeModel'
 import { waitAnimationFrames } from '../lib/viewportAnchor'
 
 /**
@@ -46,10 +49,10 @@ const hovered = ref(false)
 const focusWithin = ref(false)
 const textRisk = ref(false)
 const scaleConfig = ref({
-  desktopMinScale: 0.72,
-  mobileMinScale: 0.4,
-  mobileMinWidth: 680,
-  minHeight: 120
+  desktopMinScale: CONTENT_LAYOUT_TOKENS.mermaidDesktopMinScale,
+  mobileMinScale: CONTENT_LAYOUT_TOKENS.mermaidMobileMinScale,
+  wideDiagramMinWidth: CONTENT_LAYOUT_TOKENS.mermaidWideDiagramMinWidth,
+  minHeight: CONTENT_LAYOUT_TOKENS.mermaidMinHeight
 })
 
 let renderCounter = 0
@@ -86,9 +89,7 @@ const autoScale = computed(() => {
       ? scaleConfig.value.mobileMinScale
       : scaleConfig.value.desktopMinScale,
     minHeight: scaleConfig.value.minHeight,
-    minRenderedWidth: viewportMode.value === 'mobile'
-      ? scaleConfig.value.mobileMinWidth
-      : undefined
+    wideDiagramMinWidth: scaleConfig.value.wideDiagramMinWidth
   })
 })
 
@@ -114,6 +115,11 @@ const canvasStyle = computed(() => {
     style['--kpo-mermaid-render-width'] = `${renderedWidth}px`
   }
 
+  const renderedHeight = resolveMermaidRenderedHeight(viewBoxHeight.value, effectiveScale.value)
+  if (renderedHeight) {
+    style['--kpo-mermaid-render-height'] = `${renderedHeight}px`
+  }
+
   return style
 })
 
@@ -127,16 +133,7 @@ async function render(): Promise<void> {
   try {
     const { default: mermaid } = await import('mermaid')
 
-    mermaid.initialize({
-      startOnLoad: false,
-      theme: 'base',
-      themeVariables: mermaidThemeVariables(),
-      fontFamily: mermaidFontFamily(),
-      flowchart: {
-        htmlLabels: true,
-        wrappingWidth: 180
-      }
-    })
+    mermaid.initialize(createMermaidConfig(mermaidThemeTokens()))
 
     renderCounter += 1
     const { svg: rendered } = await mermaid.render(
@@ -186,10 +183,26 @@ function updateMeasurements(): void {
   availableWidth.value = Math.max(0, root.value.clientWidth - inlinePadding)
 
   scaleConfig.value = {
-    desktopMinScale: cssNumber(style, '--kpo-mermaid-desktop-min-scale', 0.72),
-    mobileMinScale: cssNumber(style, '--kpo-mermaid-mobile-min-scale', 0.4),
-    mobileMinWidth: cssNumber(style, '--kpo-mermaid-mobile-min-width', 680),
-    minHeight: cssNumber(style, '--kpo-mermaid-min-height', 120)
+    desktopMinScale: cssNumber(
+      style,
+      '--kpo-mermaid-desktop-min-scale',
+      CONTENT_LAYOUT_TOKENS.mermaidDesktopMinScale
+    ),
+    mobileMinScale: cssNumber(
+      style,
+      '--kpo-mermaid-mobile-min-scale',
+      CONTENT_LAYOUT_TOKENS.mermaidMobileMinScale
+    ),
+    wideDiagramMinWidth: cssNumber(
+      style,
+      '--kpo-mermaid-wide-diagram-min-width',
+      CONTENT_LAYOUT_TOKENS.mermaidWideDiagramMinWidth
+    ),
+    minHeight: cssNumber(
+      style,
+      '--kpo-mermaid-min-height',
+      CONTENT_LAYOUT_TOKENS.mermaidMinHeight
+    )
   }
 }
 
@@ -299,34 +312,16 @@ function onWindowResize(): void {
   void syncViewportLayout()
 }
 
-function mermaidThemeVariables(): Record<string, string> {
+function mermaidThemeTokens() {
   const style = getComputedStyle(document.documentElement)
-  const background = cssVariable(style, '--vp-c-bg')
-  const softBackground = cssVariable(style, '--vp-c-bg-soft')
-  const text = cssVariable(style, '--vp-c-text-1')
-  const mutedText = cssVariable(style, '--vp-c-text-2')
-  const border = cssVariable(style, '--vp-c-border')
 
   return {
     fontFamily: mermaidFontFamily(),
-    primaryColor: softBackground,
-    primaryTextColor: text,
-    primaryBorderColor: border,
-    lineColor: mutedText,
-    secondaryColor: softBackground,
-    tertiaryColor: background,
-    background,
-    mainBkg: background,
-    secondBkg: softBackground,
-    edgeLabelBackground: background,
-    clusterBkg: softBackground,
-    clusterBorder: border,
-    noteBkgColor: softBackground,
-    noteTextColor: text,
-    noteBorderColor: border,
-    textColor: text,
-    nodeTextColor: text,
-    labelTextColor: text
+    background: cssVariable(style, '--vp-c-bg'),
+    softBackground: cssVariable(style, '--vp-c-bg-soft'),
+    text: cssVariable(style, '--vp-c-text-1'),
+    mutedText: cssVariable(style, '--vp-c-text-2'),
+    border: cssVariable(style, '--vp-c-border')
   }
 }
 

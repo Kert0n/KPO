@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest'
+import { CONTENT_LAYOUT_TOKENS } from '../contentLayoutTokens'
 import {
   readSvgViewBox,
   resolveCenteredScrollLeft,
   resolveMermaidAutoScale,
   resolveMermaidManualScale,
+  resolveMermaidRenderedHeight,
   resolveMermaidOverflow,
   resolveMermaidRenderedWidth,
   resolveScrollLeftForCenterRatio,
@@ -16,8 +18,19 @@ describe('mermaidLayoutModel', () => {
       viewBoxWidth: 600,
       viewBoxHeight: 240,
       availableWidth: 800,
-      minScale: 0.72,
-      minHeight: 120
+      minScale: CONTENT_LAYOUT_TOKENS.mermaidDesktopMinScale,
+      minHeight: CONTENT_LAYOUT_TOKENS.mermaidMinHeight
+    })).toBe(1)
+  })
+
+  it('does not upscale a small mobile diagram to the wide-diagram minimum', () => {
+    expect(resolveMermaidAutoScale({
+      viewBoxWidth: 205,
+      viewBoxHeight: 330,
+      availableWidth: 382,
+      minScale: CONTENT_LAYOUT_TOKENS.mermaidMobileMinScale,
+      minHeight: CONTENT_LAYOUT_TOKENS.mermaidMinHeight,
+      wideDiagramMinWidth: CONTENT_LAYOUT_TOKENS.mermaidWideDiagramMinWidth
     })).toBe(1)
   })
 
@@ -26,8 +39,8 @@ describe('mermaidLayoutModel', () => {
       viewBoxWidth: 1000,
       viewBoxHeight: 240,
       availableWidth: 800,
-      minScale: 0.72,
-      minHeight: 120
+      minScale: CONTENT_LAYOUT_TOKENS.mermaidDesktopMinScale,
+      minHeight: CONTENT_LAYOUT_TOKENS.mermaidMinHeight
     })).toBe(0.8)
   })
 
@@ -36,20 +49,31 @@ describe('mermaidLayoutModel', () => {
       viewBoxWidth: 1800,
       viewBoxHeight: 240,
       availableWidth: 800,
-      minScale: 0.72,
-      minHeight: 120
-    })).toBe(0.72)
+      minScale: CONTENT_LAYOUT_TOKENS.mermaidDesktopMinScale,
+      minHeight: CONTENT_LAYOUT_TOKENS.mermaidMinHeight
+    })).toBe(CONTENT_LAYOUT_TOKENS.mermaidDesktopMinScale)
   })
 
-  it('uses mobile min width and min height for readability', () => {
+  it('uses mobile wide-diagram minimum only when downscaling a wide diagram', () => {
     expect(resolveMermaidAutoScale({
       viewBoxWidth: 1800,
+      viewBoxHeight: 400,
+      availableWidth: 382,
+      minScale: CONTENT_LAYOUT_TOKENS.mermaidMobileMinScale,
+      minHeight: CONTENT_LAYOUT_TOKENS.mermaidMinHeight,
+      wideDiagramMinWidth: CONTENT_LAYOUT_TOKENS.mermaidWideDiagramMinWidth
+    })).toBe(CONTENT_LAYOUT_TOKENS.mermaidMobileMinScale)
+  })
+
+  it('uses min height for readability but never above natural scale', () => {
+    expect(resolveMermaidAutoScale({
+      viewBoxWidth: 900,
       viewBoxHeight: 80,
       availableWidth: 382,
-      minScale: 0.4,
-      minHeight: 120,
-      minRenderedWidth: 680
-    })).toBe(1.5)
+      minScale: CONTENT_LAYOUT_TOKENS.mermaidMobileMinScale,
+      minHeight: CONTENT_LAYOUT_TOKENS.mermaidMinHeight,
+      wideDiagramMinWidth: CONTENT_LAYOUT_TOKENS.mermaidWideDiagramMinWidth
+    })).toBe(1)
   })
 
   it('clamps manual scale by viewport mode', () => {
@@ -75,6 +99,11 @@ describe('mermaidLayoutModel', () => {
   it('resolves rendered width from viewBox and scale', () => {
     expect(resolveMermaidRenderedWidth(1206, 0.77)).toBe(929)
     expect(resolveMermaidRenderedWidth(null, 0.77)).toBeNull()
+  })
+
+  it('resolves rendered height from viewBox and scale', () => {
+    expect(resolveMermaidRenderedHeight(222, 0.77)).toBe(171)
+    expect(resolveMermaidRenderedHeight(null, 0.77)).toBeNull()
   })
 
   it('reads svg viewBox dimensions', () => {
