@@ -1,888 +1,2034 @@
 # Лекция 5. Поведенческие паттерны проектирования
 
-Значит, сегодня мы с вами начинаем вторую группу паттернов. Они будут относиться к поведению между, ну, описанию поведения между объектами.
+Поведенческие паттерны отвечают за то, **как объекты общаются, распределяют обязанности и запускают поведение друг друга**.
+Если порождающие паттерны помогают гибко создавать объекты, а структурные - удобно связывать классы и объекты в
+композиции, то поведенческие паттерны работают с динамикой программы: выбором алгоритма, переходами состояния,
+уведомлениями, командами и операциями над объектными структурами.
 
-## Поведенческие паттерны
+Главная мысль этой лекции: во многих задачах поведение полезно сделать явной сущностью. Алгоритм можно вынести в
+стратегию, состояние - в отдельный объект состояния, действие - в команду, реакцию на событие - в подписчика, а новую
+операцию над иерархией - в посетителя. Такой ход часто уменьшает связанность и помогает соблюдать Open/Closed Principle,
+но почти всегда платит за это дополнительными типами и большей архитектурной дисциплиной.
 
-#### Обзор поведенческих паттернов и Strategy
+В этой лекции разберем шесть поведенческих паттернов:
 
-**Слайд 3: ВИДЫ ПАТТЕРНОВ**
+- **Strategy** - выбирает один из взаимозаменяемых алгоритмов.
+- **State** - меняет поведение объекта при изменении его внутреннего состояния.
+- **Template Method** - фиксирует скелет алгоритма, оставляя подклассам отдельные шаги.
+- **Observer** - уведомляет подписчиков об изменениях без жесткой связи с ними.
+- **Command** - превращает действие в объект, который можно передавать, хранить, отменять и запускать позже.
+- **Visitor** - добавляет новые операции к стабильной иерархии элементов.
+
+## Сквозной сценарий
+
+В этой лекции удобно представить одно приложение навигации и доставки. Пользователь выбирает способ построения маршрута,
+документ заказа проходит состояния, образовательный курс строится по повторяющемуся шаблону, биржевой модуль рассылает
+обновления подписчикам, редактор хранит действия для undo, а страховая система добавляет новый отчет по уже существующим
+типам клиентов.
+
+```mermaid
+flowchart LR
+    Algorithm["Меняется алгоритм"] --> Strategy["Strategy"]
+    StateProblem["Меняется поведение по состоянию"] --> State["State"]
+    Skeleton["Повторяется скелет алгоритма"] --> Template["Template Method"]
+    Event["Кто-то должен узнать о событии"] --> Observer["Observer"]
+    Action["Действие нужно хранить/отменять"] --> Command["Command"]
+    Operation["Новая операция над типами"] --> Visitor["Visitor"]
+```
+
+Общий ход один: поведение перестает быть спрятанным внутри большого `if` или одного класса и получает собственную форму.
+Дальше важно не перепутать форму с целью: функция, объект, интерфейс, делегат или callback могут быть разными
+реализациями одной идеи.
+
+## Worked example: один `if` превращается в модель поведения
+
+### Ситуация
+
+В навигационном приложении сначала есть один способ построить маршрут. Потом появляются "самый быстрый", "самый дешевый"
+и "без платных дорог". Еще позже заказ доставки получает состояния, а действия оператора нужно сохранять для audit log.
+
+### Наивное решение
+
+Оставить один большой сервис с ветками `if`: по типу маршрута выбрать алгоритм, по статусу заказа проверить допустимые
+действия, после каждого действия вручную вызвать уведомления и записать лог.
+
+### Что ломается
+
+Каждая новая ветка меняет старый метод. Алгоритмы смешиваются с состояниями, уведомлениями и историей действий. Тест
+одного правила требует собрать весь сервис, а ошибка в одном сценарии легко ломает другой.
+
+### Улучшение
+
+Сделать поведение явным: алгоритм маршрута становится Strategy, жизненный цикл заказа - State, уведомления - Observer,
+действие оператора - Command. Не все нужно применять сразу; паттерн появляется только там, где соответствующая сила уже
+видна в коде.
+
+### Почему это работает
+
+Поведенческие паттерны дают имени не классу, а намерению. Если команда говорит "это Strategy", она сообщает: здесь
+меняется алгоритм. Если говорит "это State", она сообщает: здесь правила зависят от текущего состояния и переходов.
+
+## Где поведенческие паттерны в GoF
+
 ```mermaid
 flowchart TD
-    Patterns[Паттерны] --> Behavioral[Поведенческие]
-    Patterns --> Creational[Порождающие]
-    Patterns --> Structural[Структурные]
+  Patterns[Паттерны GoF] --> Creational[Порождающие]
+  Patterns --> Structural[Структурные]
+  Patterns --> Behavioral[Поведенческие]
+
+  Creational --> CGoal[Гибкое создание объектов]
+  Structural --> SGoal[Связи между объектами]
+  Behavioral --> BGoal[Коммуникация и распределение поведения]
+
+  Behavioral --> StrategyNode[Strategy]
+  Behavioral --> StateNode[State]
+  Behavioral --> TemplateNode[Template Method]
+  Behavioral --> ObserverNode[Observer]
+  Behavioral --> CommandNode[Command]
+  Behavioral --> VisitorNode[Visitor]
 ```
 
-::: warning Текст слайда из PDF
-ВИДЫ ПАТТЕРНОВ
+| Паттерн | Что выносит в отдельную роль | Главный симптом | Цена |
+|---------|------------------------------|-----------------|------|
+| Strategy | Вариант алгоритма | Один класс содержит много веток выбора алгоритма | Клиент должен понимать, какую стратегию выбрать |
+| State | Поведение конкретного состояния | Объект меняет поведение по состоянию, а `if` множатся | Больше классов состояний и переходов |
+| Template Method | Изменяемые шаги алгоритма | Несколько классов повторяют общий порядок действий | Жесткая связь через наследование |
+| Observer | Реакцию на событие | Неизвестно, кто должен реагировать на изменение | Нужно управлять подписками и порядком уведомлений |
+| Command | Действие или запрос | Одно действие вызывается из разных мест или должно откатываться | Сложнее модель выполнения и хранения команд |
+| Visitor | Операцию над иерархией | Операций много, а типы элементов меняются редко | Трудно добавлять новые типы элементов |
 
-• Поведенческие паттерны заботятся об
-  эффективной коммуникации между
-  объектами.
-
-• Порождающие паттерны беспокоятся о гибком создании объектов без
-  внесения в программу лишних зависимостей.
-
-• Структурные паттерны показывают различные способы построения
-  связей между объектами.
+::: tip Практическое правило
+Поведенческий паттерн стоит рассматривать не тогда, когда "хочется применить паттерн", а когда в коде уже видна сила:
+разрастающиеся условные операторы, повторяющийся алгоритм, жесткая связь отправителя и получателя, неуправляемые
+события или операции, размазанные по иерархии классов.
 :::
 
-**Слайд 10: РЕШЕНИЕ**
+::: only kotlin
+В Kotlin часть Strategy/Command можно выразить функциями высшего порядка. Но если поведению нужны имя, состояние,
+валидация, логирование или сериализация, отдельный тип становится понятнее простой lambda.
+:::
+
+::: only csharp
+В C# рядом с классическими интерфейсами часто используют делегаты, события и `Func<>`/`Action<>`. Это снижает церемонию,
+но не отменяет вопроса: является ли поведение самостоятельной доменной сущностью или всего лишь callback-ом.
+:::
+
+::: only java
+В Java после lambda-выражений многие маленькие Strategy выглядят как функциональные интерфейсы. Для крупных алгоритмов
+с зависимостями и состоянием явный класс остается более читаемым и тестируемым.
+:::
+
+::: only go
+В Go Strategy часто выглядит как интерфейс с одной операцией или как функция-тип. Command может быть обычной структурой
+с методом `Execute`, если действие нужно хранить, логировать или передавать между слоями.
+:::
+
+## Strategy
+
+**Strategy** выносит алгоритм в отдельный объект и позволяет контексту использовать разные варианты этого алгоритма через
+общий интерфейс. Контекст не знает деталей конкретной стратегии: он только делегирует ей работу.
+
+### Проблема
+
+Представим навигатор. В первой версии он строит только пешие маршруты. Затем появляются маршруты на автомобиле,
+общественном транспорте и самокате. Самый простой путь - добавить в `Navigator` условный оператор:
+
+```kotlin
+when (mode) {
+    "walk" -> buildWalkingRoute(from, to)
+    "car" -> buildCarRoute(from, to)
+    "public" -> buildPublicTransportRoute(from, to)
+    "scooter" -> buildScooterRoute(from, to)
+}
+```
+
+Пока вариантов мало, код кажется терпимым. Но со временем у каждого режима появляются свои ограничения: пробки,
+стоимость, расписание, запреты проезда, погодные условия. Класс навигатора начинает отвечать не за навигацию как
+координацию, а за все алгоритмы сразу.
+
+### Решение
+
+Вынесем построение маршрута в интерфейс `RouteStrategy`. Навигатор станет контекстом: он хранит текущую стратегию и
+делегирует ей построение маршрута. При смене режима пользовательского интерфейса можно заменить стратегию в runtime, не
+создавая новый навигатор.
+
 ```mermaid
-flowchart LR
-    Navigator[Навигатор] --> Strategy[Стратегия маршрута]
-    Strategy --> Walk[Пешком]
-    Strategy --> Car[Автомобиль]
-    Strategy --> Public[Общественный транспорт]
-    Strategy --> Scooter[Самокат]
+classDiagram
+  class Navigator {
+    -RouteStrategy strategy
+    +setStrategy(strategy)
+    +buildRoute(from, to) Route
+  }
+
+  class RouteStrategy {
+    <<interface>>
+    +buildRoute(from, to) Route
+  }
+
+  class WalkingRouteStrategy
+  class CarRouteStrategy
+  class PublicTransportRouteStrategy
+
+  Navigator --> RouteStrategy
+  RouteStrategy <|.. WalkingRouteStrategy
+  RouteStrategy <|.. CarRouteStrategy
+  RouteStrategy <|.. PublicTransportRouteStrategy
 ```
 
-::: warning Текст слайда из PDF
-РЕШЕНИЕ
+Роли паттерна:
 
-Вместо того, чтобы изначальный класс сам
-выполнял тот или иной алгоритм, он будет
-играть роль контекста, ссылаясь на одну из   Стратегии построения пути.
-стратегий и делегируя ей выполнение
-работы.
+| Роль | Ответственность |
+|------|-----------------|
+| Context | Хранит ссылку на стратегию и вызывает ее |
+| Strategy | Задает общий интерфейс алгоритма |
+| ConcreteStrategy | Реализует конкретный вариант алгоритма |
+| Client | Создает стратегию и передает ее контексту |
 
-Чтобы сменить алгоритм, вам будет
-достаточно подставить в контекст другой
-объект-стратегию.
-:::
+::: multi-code "Strategy: навигатор"
 
-**Слайд 17: ПРЕИМУЩЕСТВА И НЕДОСТАТКИ**
-```mermaid
-flowchart LR
-    Strategy[Strategy] --> Pros[Плюсы]
-    Strategy --> Cons[Минусы]
-    Pros --> Runtime[Можно менять алгоритм в runtime]
-    Pros --> OCP[Соблюдается Open/Closed]
-    Cons --> Classes[Больше классов]
-    Cons --> ClientKnows[Клиент должен понимать стратегии]
+```kotlin
+data class Point(val name: String)
+data class Route(val description: String)
+
+interface RouteStrategy {
+    fun buildRoute(from: Point, to: Point): Route
+}
+
+class WalkingRouteStrategy : RouteStrategy {
+    override fun buildRoute(from: Point, to: Point): Route =
+        Route("Пешком: ${from.name} -> ${to.name}")
+}
+
+class CarRouteStrategy : RouteStrategy {
+    override fun buildRoute(from: Point, to: Point): Route =
+        Route("На автомобиле с учетом пробок: ${from.name} -> ${to.name}")
+}
+
+class Navigator(private var strategy: RouteStrategy) {
+    fun setStrategy(strategy: RouteStrategy) {
+        this.strategy = strategy
+    }
+
+    fun buildRoute(from: Point, to: Point): Route =
+        strategy.buildRoute(from, to)
+}
 ```
 
-::: warning Текст слайда из PDF
-ПРЕИМУЩЕСТВА И НЕДОСТАТКИ
+```kotlin playground
+data class Point(val name: String)
+data class Route(val description: String)
 
-       Горячая замена алгоритмов на лету.
-       Изолирует код и данные алгоритмов от остальных классов.
-       Уход от наследования к делегированию.
-       Реализует принцип открытости/закрытости.
+interface RouteStrategy {
+    fun buildRoute(from: Point, to: Point): Route
+}
 
-                               Усложняет программу за счёт дополнительных классов.
-                               Клиент должен знать, в чём состоит разница между
-                               стратегиями, чтобы выбрать подходящую.
+class WalkingRouteStrategy : RouteStrategy {
+    override fun buildRoute(from: Point, to: Point): Route =
+        Route("Пешком: ${from.name} -> ${to.name}")
+}
+
+class CarRouteStrategy : RouteStrategy {
+    override fun buildRoute(from: Point, to: Point): Route =
+        Route("На автомобиле с учетом пробок: ${from.name} -> ${to.name}")
+}
+
+class PublicTransportRouteStrategy : RouteStrategy {
+    override fun buildRoute(from: Point, to: Point): Route =
+        Route("На транспорте с пересадками: ${from.name} -> ${to.name}")
+}
+
+class Navigator(private var strategy: RouteStrategy) {
+    fun setStrategy(strategy: RouteStrategy) {
+        this.strategy = strategy
+    }
+
+    fun buildRoute(from: Point, to: Point): Route =
+        strategy.buildRoute(from, to)
+}
+
+fun main() {
+    val home = Point("Дом")
+    val office = Point("Офис")
+    val navigator = Navigator(WalkingRouteStrategy())
+
+    println(navigator.buildRoute(home, office).description)
+    navigator.setStrategy(CarRouteStrategy())
+    println(navigator.buildRoute(home, office).description)
+    navigator.setStrategy(PublicTransportRouteStrategy())
+    println(navigator.buildRoute(home, office).description)
+}
+```
+
+```csharp
+public record Point(string Name);
+public record Route(string Description);
+
+public interface IRouteStrategy
+{
+    Route BuildRoute(Point from, Point to);
+}
+
+public sealed class WalkingRouteStrategy : IRouteStrategy
+{
+    public Route BuildRoute(Point from, Point to) =>
+        new($"Пешком: {from.Name} -> {to.Name}");
+}
+
+public sealed class CarRouteStrategy : IRouteStrategy
+{
+    public Route BuildRoute(Point from, Point to) =>
+        new($"На автомобиле с учетом пробок: {from.Name} -> {to.Name}");
+}
+
+public sealed class Navigator
+{
+    private IRouteStrategy _strategy;
+
+    public Navigator(IRouteStrategy strategy) => _strategy = strategy;
+
+    public void SetStrategy(IRouteStrategy strategy) => _strategy = strategy;
+
+    public Route BuildRoute(Point from, Point to) =>
+        _strategy.BuildRoute(from, to);
+}
+```
+
+```java
+record Point(String name) {}
+record Route(String description) {}
+
+interface RouteStrategy {
+    Route buildRoute(Point from, Point to);
+}
+
+final class WalkingRouteStrategy implements RouteStrategy {
+    public Route buildRoute(Point from, Point to) {
+        return new Route("Пешком: " + from.name() + " -> " + to.name());
+    }
+}
+
+final class CarRouteStrategy implements RouteStrategy {
+    public Route buildRoute(Point from, Point to) {
+        return new Route("На автомобиле с учетом пробок: " + from.name() + " -> " + to.name());
+    }
+}
+
+final class Navigator {
+    private RouteStrategy strategy;
+
+    Navigator(RouteStrategy strategy) {
+        this.strategy = strategy;
+    }
+
+    void setStrategy(RouteStrategy strategy) {
+        this.strategy = strategy;
+    }
+
+    Route buildRoute(Point from, Point to) {
+        return strategy.buildRoute(from, to);
+    }
+}
+```
+
+```go
+package main
+
+type Point struct {
+	Name string
+}
+
+type Route struct {
+	Description string
+}
+
+type RouteStrategy interface {
+	BuildRoute(from Point, to Point) Route
+}
+
+type WalkingRouteStrategy struct{}
+
+func (WalkingRouteStrategy) BuildRoute(from Point, to Point) Route {
+	return Route{Description: "Пешком: " + from.Name + " -> " + to.Name}
+}
+
+type CarRouteStrategy struct{}
+
+func (CarRouteStrategy) BuildRoute(from Point, to Point) Route {
+	return Route{Description: "На автомобиле с учетом пробок: " + from.Name + " -> " + to.Name}
+}
+
+type Navigator struct {
+	strategy RouteStrategy
+}
+
+func NewNavigator(strategy RouteStrategy) *Navigator {
+	return &Navigator{strategy: strategy}
+}
+
+func (n *Navigator) SetStrategy(strategy RouteStrategy) {
+	n.strategy = strategy
+}
+
+func (n *Navigator) BuildRoute(from Point, to Point) Route {
+	return n.strategy.BuildRoute(from, to)
+}
+```
+
 :::
 
-#### State: решение и оценки
+### Strategy и DI
 
-**Слайд 21: РЕШЕНИЕ**
+Strategy иногда путают с dependency injection, потому что в обоих случаях объект получает зависимость извне. Разница в
+намерении.
+
+| Вопрос | Strategy | DI |
+|--------|----------|----|
+| Что меняется? | Алгоритм поведения | Зависимость, нужная объекту для работы |
+| Когда часто меняется? | Во время работы программы | При сборке приложения или создании объекта |
+| Кто выбирает вариант? | Клиентский код, пользовательский сценарий, runtime-логика | Composition root, контейнер, конфигурация |
+| Пример | Переключить маршрут с пешего на автомобильный | Передать реальный или тестовый репозиторий |
+
+### Когда применять
+
+- Внутри объекта нужны разные варианты одного алгоритма.
+- Есть похожие классы, которые отличаются только поведением.
+- Детали алгоритма не должны попадать в контекст.
+- Большой условный оператор выбирает ветку алгоритма по типу, режиму или настройке.
+
+### Плюсы и минусы
+
+| Плюсы | Минусы |
+|-------|--------|
+| Алгоритмы изолированы от контекста | Появляется больше классов |
+| Стратегию можно менять в runtime | Клиент должен понимать различия стратегий |
+| Легче добавлять новые алгоритмы без изменения контекста | Для простых двух веток паттерн может быть избыточен |
+| Наследование заменяется делегированием | Нужна дисциплина именования и организации стратегий |
+
+::: warning Типичная ошибка
+Не стоит превращать каждую маленькую ветку `if` в стратегию. Strategy полезна, когда варианты поведения самостоятельны,
+растут независимо и имеют общий смысловой интерфейс. Если ветка локальная и вряд ли будет расширяться, обычный условный
+оператор может быть проще и честнее.
+:::
+
+## State
+
+**State** похож на Strategy внешне: контекст тоже хранит ссылку на объект с поведением. Но смысл другой. В Strategy
+клиент выбирает алгоритм. В State объект ведет себя по-разному из-за своего внутреннего состояния, а переходы между
+состояниями становятся частью модели.
+
+### Проблема
+
+Документ может быть черновиком, подписанным документом, принятым к исполнению и завершенным документом. Нельзя выполнить
+документ, который еще не подписан. Нельзя подписать уже завершенный документ. Если всю логику держать в одном классе,
+быстро появляется набор похожих проверок:
+
+```kotlin
+fun sign() {
+    if (status == "draft") {
+        status = "signed"
+    } else {
+        error("Подписать можно только черновик")
+    }
+}
+
+fun accept() {
+    if (status == "signed") {
+        status = "accepted"
+    } else {
+        error("Принять можно только подписанный документ")
+    }
+}
+```
+
+Когда состояний и действий становится больше, проверки расползаются по методам. Добавление промежуточного состояния
+заставляет перепроверять весь класс.
+
+### Решение
+
+Каждое состояние становится отдельным объектом. Контекст `Document` хранит текущее состояние и делегирует ему действия.
+Состояние может решить, допустимо ли действие, и перевести документ в следующее состояние.
+
 ```mermaid
 stateDiagram-v2
-    [*] --> Draft
-    Draft --> Signed
-    Signed --> Accepted
-    Accepted --> Done
-    Done --> [*]
+  [*] --> Draft
+  Draft --> Signed: sign
+  Signed --> Accepted: accept
+  Accepted --> Done: complete
+  Draft --> Archived: archive
+  Signed --> Archived: archive
+  Done --> [*]
+  Archived --> [*]
 ```
 
-::: warning Текст слайда из PDF
-РЕШЕНИЕ
-
-                                         Вместо того, чтобы хранить код всех
-                                         состояний, первоначальный объект,
-                                         называемый контекстом, будет
-                                         содержать ссылку на один из объектов-
-                                         состояний и делегировать ему работу,
-                                         зависящую от состояния.
-
-     Документ делегирует работу своему
-       активному объекту-состоянию.
-:::
-
-**Слайд 32: ПРЕИМУЩЕСТВА И НЕДОСТАТКИ**
-```mermaid
-flowchart LR
-    State[State] --> Pros[Плюсы]
-    State --> Cons[Минусы]
-    Pros --> Local[Логика состояний локализована]
-    Pros --> Clear[Переходы становятся явными]
-    Cons --> Classes[Много классов состояний]
-    Cons --> Overkill[Избыточен для простых сценариев]
-```
-
-::: warning Текст слайда из PDF
-ПРЕИМУЩЕСТВА И НЕДОСТАТКИ
-
-        Избавляет от множества больших условных
-        операторов
-        Концентрирует в одном месте код, связанный
-        с определённым состоянием.
-        Упрощает код контекста.
-
-                           Может неоправданно усложнить код, если
-                           состояний мало и они редко меняются.
-:::
-
-#### Template Method: решение и пример
-
-**Слайд 36: РЕШЕНИЕ**
-```mermaid
-flowchart TD
-    Template[Template Method] --> Step1[Фиксированный шаг]
-    Template --> Hook1[Переопределяемый шаг]
-    Template --> Step2[Фиксированный шаг]
-    Template --> Hook2[Переопределяемый шаг]
-```
-
-::: warning Текст слайда из PDF
-РЕШЕНИЕ
-                                                            Мы можем создать общий базовый класс
-                                                            для всех трёх алгоритмов. Этот класс
-                                                            будет состоять из шаблонного метода,
-                                                            который последовательно вызывает
-                                                            шаги разбора документов.
-
-                                                            Для начала шаги шаблонного метода
-                                                            можно сделать абстрактными.
-
-                                                            В последующем мы можем определить
-                                                            общее для всех классов поведение и
-                                                            вынести его в суперкласс.
-
-     Шаблонный метод разбивает алгоритм на шаги, позволяя
-         подклассам переопределить некоторые из них.
-:::
-
-**Слайд 40: РАССМОТРИМ НА ПРИМЕРЕ**
-
-![Слайд 40: РАССМОТРИМ НА ПРИМЕРЕ](assets/slide-040.png)
-
-**Слайд 45: ПРЕИМУЩЕСТВА И НЕДОСТАТКИ**
-```mermaid
-flowchart LR
-    TM[Template Method] --> Pros[Плюсы]
-    TM --> Cons[Минусы]
-    Pros --> Reuse[Переиспользование каркаса алгоритма]
-    Pros --> OCP[Расширение через подклассы]
-    Cons --> Inheritance[Жёсткая связь через наследование]
-    Cons --> Limit[Ограниченная гибкость]
-```
-
-::: warning Текст слайда из PDF
-ПРЕИМУЩЕСТВА И НЕДОСТАТКИ
-
-       Облегчает повторное использование кода.
-
-                         Вы жёстко ограничены скелетом
-                         существующего алгоритма.
-                         Вы можете нарушить принцип подстановки
-                         Лисков, изменяя базовое поведение одного
-                         из шагов алгоритма через подкласс.
-                         С ростом количества шагов шаблонный метод
-                         становится слишком сложно поддерживать.
-:::
-
-#### Observer: подписка и оценки
-
-**Слайд 49: РЕШЕНИЕ**
-```mermaid
-flowchart LR
-    Publisher[Наблюдаемый объект] -->|notify| Observer1[Наблюдатель 1]
-    Publisher -->|notify| Observer2[Наблюдатель 2]
-    Publisher -->|notify| Observer3[Наблюдатель 3]
-```
-
-::: warning Текст слайда из PDF
-РЕШЕНИЕ
-
-             Подписка на события.
-
-Когда в издателе будет происходить важное
-событие, он будет проходиться по списку
-подписчиков и оповещать их об этом, вызывая
-определённый метод объектов-подписчиков.
-
-49                                            Оповещения о событиях.
-:::
-
-**Слайд 59: ПРЕИМУЩЕСТВА И НЕДОСТАТКИ**
-```mermaid
-flowchart LR
-    Observer[Observer] --> Pros[Плюсы]
-    Observer --> Cons[Минусы]
-    Pros --> Decouple[Издатель не зависит от подписчиков]
-    Pros --> Runtime[Можно подписываться в runtime]
-    Cons --> Order[Неочевидный порядок уведомлений]
-    Cons --> Leaks[Риск забытых подписок]
-```
-
-::: warning Текст слайда из PDF
-ПРЕИМУЩЕСТВА И НЕДОСТАТКИ
-
-       Издатели не зависят от конкретных классов подписчиков и
-       наоборот.
-       Вы можете подписывать и отписывать получателей на лету.
-       Реализует принцип открытости/закрытости.
-
-                         Подписчики оповещаются в случайном порядке.
-:::
-
-#### Command: команда как объект
-
-**Слайд 63: РЕШЕНИЕ**
-```mermaid
-flowchart LR
-    Client[Клиент] --> Command[Команда]
-    Command --> Receiver[Получатель]
-    Invoker[Инициатор] --> Command
-    Command -->|execute| Receiver
-```
-
-::: warning Текст слайда из PDF
-РЕШЕНИЕ
-
- Прямой доступ из UI в бизнес-логику.
-
-                                        Каждый вызов следует завернуть в собственный
-                                        класс с единственным методом, который и будет
-                                        осуществлять вызов.
-
-Паттерн Команда предлагает больше не
-отправлять такие вызовы напрямую.
-
-63                                          Доступ из UI в бизнес-логику через команду.
-:::
-
-#### Visitor: обход операций и оценки
-
-**Слайд 77: РЕШЕНИЕ**
-```mermaid
-flowchart LR
-    Visitor[Visitor] --> ElementA[Элемент A]
-    Visitor --> ElementB[Элемент B]
-    Visitor --> ElementC[Элемент C]
-    ElementA -->|accept| Visitor
-    ElementB -->|accept| Visitor
-    ElementC -->|accept| Visitor
-```
-
-::: warning Текст слайда из PDF
-РЕШЕНИЕ
-
-Вместо того, чтобы самим искать нужный
-метод, мы можем поручить это объектам,      Как видите, изменить классы узлов всё-
-которые передаём в параметрах посетителю.   таки придётся – это минус, но есть нюанс…
-                                            Если придётся добавить в программу
-     77                                     новое поведение, вы просто создадите
-                                            новый класс посетителей.
-:::
-
-**Слайд 82: РАССМОТРИМ НА ПРИМЕРЕ**
-
-![Слайд 82: РАССМОТРИМ НА ПРИМЕРЕ](assets/slide-082.png)
-
-**Слайд 83: ПРЕИМУЩЕСТВА И НЕДОСТАТКИ**
-```mermaid
-flowchart LR
-    Visitor[Visitor] --> Pros[Плюсы]
-    Visitor --> Cons[Минусы]
-    Pros --> AddOperation[Легко добавлять новые операции]
-    Cons --> AddElement[Сложно добавлять новые типы элементов]
-```
-
-::: warning Текст слайда из PDF
-ПРЕИМУЩЕСТВА И НЕДОСТАТКИ
-
-       Упрощает добавление операций, работающих со сложными
-       структурами объектов.
-       Объединяет родственные операции в одном классе.
-       Посетитель может накапливать состояние при обходе
-       структуры элементов.
-
-                             Паттерн не оправдан, если иерархия
-                             элементов часто меняется.
-                             Может привести к нарушению
-                             инкапсуляции элементов.
-:::
-
-И эта группа, собственно, и называется поведенческая. Напомню, что мы с вами уже изучили такую группу паттернов, как порождающие. Они описывали именно... как создаются объекты по заданным критериям, по заданным правилам или решающие ту или иную задачу. Поведенческая группа паттернов, она относится к той группе, которая решает проблему сложного взаимодействия объектов. Общение этих объектов между собой, пересылка информации, данных и так далее. Это самая крупная группа, наверное, самая часто используемая группа паттернов.
-
-### Strategy
-
-Мы рассмотрим не все из этой группы, но постараемся рассмотреть самые важные, а именно рассмотрим паттерн команда, стратегия, визитер, состояние и наблюдатель. И попробуем потом применить эти паттерны уже на практике. Ряд паттернов мы пропустим, потому что есть паттерны, которые реализованы практически во всех языках. Итератор. И рассматривать его сейчас в современных языках программирования может быть бессмысленно, но тем не менее почитать про те паттерны, которые мы не успеем разобрать в лекционном материале и не разберем на семинарах для общего такого вашего развития рекомендую.
-
-Начнем, наверное, с самого популярного, с самого часто используемого паттерна. Это стратегия. Представим такую ситуацию, что мы разрабатываем... Навигатор. Устроились еще в несуществующий Яндекс и решили сделать такой стартап. Написать навигатор, который будет строить маршрут из точки А в точку Б. Изначально вы просто хотели прокладывать пеший маршрут, но со временем, прям как в Яндексе, со временем появились маршруты на самокате, маршруты на общественном транспорте. Выход у вас какой?
-
-Ну, отрицать. вообще существование паттерна стратегия делать вид что его нет и пытаться в классе вашего навигатора добавлять все новые и новые методы забыть что есть такой принцип открытости закрытости как бы рисковать каждый раз изменяя класс что где-то собьется и как эффект бабочки сломается другая часть проекта то есть через годик вы получите такой комок грязи Спагетти-код, как угодно его назовите, в любом случае это плохо, то, что вы получите. Класс будет просто неподдерживаемый, он будет очень сложной, запутанной логикой. И, собственно, поддержка такого проекта в большой, такой длительной перспективе, она просто чревата тем, что рано или поздно это все упадет, и каждое малейшее изменение будет рушить весь проект. Вариантов на самом деле немного.
-
-Самый, наверное, лучший вариант – это воспользоваться паттерном стратегия. Когда вы алгоритм, который определяет построение, ну давайте на примере навигатора, когда вы алгоритм того или иного построения маршрута, маршрут для самокатчиков, маршрут для личного транспорта, для общественного транспорта, вы носите это не в какую-то там отдельную ветку условного оператора, что если человек захотел то-то, то-то, у вас класс-навигатор. Остается open-close, то есть открыт для расширения своих возможностей, но закрыт для модификации. Но эти алгоритмы вы подсовываете как объекты, как стратегии, которые будут реализовывать построение именно маршрута.
-
-### Структуры поведенческих паттернов
-
-#### Strategy и State: структура
-
-**Слайд 11: СТРУКТУРА**
 ```mermaid
 classDiagram
-    class Context {
-        -Strategy strategy
-        +SetStrategy(Strategy)
-        +Execute()
-    }
-    class Strategy {
-        <<interface>>
-        +Algorithm()
-    }
-    class ConcreteStrategyA
-    class ConcreteStrategyB
-    Context --> Strategy
-    Strategy <|.. ConcreteStrategyA
-    Strategy <|.. ConcreteStrategyB
+  class Document {
+    -DocumentState state
+    +setState(state)
+    +sign()
+    +accept()
+    +complete()
+  }
+
+  class DocumentState {
+    <<interface>>
+    +sign(document)
+    +accept(document)
+    +complete(document)
+  }
+
+  class DraftState
+  class SignedState
+  class AcceptedState
+  class DoneState
+
+  Document --> DocumentState
+  DocumentState <|.. DraftState
+  DocumentState <|.. SignedState
+  DocumentState <|.. AcceptedState
+  DocumentState <|.. DoneState
 ```
 
-::: warning Текст слайда из PDF
-СТРУКТУРА
-1.   Контекст хранит ссылку на объект
-     конкретной стратегии.
-2.   Стратегия определяет интерфейс,
-     общий для всех вариаций алгоритма.
-3.   Конкретные стратегии реализуют
-     различные вариации алгоритма.
-4.   Во время выполнения программы
-     контекст получает вызовы от клиента
-     и делегирует их объекту конкретной
-     стратегии.
-5.   Клиент должен создать объект
-     конкретной стратегии и передать его в
-     конструктор контекста. Кроме этого,
-     клиент должен иметь возможность
-     заменить стратегию на лету, используя
-     сеттер.
+Роли паттерна:
+
+| Роль | Ответственность |
+|------|-----------------|
+| Context | Объект, состояние которого меняется |
+| State | Общий интерфейс действий, зависящих от состояния |
+| ConcreteState | Поведение и переходы конкретного состояния |
+| Client | Работает с контекстом, не выбирая ветки вручную |
+
+::: multi-code "State: документ"
+
+```kotlin
+interface DocumentState {
+    val name: String
+    fun sign(document: Document) = error("Нельзя подписать из состояния $name")
+    fun accept(document: Document) = error("Нельзя принять из состояния $name")
+    fun complete(document: Document) = error("Нельзя завершить из состояния $name")
+}
+
+class Document(initialState: DocumentState) {
+    var state: DocumentState = initialState
+        private set
+
+    fun changeState(next: DocumentState) {
+        state = next
+    }
+
+    fun sign() = state.sign(this)
+    fun accept() = state.accept(this)
+    fun complete() = state.complete(this)
+}
+
+class DraftState : DocumentState {
+    override val name = "Черновик"
+    override fun sign(document: Document) = document.changeState(SignedState())
+}
+
+class SignedState : DocumentState {
+    override val name = "Подписан"
+    override fun accept(document: Document) = document.changeState(AcceptedState())
+}
+
+class AcceptedState : DocumentState {
+    override val name = "Принят"
+    override fun complete(document: Document) = document.changeState(DoneState())
+}
+
+class DoneState : DocumentState {
+    override val name = "Завершен"
+}
+```
+
+```kotlin playground
+interface DocumentState {
+    val name: String
+    fun sign(document: Document) = println("Нельзя подписать из состояния $name")
+    fun accept(document: Document) = println("Нельзя принять из состояния $name")
+    fun complete(document: Document) = println("Нельзя завершить из состояния $name")
+}
+
+class Document(initialState: DocumentState) {
+    var state: DocumentState = initialState
+        private set
+
+    fun changeState(next: DocumentState) {
+        println("${state.name} -> ${next.name}")
+        state = next
+    }
+
+    fun sign() = state.sign(this)
+    fun accept() = state.accept(this)
+    fun complete() = state.complete(this)
+}
+
+class DraftState : DocumentState {
+    override val name = "Черновик"
+    override fun sign(document: Document) = document.changeState(SignedState())
+}
+
+class SignedState : DocumentState {
+    override val name = "Подписан"
+    override fun accept(document: Document) = document.changeState(AcceptedState())
+}
+
+class AcceptedState : DocumentState {
+    override val name = "Принят"
+    override fun complete(document: Document) = document.changeState(DoneState())
+}
+
+class DoneState : DocumentState {
+    override val name = "Завершен"
+}
+
+fun main() {
+    val document = Document(DraftState())
+    document.accept()
+    document.sign()
+    document.accept()
+    document.complete()
+    document.sign()
+}
+```
+
+```csharp
+public interface IDocumentState
+{
+    string Name { get; }
+    void Sign(Document document) => throw new InvalidOperationException($"Нельзя подписать из состояния {Name}");
+    void Accept(Document document) => throw new InvalidOperationException($"Нельзя принять из состояния {Name}");
+    void Complete(Document document) => throw new InvalidOperationException($"Нельзя завершить из состояния {Name}");
+}
+
+public sealed class Document
+{
+    public IDocumentState State { get; private set; }
+
+    public Document(IDocumentState initialState) => State = initialState;
+
+    public void ChangeState(IDocumentState next) => State = next;
+    public void Sign() => State.Sign(this);
+    public void Accept() => State.Accept(this);
+    public void Complete() => State.Complete(this);
+}
+
+public sealed class DraftState : IDocumentState
+{
+    public string Name => "Черновик";
+    public void Sign(Document document) => document.ChangeState(new SignedState());
+}
+
+public sealed class SignedState : IDocumentState
+{
+    public string Name => "Подписан";
+    public void Accept(Document document) => document.ChangeState(new AcceptedState());
+}
+
+public sealed class AcceptedState : IDocumentState
+{
+    public string Name => "Принят";
+    public void Complete(Document document) => document.ChangeState(new DoneState());
+}
+
+public sealed class DoneState : IDocumentState
+{
+    public string Name => "Завершен";
+}
+```
+
+```java
+interface DocumentState {
+    String name();
+
+    default void sign(Document document) {
+        throw new IllegalStateException("Нельзя подписать из состояния " + name());
+    }
+
+    default void accept(Document document) {
+        throw new IllegalStateException("Нельзя принять из состояния " + name());
+    }
+
+    default void complete(Document document) {
+        throw new IllegalStateException("Нельзя завершить из состояния " + name());
+    }
+}
+
+final class Document {
+    private DocumentState state;
+
+    Document(DocumentState initialState) {
+        state = initialState;
+    }
+
+    void changeState(DocumentState next) {
+        state = next;
+    }
+
+    void sign() { state.sign(this); }
+    void accept() { state.accept(this); }
+    void complete() { state.complete(this); }
+}
+
+final class DraftState implements DocumentState {
+    public String name() { return "Черновик"; }
+    public void sign(Document document) { document.changeState(new SignedState()); }
+}
+
+final class SignedState implements DocumentState {
+    public String name() { return "Подписан"; }
+    public void accept(Document document) { document.changeState(new AcceptedState()); }
+}
+```
+
+```go
+package main
+
+import "fmt"
+
+type DocumentState interface {
+	Name() string
+	Sign(document *Document) error
+	Accept(document *Document) error
+	Complete(document *Document) error
+}
+
+type Document struct {
+	state DocumentState
+}
+
+func NewDocument(initialState DocumentState) *Document {
+	return &Document{state: initialState}
+}
+
+func (d *Document) ChangeState(next DocumentState) {
+	d.state = next
+}
+
+func (d *Document) Sign() error     { return d.state.Sign(d) }
+func (d *Document) Accept() error   { return d.state.Accept(d) }
+func (d *Document) Complete() error { return d.state.Complete(d) }
+
+type DraftState struct{}
+
+func (DraftState) Name() string { return "Черновик" }
+func (DraftState) Sign(document *Document) error {
+	document.ChangeState(SignedState{})
+	return nil
+}
+func (s DraftState) Accept(*Document) error   { return fmt.Errorf("нельзя принять из состояния %s", s.Name()) }
+func (s DraftState) Complete(*Document) error { return fmt.Errorf("нельзя завершить из состояния %s", s.Name()) }
+
+type SignedState struct{}
+
+func (SignedState) Name() string { return "Подписан" }
+func (SignedState) Sign(*Document) error { return fmt.Errorf("уже подписан") }
+func (SignedState) Accept(document *Document) error {
+	document.ChangeState(AcceptedState{})
+	return nil
+}
+func (SignedState) Complete(*Document) error { return fmt.Errorf("сначала нужно принять документ") }
+
+type AcceptedState struct{}
+```
+
 :::
 
-**Слайд 22: СТРУКТУРА**
+### Кто отвечает за переходы
+
+Есть два распространенных варианта.
+
+| Вариант | Как работает | Когда удобен |
+|---------|--------------|--------------|
+| Переходы внутри состояний | `DraftState.sign()` переводит документ в `SignedState` | Правила переходов тесно связаны с состояниями |
+| Переходы в контексте | Состояние только разрешает действие, а `Document` выбирает следующее состояние | Нужно централизованно логировать, валидировать или хранить переходы |
+
+В учебном примере переходы живут в состояниях: так лучше видно сам паттерн. В промышленном коде часто добавляют
+таблицу переходов, доменные события, аудит или отдельный workflow engine.
+
+### Когда применять
+
+- Поведение объекта заметно меняется в зависимости от состояния.
+- Состояний достаточно много, и у каждого есть свои допустимые действия.
+- Переходы меняются чаще, чем остальной контекст.
+- В классе уже есть похожие условные операторы по одному и тому же полю `status`, `state` или `mode`.
+
+### Плюсы и минусы
+
+| Плюсы | Минусы |
+|-------|--------|
+| Логика состояния локализована | Много маленьких классов |
+| Контекст освобождается от больших условных операторов | Сложнее увидеть всю машину состояний в одном месте |
+| Легче добавлять промежуточные состояния | Для двух стабильных состояний избыточен |
+| Недопустимые действия можно описывать явно | Нужно следить за консистентностью переходов |
+
+::: warning State не нужен для каждого enum
+Если объект имеет два-три стабильных состояния и простые переходы, enum и понятные проверки могут быть лучше. State
+окупается, когда состояние несет самостоятельное поведение, а не просто хранит подпись в базе данных.
+:::
+
+### State и Strategy
+
+| Вопрос | Strategy | State |
+|--------|----------|-------|
+| Что меняется? | Вариант алгоритма | Внутреннее состояние объекта |
+| Кто обычно выбирает объект поведения? | Клиент или пользовательский сценарий | Сам контекст или текущее состояние |
+| Есть ли переходы? | Обычно нет | Да, это центральная часть паттерна |
+| Пример | Выбрать способ построения маршрута | Документ переходит из черновика в подписанный |
+
+## Template Method
+
+**Template Method** задает скелет алгоритма в базовом классе, а отдельные шаги оставляет подклассам. Порядок шагов
+фиксирован, но некоторые шаги могут быть абстрактными, иметь реализацию по умолчанию или быть hooks - необязательными
+точками расширения.
+
+### Проблема
+
+Допустим, есть несколько обработчиков документов: PDF, JSON и XML. Общий процесс одинаковый:
+
+1. открыть источник;
+2. извлечь данные;
+3. проверить данные;
+4. построить отчет;
+5. закрыть источник.
+
+Различается в основном извлечение данных. Если скопировать весь алгоритм в каждый класс, то любое изменение общего шага
+придется повторять во всех обработчиках.
+
+### Решение
+
+Базовый класс фиксирует метод `process()`. Он вызывает шаги в нужном порядке. Подклассы переопределяют только то, что
+действительно отличается.
+
 ```mermaid
 classDiagram
-    class Context {
-        -State state
-        +SetState(State)
-        +Request()
-    }
-    class State {
-        <<interface>>
-        +Handle(Context)
-    }
-    class ConcreteStateA
-    class ConcreteStateB
-    Context --> State
-    State <|.. ConcreteStateA
-    State <|.. ConcreteStateB
+  class DocumentProcessor {
+    +process(source) Report
+    #open(source)
+    #extractData()
+    #validate(data)
+    #buildReport(data)
+    #close()
+  }
+
+  class PdfDocumentProcessor
+  class JsonDocumentProcessor
+
+  DocumentProcessor <|-- PdfDocumentProcessor
+  DocumentProcessor <|-- JsonDocumentProcessor
 ```
 
-::: warning Текст слайда из PDF
-СТРУКТУРА
+Виды шагов:
 
-1.   Контекст хранит ссылку на объект
-     состояния и делегирует ему часть
-     работы, зависящей от состояний.
-2.   Состояние описывает общий
-     интерфейс для всех конкретных
-     состояний.
-3.   Конкретные состояния реализуют
-     поведения, связанные с
-     определённым состоянием
-     контекста.
-4.   И контекст, и объекты конкретных
-     состояний могут решать, когда и
-     какое следующее состояние будет
-     выбрано.
+| Вид шага | Что означает |
+|----------|--------------|
+| Абстрактный шаг | Подкласс обязан дать реализацию |
+| Шаг с реализацией по умолчанию | Подкласс может использовать готовое поведение |
+| Hook | Пустой или минимальный метод, который подкласс переопределяет при необходимости |
+
+::: multi-code "Template Method: образовательный процесс"
+
+```kotlin
+abstract class EducationProcess {
+    fun study() {
+        enroll()
+        learn()
+        passExams()
+        afterExams()
+        receiveDocument()
+    }
+
+    protected abstract fun enroll()
+    protected abstract fun learn()
+
+    protected open fun passExams() {
+        println("Сдать итоговую аттестацию")
+    }
+
+    protected open fun afterExams() {}
+
+    protected abstract fun receiveDocument()
+}
+
+class UniversityEducation : EducationProcess() {
+    override fun enroll() = println("Сдать вступительные экзамены")
+    override fun learn() = println("Пройти семестры, зачеты и практику")
+    override fun afterExams() = println("Защитить выпускную работу")
+    override fun receiveDocument() = println("Получить диплом")
+}
+```
+
+```kotlin playground
+abstract class EducationProcess {
+    fun study() {
+        enroll()
+        learn()
+        passExams()
+        afterExams()
+        receiveDocument()
+    }
+
+    protected abstract fun enroll()
+    protected abstract fun learn()
+
+    protected open fun passExams() {
+        println("Сдать итоговую аттестацию")
+    }
+
+    protected open fun afterExams() {}
+
+    protected abstract fun receiveDocument()
+}
+
+class SchoolEducation : EducationProcess() {
+    override fun enroll() = println("Поступить в школу")
+    override fun learn() = println("Изучать школьную программу")
+    override fun receiveDocument() = println("Получить аттестат")
+}
+
+class UniversityEducation : EducationProcess() {
+    override fun enroll() = println("Сдать вступительные экзамены")
+    override fun learn() = println("Пройти семестры, зачеты и практику")
+    override fun afterExams() = println("Защитить выпускную работу")
+    override fun receiveDocument() = println("Получить диплом")
+}
+
+fun main() {
+    val processes = listOf(SchoolEducation(), UniversityEducation())
+    processes.forEach {
+        it.study()
+        println("---")
+    }
+}
+```
+
+```csharp
+public abstract class EducationProcess
+{
+    public void Study()
+    {
+        Enroll();
+        Learn();
+        PassExams();
+        AfterExams();
+        ReceiveDocument();
+    }
+
+    protected abstract void Enroll();
+    protected abstract void Learn();
+
+    protected virtual void PassExams() =>
+        Console.WriteLine("Сдать итоговую аттестацию");
+
+    protected virtual void AfterExams() {}
+
+    protected abstract void ReceiveDocument();
+}
+
+public sealed class UniversityEducation : EducationProcess
+{
+    protected override void Enroll() => Console.WriteLine("Сдать вступительные экзамены");
+    protected override void Learn() => Console.WriteLine("Пройти семестры, зачеты и практику");
+    protected override void AfterExams() => Console.WriteLine("Защитить выпускную работу");
+    protected override void ReceiveDocument() => Console.WriteLine("Получить диплом");
+}
+```
+
+```java
+abstract class EducationProcess {
+    public final void study() {
+        enroll();
+        learn();
+        passExams();
+        afterExams();
+        receiveDocument();
+    }
+
+    protected abstract void enroll();
+    protected abstract void learn();
+
+    protected void passExams() {
+        System.out.println("Сдать итоговую аттестацию");
+    }
+
+    protected void afterExams() {}
+
+    protected abstract void receiveDocument();
+}
+
+final class UniversityEducation extends EducationProcess {
+    protected void enroll() { System.out.println("Сдать вступительные экзамены"); }
+    protected void learn() { System.out.println("Пройти семестры, зачеты и практику"); }
+    protected void afterExams() { System.out.println("Защитить выпускную работу"); }
+    protected void receiveDocument() { System.out.println("Получить диплом"); }
+}
+```
+
+```go
+package main
+
+import "fmt"
+
+type EducationSteps interface {
+	Enroll()
+	Learn()
+	PassExams()
+	AfterExams()
+	ReceiveDocument()
+}
+
+func Study(steps EducationSteps) {
+	steps.Enroll()
+	steps.Learn()
+	steps.PassExams()
+	steps.AfterExams()
+	steps.ReceiveDocument()
+}
+
+type UniversityEducation struct{}
+
+func (UniversityEducation) Enroll()          { fmt.Println("Сдать вступительные экзамены") }
+func (UniversityEducation) Learn()           { fmt.Println("Пройти семестры, зачеты и практику") }
+func (UniversityEducation) PassExams()       { fmt.Println("Сдать итоговую аттестацию") }
+func (UniversityEducation) AfterExams()      { fmt.Println("Защитить выпускную работу") }
+func (UniversityEducation) ReceiveDocument() { fmt.Println("Получить диплом") }
+```
+
 :::
 
-#### Template Method и Observer: структура
+::: warning Template Method легко нарушает LSP
+Если подкласс меняет смысл шага так, что общий алгоритм перестает быть корректным, клиент уже не может безопасно
+использовать подкласс вместо базового класса. Поэтому шаблонный метод часто делают `final`/непереопределяемым, а
+подклассам оставляют только заранее выбранные шаги.
+:::
 
-**Слайд 38: СТРУКТУРА**
+### Когда применять
+
+- У нескольких классов одинаковый порядок действий, но отдельные шаги отличаются.
+- Нужно убрать дублирование общего алгоритма.
+- Подклассы должны расширять алгоритм, не меняя его структуру.
+- В базовом классе есть полезная общая реализация части шагов.
+
+### Плюсы и минусы
+
+| Плюсы | Минусы |
+|-------|--------|
+| Переиспользуется общий каркас алгоритма | Жесткая связь через наследование |
+| Общие шаги меняются в одном месте | Новый сценарий может не вписаться в старый скелет |
+| Подклассы переопределяют только отличия | С ростом числа шагов алгоритм трудно поддерживать |
+| Порядок выполнения централизован | Неправильное переопределение может нарушить LSP |
+
+### Template Method и Strategy
+
+| Вопрос | Template Method | Strategy |
+|--------|-----------------|----------|
+| Основной механизм | Наследование | Композиция и делегирование |
+| Что фиксировано? | Порядок шагов алгоритма | Интерфейс алгоритма |
+| Что меняется? | Отдельные шаги в подклассах | Весь алгоритм-стратегия |
+| Runtime-замена | Обычно нет | Обычно да |
+
+## Observer
+
+**Observer** связывает объект-издатель и набор подписчиков. Когда состояние издателя меняется, он уведомляет только тех,
+кто подписался на событие. Издатель не знает конкретные классы подписчиков: он знает только интерфейс наблюдателя.
+
+### Проблема
+
+В UI часто есть модель данных и элементы интерфейса. Коллекция пользователей изменилась - список на экране должен
+перерисоваться. Курс валют изменился - банк должен обновить табло, а брокер решить, покупать или продавать. Но издатель
+не должен быть жестко связан со всеми потенциальными получателями.
+
+Плохой вариант - заставить издателя напрямую вызывать конкретные классы:
+
+```kotlin
+bank.updateRates(info)
+broker.analyze(info)
+mobileApp.sendPush(info)
+```
+
+Такой код знает слишком много. Добавление нового получателя заставляет менять издателя.
+
+### Решение
+
+Издатель хранит список наблюдателей. Наблюдатель реализует общий метод `update`. При изменении состояния издатель
+проходит по списку и вызывает `update` у каждого подписчика.
+
+```mermaid
+flowchart LR
+  Exchange[Биржа] -->|notify StockInfo| Bank[Банк]
+  Exchange -->|notify StockInfo| Broker[Брокер]
+  Exchange -->|notify StockInfo| MobileApp[Мобильное приложение]
+```
+
 ```mermaid
 classDiagram
-    class AbstractClass {
-        +TemplateMethod()
-        #StepA()
-        #StepB()
-    }
-    class ConcreteClass
-    AbstractClass <|-- ConcreteClass
+  class Publisher {
+    +subscribe(observer)
+    +unsubscribe(observer)
+    +notify(event)
+  }
+
+  class Observer {
+    <<interface>>
+    +update(event)
+  }
+
+  class Exchange
+  class Bank
+  class Broker
+
+  Publisher <|.. Exchange
+  Observer <|.. Bank
+  Observer <|.. Broker
+  Exchange --> Observer
 ```
 
-::: warning Текст слайда из PDF
-СТРУКТУРА
+::: multi-code "Observer: биржа и подписчики"
 
-1.   Абстрактный класс определяет шаги
-     алгоритма и содержит шаблонный метод,
-     состоящий из вызовов этих шагов. Шаги
-     могут быть как абстрактными, так и
-     содержать реализацию по умолчанию.
-2.   Конкретный класс переопределяет
-     некоторые (или все) шаги алгоритма.
-     Конкретные классы не переопределяют
-     сам шаблонный метод.
+```kotlin
+data class StockInfo(val usd: Double, val eur: Double)
+
+interface Observer {
+    fun update(info: StockInfo)
+}
+
+class Exchange {
+    private val observers = mutableSetOf<Observer>()
+
+    fun subscribe(observer: Observer) {
+        observers += observer
+    }
+
+    fun unsubscribe(observer: Observer) {
+        observers -= observer
+    }
+
+    fun publish(info: StockInfo) {
+        observers.forEach { it.update(info) }
+    }
+}
+
+class Bank : Observer {
+    override fun update(info: StockInfo) {
+        println("Банк обновил курс EUR: ${info.eur}")
+    }
+}
+```
+
+```kotlin playground
+data class StockInfo(val usd: Double, val eur: Double)
+
+interface Observer {
+    fun update(info: StockInfo)
+}
+
+class Exchange {
+    private val observers = mutableSetOf<Observer>()
+
+    fun subscribe(observer: Observer) {
+        observers += observer
+    }
+
+    fun unsubscribe(observer: Observer) {
+        observers -= observer
+    }
+
+    fun publish(info: StockInfo) {
+        println("Биржа публикует USD=${info.usd}, EUR=${info.eur}")
+        observers.toList().forEach { it.update(info) }
+    }
+}
+
+class Bank : Observer {
+    override fun update(info: StockInfo) {
+        println("Банк обновил курс EUR: ${info.eur}")
+    }
+}
+
+class Broker(private val name: String) : Observer {
+    override fun update(info: StockInfo) {
+        if (info.usd > 95.0) {
+            println("$name продает доллары")
+        } else {
+            println("$name ждет")
+        }
+    }
+}
+
+fun main() {
+    val exchange = Exchange()
+    val bank = Bank()
+    val broker = Broker("Брокер")
+
+    exchange.subscribe(bank)
+    exchange.subscribe(broker)
+    exchange.publish(StockInfo(94.0, 101.0))
+
+    exchange.unsubscribe(broker)
+    exchange.publish(StockInfo(97.0, 104.0))
+}
+```
+
+```csharp
+public record StockInfo(double Usd, double Eur);
+
+public interface IObserver
+{
+    void Update(StockInfo info);
+}
+
+public sealed class Exchange
+{
+    private readonly HashSet<IObserver> _observers = new();
+
+    public void Subscribe(IObserver observer) => _observers.Add(observer);
+    public void Unsubscribe(IObserver observer) => _observers.Remove(observer);
+
+    public void Publish(StockInfo info)
+    {
+        foreach (var observer in _observers.ToArray())
+        {
+            observer.Update(info);
+        }
+    }
+}
+
+public sealed class Bank : IObserver
+{
+    public void Update(StockInfo info) =>
+        Console.WriteLine($"Банк обновил курс EUR: {info.Eur}");
+}
+```
+
+```java
+import java.util.ArrayList;
+import java.util.List;
+
+record StockInfo(double usd, double eur) {}
+
+interface Observer {
+    void update(StockInfo info);
+}
+
+final class Exchange {
+    private final List<Observer> observers = new ArrayList<>();
+
+    void subscribe(Observer observer) {
+        observers.add(observer);
+    }
+
+    void unsubscribe(Observer observer) {
+        observers.remove(observer);
+    }
+
+    void publish(StockInfo info) {
+        for (Observer observer : List.copyOf(observers)) {
+            observer.update(info);
+        }
+    }
+}
+
+final class Bank implements Observer {
+    public void update(StockInfo info) {
+        System.out.println("Банк обновил курс EUR: " + info.eur());
+    }
+}
+```
+
+```go
+package main
+
+import "fmt"
+
+type StockInfo struct {
+	USD float64
+	EUR float64
+}
+
+type Observer interface {
+	Update(info StockInfo)
+}
+
+type Exchange struct {
+	observers []Observer
+}
+
+func (e *Exchange) Subscribe(observer Observer) {
+	e.observers = append(e.observers, observer)
+}
+
+func (e *Exchange) Publish(info StockInfo) {
+	for _, observer := range e.observers {
+		observer.Update(info)
+	}
+}
+
+type Bank struct{}
+
+func (Bank) Update(info StockInfo) {
+	fmt.Println("Банк обновил курс EUR:", info.EUR)
+}
+```
+
 :::
 
-**Слайд 50: СТРУКТУРА**
+### Push и Pull
+
+| Модель | Как работает | Плюсы | Минусы |
+|--------|--------------|-------|--------|
+| Push | Издатель передает данные события в `update(event)` | Подписчику не нужно лезть обратно в издателя | Нужно заранее спроектировать объект события |
+| Pull | Издатель сообщает "я изменился", а подписчик сам читает нужные поля | Подписчик берет только нужные данные | Подписчик сильнее знает издателя |
+
+В UI и доменных событиях чаще используют push: событие несет данные, которые нужны для реакции.
+
+### Когда применять
+
+- После изменения одного объекта должны реагировать другие объекты.
+- Заранее неизвестно, какие именно объекты будут подписчиками.
+- Подписка и отписка нужны во время работы программы.
+- Нужно ослабить связь между источником события и получателями.
+
+### Плюсы и минусы
+
+| Плюсы | Минусы |
+|-------|--------|
+| Издатель не зависит от конкретных подписчиков | Порядок уведомлений может быть неочевидным |
+| Подписчики подключаются и отключаются в runtime | Забытые подписки могут удерживать объекты в памяти |
+| Новые реакции добавляются без изменения издателя | Ошибка одного подписчика может повлиять на цепочку уведомлений |
+| Хорошо подходит для UI и событийной модели | Сложнее отлаживать цепочки реакций |
+
+::: warning Следите за жизненным циклом подписок
+Если подписчик живет меньше издателя, его нужно отписывать или использовать механизм слабых ссылок/автоматического
+освобождения. Иначе издатель будет удерживать ссылку на объект, который уже не должен участвовать в работе программы.
+:::
+
+## Command
+
+**Command** превращает запрос или действие в объект. Такой объект можно передать в другой класс, положить в очередь,
+сохранить, выполнить позже, повторить или отменить.
+
+### Проблема
+
+Одно и то же действие "сохранить документ" может запускаться из кнопки toolbar, пункта меню, контекстного меню и
+комбинации клавиш `Ctrl+S`. Если каждый элемент UI напрямую знает бизнес-логику сохранения, логика дублируется и UI
+становится связанным с получателем операции.
+
+Похожая идея есть в ресторане: клиент произносит заказ, официант фиксирует его на бумаге, а повар выполняет позже.
+Заказ стал объектом: его можно положить в очередь и обработать не сразу.
+
+### Решение
+
+Вводится интерфейс `Command` с методом `execute`. Если нужна отмена, добавляют `undo`. Конкретная команда знает
+получателя (`Receiver`) и вызывает у него нужную бизнес-операцию. Инициатор (`Invoker`) хранит команду и запускает ее, не
+зная деталей получателя.
+
 ```mermaid
 classDiagram
-    class Subject {
-        +Attach(Observer)
-        +Detach(Observer)
-        +Notify()
-    }
-    class Observer {
-        <<interface>>
-        +Update()
-    }
-    class ConcreteSubject
-    class ConcreteObserver
-    Subject <|-- ConcreteSubject
-    Observer <|.. ConcreteObserver
-    ConcreteSubject --> Observer
+  class Command {
+    <<interface>>
+    +execute()
+    +undo()
+  }
+
+  class InsertTextCommand
+  class TextEditor {
+    +insert(position, text)
+    +delete(position, length)
+  }
+  class ToolbarButton
+  class KeyboardShortcut
+
+  Command <|.. InsertTextCommand
+  InsertTextCommand --> TextEditor
+  ToolbarButton --> Command
+  KeyboardShortcut --> Command
 ```
 
-::: warning Текст слайда из PDF
-СТРУКТУРА
-1. Издатель владеет внутренним состоянием,
-изменение которого интересно отслеживать
-подписчикам.
-2. Когда внутреннее состояние издателя меняется, он
-оповещает своих подписчиков.
-3. Подписчик определяет интерфейс, которым
-пользуется издатель для отправки оповещения.
-4. Конкретные подписчики выполняют что-то
-в ответ на оповещение, пришедшее от издателя.
-5. По приходу оповещения подписчику нужно получить
-обновлённое состояние издателя.
-6. Клиент создаёт объекты издателей и подписчиков, а
-затем регистрирует подписчиков
-на обновления в издателях.
+Роли паттерна:
+
+| Роль | Ответственность |
+|------|-----------------|
+| Command | Общий интерфейс действия |
+| ConcreteCommand | Хранит параметры действия и ссылку на получателя |
+| Receiver | Содержит бизнес-логику, которую нужно выполнить |
+| Invoker | Запускает команду, не зная деталей |
+| Client | Создает команду и связывает ее с получателем |
+
+::: multi-code "Command: текстовый редактор"
+
+```kotlin
+interface Command {
+    fun execute()
+    fun undo()
+}
+
+class TextEditor {
+    private val content = StringBuilder()
+
+    fun insert(position: Int, text: String) {
+        content.insert(position, text)
+    }
+
+    fun delete(position: Int, length: Int) {
+        content.delete(position, position + length)
+    }
+
+    override fun toString(): String = content.toString()
+}
+
+class InsertTextCommand(
+    private val editor: TextEditor,
+    private val position: Int,
+    private val text: String
+) : Command {
+    override fun execute() = editor.insert(position, text)
+    override fun undo() = editor.delete(position, text.length)
+}
+```
+
+```kotlin playground
+interface Command {
+    fun execute()
+    fun undo()
+}
+
+class TextEditor {
+    private val content = StringBuilder()
+
+    fun insert(position: Int, text: String) {
+        content.insert(position, text)
+    }
+
+    fun delete(position: Int, length: Int) {
+        content.delete(position, position + length)
+    }
+
+    override fun toString(): String = content.toString()
+}
+
+class InsertTextCommand(
+    private val editor: TextEditor,
+    private val position: Int,
+    private val text: String
+) : Command {
+    override fun execute() = editor.insert(position, text)
+    override fun undo() = editor.delete(position, text.length)
+}
+
+class CommandHistory {
+    private val history = ArrayDeque<Command>()
+
+    fun run(command: Command) {
+        command.execute()
+        history.addLast(command)
+    }
+
+    fun undoLast() {
+        history.removeLastOrNull()?.undo()
+    }
+}
+
+fun main() {
+    val editor = TextEditor()
+    val history = CommandHistory()
+
+    history.run(InsertTextCommand(editor, 0, "Hello"))
+    history.run(InsertTextCommand(editor, 5, ", world"))
+    println(editor)
+
+    history.undoLast()
+    println(editor)
+}
+```
+
+```csharp
+public interface ICommand
+{
+    void Execute();
+    void Undo();
+}
+
+public sealed class TextEditor
+{
+    private readonly StringBuilder _content = new();
+
+    public void Insert(int position, string text) =>
+        _content.Insert(position, text);
+
+    public void Delete(int position, int length) =>
+        _content.Remove(position, length);
+
+    public override string ToString() => _content.ToString();
+}
+
+public sealed class InsertTextCommand : ICommand
+{
+    private readonly TextEditor _editor;
+    private readonly int _position;
+    private readonly string _text;
+
+    public InsertTextCommand(TextEditor editor, int position, string text)
+    {
+        _editor = editor;
+        _position = position;
+        _text = text;
+    }
+
+    public void Execute() => _editor.Insert(_position, _text);
+    public void Undo() => _editor.Delete(_position, _text.Length);
+}
+```
+
+```java
+interface Command {
+    void execute();
+    void undo();
+}
+
+final class TextEditor {
+    private final StringBuilder content = new StringBuilder();
+
+    void insert(int position, String text) {
+        content.insert(position, text);
+    }
+
+    void delete(int position, int length) {
+        content.delete(position, position + length);
+    }
+
+    public String toString() {
+        return content.toString();
+    }
+}
+
+final class InsertTextCommand implements Command {
+    private final TextEditor editor;
+    private final int position;
+    private final String text;
+
+    InsertTextCommand(TextEditor editor, int position, String text) {
+        this.editor = editor;
+        this.position = position;
+        this.text = text;
+    }
+
+    public void execute() { editor.insert(position, text); }
+    public void undo() { editor.delete(position, text.length()); }
+}
+```
+
+```go
+package main
+
+import "strings"
+
+type Command interface {
+	Execute()
+	Undo()
+}
+
+type TextEditor struct {
+	content strings.Builder
+}
+
+func (e *TextEditor) Insert(text string) {
+	e.content.WriteString(text)
+}
+
+func (e *TextEditor) DeleteLast(length int) {
+	current := e.content.String()
+	e.content.Reset()
+	e.content.WriteString(current[:len(current)-length])
+}
+
+func (e *TextEditor) String() string {
+	return e.content.String()
+}
+
+type InsertTextCommand struct {
+	editor *TextEditor
+	text   string
+}
+
+func (c InsertTextCommand) Execute() {
+	c.editor.Insert(c.text)
+}
+
+func (c InsertTextCommand) Undo() {
+	c.editor.DeleteLast(len(c.text))
+}
+```
+
 :::
 
-#### Command и Visitor: структура
+### Command и callback
 
-**Слайд 65: СТРУКТУРА**
+Callback тоже можно передать и вызвать позже. Command нужен, когда у действия появляется собственная модель:
+
+| Нужно | Callback | Command |
+|-------|----------|---------|
+| Просто выполнить функцию позже | Подходит | Может быть избыточен |
+| Хранить параметры и получателя | Можно, но неявно | Естественно |
+| Отменять действие | Неудобно | Встроено через `undo` |
+| Логировать, сериализовать, ставить в очередь | Сложнее | Обычно проще |
+| Объединять команды в макрокоманды | Сложнее | Естественно |
+
+### Когда применять
+
+- Одно действие должно запускаться из разных мест интерфейса.
+- Нужны undo/redo.
+- Нужен отложенный запуск или очередь команд.
+- Нужно логировать историю действий.
+- Нужно отделить инициатора действия от получателя.
+
+### Плюсы и минусы
+
+| Плюсы | Минусы |
+|-------|--------|
+| Инициатор не зависит от получателя | Появляется много классов команд |
+| Команды можно хранить и запускать позже | Undo требует аккуратного хранения состояния |
+| Удобно строить историю, очереди, макрокоманды | Сериализация команд может быть сложной |
+| Поддерживает транзакционный стиль | Для простых UI-кнопок может быть избыточен |
+
+::: warning Команда не равна распределенной транзакции
+Если команда сериализуется и отправляется в другой сервис, это еще не гарантирует атомарность, идемпотентность и
+безопасный откат. Для распределенных сценариев отдельно проектируют идентификаторы команд, повторы, дедупликацию,
+компенсирующие действия и обработку частичных сбоев.
+:::
+
+## Visitor
+
+**Visitor** добавляет новые операции к объектной структуре без помещения этих операций внутрь классов элементов. Это
+особенно полезно для деревьев и стабильных иерархий: AST, документов, UI-деревьев, моделей отчетов.
+
+### Проблема
+
+Есть несколько типов объектов: дом, фабрика и банк. Для каждого типа нужно выполнить операцию страхового агента. Потом
+появится другая операция: построить отчет, рассчитать риск, экспортировать данные. Если добавлять все операции прямо в
+классы элементов, они быстро превратятся в набор несвязанных методов.
+
+При этом иерархия элементов стабильна: новые типы зданий появляются редко, а новые операции над ними появляются часто.
+
+### Решение
+
+Элемент получает метод `accept(visitor)`. Внутри `accept` элемент вызывает подходящий метод посетителя, передавая себя:
+`visitor.visitHouse(this)`. Это называется **double dispatch**: сначала клиент выбирает элемент и вызывает `accept`, затем
+сам элемент выбирает правильную перегрузку/метод посетителя по своему конкретному типу.
+
 ```mermaid
 classDiagram
-    class Command {
-        <<interface>>
-        +Execute()
-        +Undo()
+  class Visitor {
+    <<interface>>
+    +visitHouse(house)
+    +visitFactory(factory)
+    +visitBank(bank)
+  }
+
+  class Element {
+    <<interface>>
+    +accept(visitor)
+  }
+
+  class House
+  class Factory
+  class Bank
+  class InsuranceVisitor
+  class ReportVisitor
+
+  Element <|.. House
+  Element <|.. Factory
+  Element <|.. Bank
+  Visitor <|.. InsuranceVisitor
+  Visitor <|.. ReportVisitor
+  House --> Visitor
+  Factory --> Visitor
+  Bank --> Visitor
+```
+
+::: multi-code "Visitor: страховой агент и отчет"
+
+```kotlin
+interface Building {
+    fun accept(visitor: BuildingVisitor)
+}
+
+class House(val owner: String) : Building {
+    override fun accept(visitor: BuildingVisitor) = visitor.visitHouse(this)
+}
+
+class Factory(val title: String) : Building {
+    override fun accept(visitor: BuildingVisitor) = visitor.visitFactory(this)
+}
+
+interface BuildingVisitor {
+    fun visitHouse(house: House)
+    fun visitFactory(factory: Factory)
+}
+
+class InsuranceVisitor : BuildingVisitor {
+    override fun visitHouse(house: House) {
+        println("Предложить ${house.owner} страхование имущества")
     }
-    class ConcreteCommand
-    class Receiver {
-        +Operation()
+
+    override fun visitFactory(factory: Factory) {
+        println("Предложить ${factory.title} страхование от простоя")
     }
-    class Invoker
-    Command <|.. ConcreteCommand
-    ConcreteCommand --> Receiver
-    Invoker --> Command
+}
 ```
 
-::: warning Текст слайда из PDF
-СТРУКТУРА
+```kotlin playground
+interface Building {
+    fun accept(visitor: BuildingVisitor)
+}
 
-1. Отправитель хранит ссылку на объект команды и
-   обращается к нему, когда нужно выполнить какое-
-   то действие..
-2. Команда описывает общий для всех конкретных
-   команд интерфейс.
-3. Конкретные команды реализуют различные
-   запросы, следуя общему интерфейсу команд.
-   Обычно команда передаёт вызов получателю,
-   которым является один из объектов бизнес-логики.
-4. Получатель содержит бизнес-логику программы, вы
-   можете избавиться от получателей, «слив» их код в
-   классы команд.
-5. Клиент создаёт объекты конкретных команд,
-   передавая в них ссылки на объекты получателей.
-   После этого клиент связывает объекты
-   отправителей с созданными командами.
-:::
+class House(val owner: String) : Building {
+    override fun accept(visitor: BuildingVisitor) = visitor.visitHouse(this)
+}
 
-**Слайд 78: СТРУКТУРА**
-```mermaid
-classDiagram
-    class Visitor {
-        +VisitElementA(ElementA)
-        +VisitElementB(ElementB)
+class Factory(val title: String) : Building {
+    override fun accept(visitor: BuildingVisitor) = visitor.visitFactory(this)
+}
+
+class Bank(val title: String) : Building {
+    override fun accept(visitor: BuildingVisitor) = visitor.visitBank(this)
+}
+
+interface BuildingVisitor {
+    fun visitHouse(house: House)
+    fun visitFactory(factory: Factory)
+    fun visitBank(bank: Bank)
+}
+
+class InsuranceVisitor : BuildingVisitor {
+    override fun visitHouse(house: House) {
+        println("Предложить ${house.owner} страхование имущества")
     }
-    class Element {
-        <<interface>>
-        +Accept(Visitor)
+
+    override fun visitFactory(factory: Factory) {
+        println("Предложить ${factory.title} страхование от пожара и простоя")
     }
-    class ElementA
-    class ElementB
-    Element <|.. ElementA
-    Element <|.. ElementB
-    ElementA --> Visitor
-    ElementB --> Visitor
+
+    override fun visitBank(bank: Bank) {
+        println("Предложить ${bank.title} страхование финансовых рисков")
+    }
+}
+
+class ReportVisitor : BuildingVisitor {
+    private val rows = mutableListOf<String>()
+
+    override fun visitHouse(house: House) {
+        rows += "Дом владельца ${house.owner}"
+    }
+
+    override fun visitFactory(factory: Factory) {
+        rows += "Фабрика ${factory.title}"
+    }
+
+    override fun visitBank(bank: Bank) {
+        rows += "Банк ${bank.title}"
+    }
+
+    fun report(): String = rows.joinToString("\n")
+}
+
+fun main() {
+    val buildings: List<Building> = listOf(
+        House("Анна"),
+        Factory("Северный завод"),
+        Bank("Городской банк")
+    )
+
+    val insurance = InsuranceVisitor()
+    buildings.forEach { it.accept(insurance) }
+
+    val report = ReportVisitor()
+    buildings.forEach { it.accept(report) }
+    println("---")
+    println(report.report())
+}
 ```
 
-::: warning Текст слайда из PDF
-СТРУКТУРА
-1.Посетитель описывает общий интерфейс для всех
-типов посетителей. Он объявляет набор методов,
-отличающихся типом входящего параметра.
-2.Конкретные посетители реализуют какое-то
-особенное поведение для всех типов элементов,
-которые можно подать через методы интерфейса
-посетителя.
-3.Элемент описывает метод принятия посетителя.
-Этот метод должен иметь единственный параметр,
-объявленный с типом интерфейса посетителя.
-4.Конкретные элементы реализуют методы
-принятия посетителя. Цель этого метода — вызвать
-тот метод посещения, который соответствует типу
-этого элемента. Так посетитель узнает, с каким
-именно элементом он работает.
-5.Клиентом зачастую выступает коллекция или
-сложный составной объект
-:::
+```csharp
+public interface IBuilding
+{
+    void Accept(IBuildingVisitor visitor);
+}
 
-Структурно паттерн выглядит на самом деле несложно. Есть целевой класс, навигатор, который будет в себе содержать интерфейс той или иной стратегии. А **реализация** этих стратегий, то есть вот этих алгоритмов, они будут оформлены в виде отдельных классов. И тогда вы можете при инициализации вашего навигатора подсунуть ему стратегию. Но самое что прекрасное, вы можете на лету сменить одну стратегию на другую стратегию, не пересоздавая инстанс навигатора. Вы можете просто на экране телефона кликнуть «Построй маршрут мне на общественном транспорте», «Построй мне на автомобиле». Участники данного паттерна у нас следующие.
+public sealed class House : IBuilding
+{
+    public string Owner { get; }
+    public House(string owner) => Owner = owner;
+    public void Accept(IBuildingVisitor visitor) => visitor.VisitHouse(this);
+}
 
-Это контекст, который хранит ссылку на интерфейс стратегии, но дальше этот интерфейс реализует уже конкретные стратегии с теми или иными алгоритмами. Ну и во время выполнения программы контекст получает от клиентского кода, от основной программы мейна, от клиентского кода получает уже конкретную стратегию. Но самое прекрасное, что клиент может и в момент рантайма заменить у контекста одну стратегию на другую. Концептуальный пример может выглядеть следующим образом. У нас с вами есть интерфейс, который описывает методы стратегии. Потому что наш контекст должен знать о... интерфейсе данной стратегии, чтобы потом в дальнейшем вызвать тот или иной алгоритм.
+public sealed class Factory : IBuilding
+{
+    public string Title { get; }
+    public Factory(string title) => Title = title;
+    public void Accept(IBuildingVisitor visitor) => visitor.VisitFactory(this);
+}
 
-И, собственно, контекст может получать стратегию либо при инициализации, но чаще всего это поле оставляют открытым, чтобы уже в runtime можно было у контекста поменять стратегию, не пересоздавая сам класс контекста. И, собственно, метод, который заставит выполниться алгоритм, полученного либо при инициализации, либо в дальнейшем, той или иной стратегии. Количество стратегий может быть каким угодно, сколько угодно.
+public interface IBuildingVisitor
+{
+    void VisitHouse(House house);
+    void VisitFactory(Factory factory);
+}
 
-Давайте теперь посмотрим, после вот такого концептуального примера, давайте попробуем на более-менее реалистичном примере рассмотреть, где бы мы могли применить стратегию. Ну и вот наш излюбленный пример с автомобилями. У нас есть автомобиль, но автомобиль может... Гибридный автомобиль может передвигаться на бензине, на электротяге двигателя, на дизеле. И при этом мы можем из мультимедиа меню нашего автомобиля поменять способ передвижения. В момент движения даже. Применим здесь стратегию. Нам понадобится интерфейс стратегии. В данном случае это у нас будет iMovable. И мы говорим, что у любой стратегии... будет метод Move.
+public sealed class InsuranceVisitor : IBuildingVisitor
+{
+    public void VisitHouse(House house) =>
+        Console.WriteLine($"Предложить {house.Owner} страхование имущества");
 
-Дальше, собственно, в зависимости от того, на чем будет передвигаться, на каком виде топлива, бензин, дизель, электро, мы реализуем конкретные стратегии, и он реализует тот самый метод, который был заложен в интерфейсе стратегии. Ну а дальше, создавая автомобиль, мы либо при его создании определяем стратегию передвижения, либо в дальнейшем можем при создании... мы можем сразу заложить способ передвижения и выполнить ту или иную стратегию, которая в него была передана в момент создания. Но нам ничего не мешает в дальнейшем подменить стратегию передвижения автомобиля на другую.
-
-### Применимость поведенческих паттернов
-
-#### Strategy и State: применимость
-
-**Слайд 16: ПРИМЕНИМОСТЬ**
-```mermaid
-flowchart TD
-    Strategy[Strategy применима] --> Variants[Есть разные варианты одного алгоритма]
-    Strategy --> ManyClasses[Есть похожие классы с разным поведением]
-    Strategy --> Hide[Нужно скрыть детали алгоритма от контекста]
-    Strategy --> IfElse[Класс разрастается условными операторами]
+    public void VisitFactory(Factory factory) =>
+        Console.WriteLine($"Предложить {factory.Title} страхование от простоя");
+}
 ```
 
-::: warning Текст слайда из PDF
-ПРИМЕНИМОСТЬ
+```java
+interface Building {
+    void accept(BuildingVisitor visitor);
+}
 
-• Когда вам нужно использовать разные вариации какого-то
-  алгоритма внутри одного объекта.
-• Когда у вас есть множество похожих классов, отличающихся
-  только некоторым поведением.
-• Когда вы не хотите обнажать детали реализации алгоритмов для
-  других классов.
-• Когда различные вариации алгоритмов реализованы в виде
-  развесистого условного оператора. Каждая ветка такого
-  оператора представляет собой вариацию алгоритма.
-:::
+final class House implements Building {
+    final String owner;
 
-**Слайд 31: ПРИМЕНИМОСТЬ**
-```mermaid
-flowchart TD
-    State[State применим] --> Behavior[Поведение зависит от состояния]
-    State --> Transitions[Есть правила переходов между состояниями]
-    State --> IfElse[В классе много похожих условных операторов]
+    House(String owner) {
+        this.owner = owner;
+    }
+
+    public void accept(BuildingVisitor visitor) {
+        visitor.visitHouse(this);
+    }
+}
+
+final class Factory implements Building {
+    final String title;
+
+    Factory(String title) {
+        this.title = title;
+    }
+
+    public void accept(BuildingVisitor visitor) {
+        visitor.visitFactory(this);
+    }
+}
+
+interface BuildingVisitor {
+    void visitHouse(House house);
+    void visitFactory(Factory factory);
+}
+
+final class InsuranceVisitor implements BuildingVisitor {
+    public void visitHouse(House house) {
+        System.out.println("Предложить " + house.owner + " страхование имущества");
+    }
+
+    public void visitFactory(Factory factory) {
+        System.out.println("Предложить " + factory.title + " страхование от простоя");
+    }
+}
 ```
 
-::: warning Текст слайда из PDF
-ПРИМЕНИМОСТЬ
+```go
+package main
 
-• Когда у вас есть объект, поведение которого кардинально
-  меняется в зависимости от внутреннего состояния.
-• Когда код класса содержит множество больших, похожих друг на
-  друга, условных операторов, которые выбирают поведения в
-  зависимости от текущих значений полей класса.
-• Когда вы сознательно используете табличную машину состояний,
-  построенную на условных операторах, но вынуждены мириться с
-  дублированием кода для похожих состояний и переходов.
-:::
+import "fmt"
 
-#### Template Method и Observer: применимость
+type Building interface {
+	Accept(visitor BuildingVisitor)
+}
 
-**Слайд 44: ПРИМЕНИМОСТЬ**
-```mermaid
-flowchart TD
-    TM[Template Method применим] --> Base[Есть общий алгоритм]
-    TM --> Steps[Подклассы меняют отдельные шаги]
-    TM --> Duplication[Несколько классов делают одно и то же с отличиями]
+type House struct {
+	Owner string
+}
+
+func (h House) Accept(visitor BuildingVisitor) {
+	visitor.VisitHouse(h)
+}
+
+type Factory struct {
+	Title string
+}
+
+func (f Factory) Accept(visitor BuildingVisitor) {
+	visitor.VisitFactory(f)
+}
+
+type BuildingVisitor interface {
+	VisitHouse(house House)
+	VisitFactory(factory Factory)
+}
+
+type InsuranceVisitor struct{}
+
+func (InsuranceVisitor) VisitHouse(house House) {
+	fmt.Println("Предложить", house.Owner, "страхование имущества")
+}
+
+func (InsuranceVisitor) VisitFactory(factory Factory) {
+	fmt.Println("Предложить", factory.Title, "страхование от простоя")
+}
 ```
 
-::: warning Текст слайда из PDF
-ПРИМЕНИМОСТЬ
-
-• Когда подклассы должны расширять базовый алгоритм, не меняя
-  его структуры.
-• Когда у вас есть несколько классов, делающих одно и то же с
-  незначительными отличиями. Если вы редактируете один класс,
-  то приходится вносить такие же правки и в остальные классы.
 :::
 
-**Слайд 58: ПРИМЕНИМОСТЬ**
-```mermaid
-flowchart TD
-    Observer[Observer применим] --> UI[UI наблюдает за моделью]
-    Observer --> Unknown[Заранее неизвестно, кто будет реагировать]
-    Observer --> Runtime[Подписка и отписка нужны в runtime]
-```
+### Когда применять
 
-::: warning Текст слайда из PDF
-ПРИМЕНИМОСТЬ
+- Нужно выполнить операцию над всеми элементами сложной структуры: деревом, AST, документом, UI.
+- Операции над элементами часто добавляются, а типы элементов меняются редко.
+- Не хочется засорять классы элементов несвязанными операциями.
+- Операция должна накапливать состояние во время обхода.
 
-• Когда после изменения состояния одного объекта требуется что-
-  то сделать в других, но вы не знаете наперёд, какие именно
-  объекты должны отреагировать.
-• Когда одни объекты должны наблюдать за другими, но только в
-  определённых случаях.
+### Плюсы и минусы
+
+| Плюсы | Минусы |
+|-------|--------|
+| Новые операции добавляются отдельными посетителями | Новый тип элемента требует изменить интерфейс посетителя |
+| Родственные операции собраны в одном классе | Элементы должны заранее поддерживать `accept` |
+| Посетитель может накапливать состояние обхода | Может раскрывать внутренности элементов |
+| Хорошо работает со стабильными деревьями объектов | Для простой иерархии выглядит тяжеловесно |
+
+::: warning Главный tradeoff Visitor
+Visitor удобен, когда операции меняются чаще, чем типы элементов. Если в системе постоянно появляются новые типы
+элементов, Visitor будет болезненным: каждый новый тип заставит менять интерфейс посетителя и все существующие
+посетители.
 :::
 
-#### Visitor: применимость
+## Как выбрать паттерн
 
-**Слайд 81: ПРИМЕНИМОСТЬ**
-```mermaid
-flowchart TD
-    Visitor[Visitor применим] --> ManyElements[Нужно выполнить операцию над многими объектами]
-    Visitor --> Structure[Есть сложная структура объектов]
-    Visitor --> Some[Поведение нужно только части элементов]
-```
+| Ситуация | Вероятный паттерн |
+|----------|-------------------|
+| Есть разные варианты одного алгоритма | Strategy |
+| Поведение зависит от текущего состояния и есть правила переходов | State |
+| Есть общий скелет алгоритма, но разные шаги | Template Method |
+| Нужно реагировать на событие без жесткой связи источника и получателей | Observer |
+| Действие нужно представить объектом, хранить, отменять или запускать позже | Command |
+| Иерархия элементов стабильна, а операции над ней добавляются часто | Visitor |
 
-::: warning Текст слайда из PDF
-ПРИМЕНИМОСТЬ
+### Короткие сравнения
 
-• Когда вам нужно выполнить какую-то операцию над всеми
-  элементами сложной структуры объектов, например, деревом.
-• Когда над объектами сложной структуры объектов надо
-  выполнять некоторые не связанные между собой операции, но
-  вы не хотите «засорять» классы такими операциями.
-• Когда новое поведение имеет смысл только для некоторых
-  классов из существующей иерархии.
+| Пара | Как различать |
+|------|---------------|
+| Strategy vs State | Strategy выбирает алгоритм извне; State моделирует внутреннее состояние и переходы |
+| Strategy vs Template Method | Strategy использует композицию и заменяет весь алгоритм; Template Method использует наследование и фиксирует порядок шагов |
+| Observer vs Command | Observer сообщает о событии многим подписчикам; Command представляет одно действие как объект |
+| Visitor vs полиморфизм | Полиморфизм удобен, когда поведение принадлежит самому элементу; Visitor удобен, когда операций много и они не должны жить внутри элементов |
+
+::: details Почему поведенческие паттерны часто похожи
+Многие из них используют одну и ту же техническую идею: заменить ветвление или прямой вызов объектом с общим
+интерфейсом. Отличается не форма кода, а намерение. Strategy отвечает за выбор алгоритма, State - за состояние и
+переходы, Command - за действие как значение, Observer - за уведомление подписчиков, Visitor - за внешнюю операцию над
+структурой, Template Method - за фиксированный скелет алгоритма.
 :::
 
-Наверное, очень часто используемый паттерн, когда мы можем его применить.
+## Итоги
 
-- Когда необходимо использовать разные вариации какого-то алгоритма внутри одного объекта.
+Поведенческие паттерны помогают управлять изменяемым поведением программы. Они особенно полезны, когда прямой код уже
+начинает плохо расти: условные операторы разрастаются, отправители слишком много знают о получателях, один алгоритм
+копируется по классам, действие нужно отложить или отменить, а новая операция не должна засорять существующую иерархию.
 
-- У нас есть множество похожих классов.
+После этой лекции нужно уметь:
 
-Ну, опять же, бензиновый автомобиль, дизельный автомобиль, электроавтомобиль с разными типами передвижения. Но и нам не хочется именно создавать вот эту большую иерархию наследования, где действительно будет переопределяться всего лишь навсего стратегия поведения объекта. Поэтому мы сам алгоритм выносим в отдельный класс, в стратегию, ну а дальше уже в контекст передаем эту стратегию как входной параметр, либо через метод.
+- объяснить, какую проблему решает каждый из шести паттернов;
+- отличить Strategy от State и Template Method;
+- увидеть, когда Observer подходит лучше прямых вызовов;
+- понять, зачем Command делает действие объектом;
+- назвать главный tradeoff Visitor;
+- оценить цену паттерна и отказаться от него, если обычный код проще.
 
-- Есть еще варианты, что, возможно, у вас есть какая-то очень серьезная бизнес-логика в этих стратегиях, и вы просто не хотите ее отдавать в контекст и, собственно, светить эту логику.
+После этой лекции у нас появились объекты поведения: стратегии, состояния, команды, наблюдатели. Следующий вопрос -
+как соединять уже существующие объекты, если интерфейсы несовместимы, подсистема слишком сложна или к объекту нужно
+добавить поведение без наследования. Это переход к [структурным паттернам](/lectures/06#adapter).
 
-Возможно, она у вас будет где-то в отдельном месте. Вы готовы просто передать инстанс с данной стратегией. Но код, чтобы он вживлялся в какой-то контекст, вам этого не нужно. А возможно, тому классу, в который вы собираетесь вживить стратегию, просто там не место этой большой бизнес-логики. Ну и если действительно вы видите, что ваш класс превращается уже в такую развесистые условные операторы, если был выбран... способ построения маршрута общественный транспорт, то выполни вот эту стратегию. Иначе, если был выбран способ передвижения пешей, то построй вот такой алгоритм, используй такой алгоритм для построения маршрута.
+## Самопроверка
 
-- Если вы начинаете замечать, что класс разрастается вот этой кучей условных операторов, и, собственно, уже тяжело поддерживается, тяжело читается, тоже нужно задуматься о стратегии.
+1. В навигатор добавляют новый способ построения маршрута, но сам `Navigator` не должен меняться. Какой паттерн подходит?
 
-### Итоги по Strategy
+::: details Ответ
+Strategy. Новый способ маршрутизации становится новой реализацией `RouteStrategy`, а навигатор продолжает работать через
+общий интерфейс.
+:::
 
-- Из плюсов-минусов.
+2. Документ можно подписать только из состояния черновика, принять только после подписания и завершить только после
+принятия. Какой паттерн лучше всего моделирует это поведение?
 
-Ну, минус, как обычно. Все, на самом деле, становится сложнее. Усложняется программа за счет дополнительных классов.
+::: details Ответ
+State. Важны не просто варианты алгоритма, а допустимые действия и переходы между состояниями.
+:::
 
-- Это, собственно, вы заметили, минус любого паттерна, только иногда он прямо чрезмерно явный, иногда не такой явный.
+3. Чем Strategy отличается от Template Method?
 
-- Из плюсов, наверное, очень важный плюс, в отличие от DI, который, конечно, тоже может на лету менять зависимость, но DI все-таки, его иногда сопоставляют с паттерном стратегия, но DI идеологически...
+::: details Ответ
+Strategy заменяет весь алгоритм через композицию и обычно может меняться в runtime. Template Method фиксирует порядок
+шагов в базовом классе, а подклассы переопределяют отдельные шаги.
+:::
 
-Ну, во-первых, он позже появился, и он идеологически настроен на то, что определить зависимость в момент инстанцирования объекта, в момент запуска приложения. А стратегия, она нацелена на то, что действительно мы на лету можем поменять одну стратегию на другую стратегию в рамках нашего контекста, где эта стратегия используется. Вот. Ну, изолирует код алгоритма от контекста, где он используется. Избавляемся от наследования. Ну, пример с нашим автомобилем.
+4. Почему Observer снижает связанность между издателем и подписчиками?
 
-- У нас нет автомобиля, там отдельно автомобиль бензиновый, дизельный, электро.
+::: details Ответ
+Издатель знает только интерфейс наблюдателя и список подписчиков. Он не зависит от конкретных классов `Bank`, `Broker`
+или UI-контролов.
+:::
 
-- У нас просто есть автомобиль и разные стратегии, которые он может, не используя **наследование**, а именно делегирование.
+5. В приложении нужно поддержать undo/redo для действий пользователя. Какой паттерн стоит рассмотреть?
 
-Делегировать это свой алгоритм передвижения отдельному классу. Ну и таким образом мы добиваемся заветного принципа. Открытости и закрытости. По сути, мы теперь тот же контекст, который потребляет различные алгоритмы в виде отдельно созданных классов, мы контекст теперь не перезаписываем, но если нам нужен другой алгоритм, другой способ передвижения, другой способ построения маршрута, мы просто создаем новый алгоритм в виде отдельного класса и передаем в контекст.
+::: details Ответ
+Command. Каждое действие можно представить объектом с `execute` и `undo`, а затем хранить историю выполненных команд.
+:::
 
-Таким образом, принцип открытости и закрытости соблюден.
+6. Почему Visitor неудобен, если часто появляются новые типы элементов?
 
-Переходим к следующему паттерну. Паттерн легкий, мне почему-то его часто приходится использовать, но на самом деле посмотрел по статистике, такой средней популярности паттерн. У меня как-то проекты складывали, сейчас расскажу, почти в каждом.
+::: details Ответ
+Новый тип элемента требует добавить новый метод в интерфейс посетителя и обновить все существующие реализации
+посетителей.
+:::
 
-### State
+7. Когда State будет избыточным?
 
-**State**, состояние. Ну, смотрите, где мне приходилось сталкиваться, может быть из-за специфики. Мы очень много делали... Программного обеспечения для заводов, где есть станки и производство, ну и производимый продукт очень часто переходил из одного состояния в другое состояние. И, разумеется, он не мог перескочить какое-то второе состояние и с первого перейти сразу в третье. Были определенные правила, и это и составляло основу бизнес-процесса. Поэтому стейт мы использовали очень часто. Ну и давайте рассмотрим такое. Пример. Подписание документа. Документ не может быть исполнен, ну или приказ не может быть исполнен, если сначала не был создан черновик, потом его подписали и назначили, кто будет исполнять этот приказ.
+::: details Ответ
+Когда состояний мало, переходы простые и почти не меняются. В таком случае enum и несколько явных проверок могут быть
+понятнее набора классов состояний.
+:::
 
-Потом тот, кто исполняет, принял, выполнил, отметил, что... Данный приказ исполнен, ну и документ там завершает свою работу. То есть определенные стадии документопроизводства, они тоже присутствуют. И если этих стадий не так много, если эти стадии действительно четко определены и не меняются в ходе жизни проекта, то паттерн не нужен. Можно написать наши любимые if-else, if-else, если ты сейчас в таком состоянии, то перейдешь в такое состояние. Ну, допустим, вода. Если ты жидкая, при нагревании ты станешь паром. Если ты лед, при нагревании ты станешь жидкостью, при дальнейшем нагревании ты станешь паром. При заморозке пар станет жидкостью, жидкость перейдет в лед. Лед при дальнейшей заморозке опять останется льдом.
+8. Что опасного в забытых подписках Observer?
 
-Вот если у вас действительно... немного состояния, и они определены и вряд ли будут меняться, то с вероятностью большой вам стоять не понадобится. Но в жизни так не бывает. В жизни всегда что-то меняется. Да даже где-то считал статью, что лет пять назад, что в школе меня учили, что у воды есть три состояния в жид. Жидкая пар лед. А там какой-то еще, грубо скажу, нашли еще одно состояние, супер лед. С определенной кристаллической решеткой. То есть вроде бы столетиями жили, но даже в таких устоявшихся законах физических, видите, тоже может поменяться и появиться новое состояние. Поэтому паттерн на самом деле годный.
+::: details Ответ
+Издатель может продолжать хранить ссылку на подписчика. Это мешает освобождению объекта и может вызывать реакции у
+объекта, который уже не должен участвовать в сценарии.
+:::
 
-Давайте посмотрим, что предлагает нам... Проблему мы видим. Некая сущность может находиться в разных состояниях, и его следующее состояние зависит от предыдущего. Ну и, разумеется, его текущее состояние будет определять последующее состояние. **State** предлагает нам не писать в самом классе, который имеет различные состояния. Вот эту вот развесистую с условными операторами вот эти ветки, если состояние такое, то станет таким. А если вот такое, будет таким. Он предлагает каждое состояние оформить в виде отдельной сущности, отдельного класса. Ну, чем-то, видите, на стратегию напоминает, да? Но только стратегия как бы сама определяет алгоритм, а стейт больше меняет тот объект, состояние которого он описывает. То есть есть нечто похожее.
+9. Почему Command не равен обычному callback?
 
-Ну, собственно, у всех этих поведенческих паттернов есть нечто похожее. Они действия оборачивают очень часто в какой-то объект.
+::: details Ответ
+Callback обычно только выполняет функцию. Command делает действие отдельной моделью: с параметрами, получателем,
+историей, отменой, логированием или постановкой в очередь.
+:::
 
-Давайте посмотрим на вот этот пример с документами, как можно было бы решить. Мы могли бы создать документ, который обладает знанием о состоянии, описанное в виде интерфейса. И данное состояние определяется конкретными состояниями, в котором может пребывать документ. Черновик. Подписанный вариант, исполненный вариант. И дальше уже клиент и тот код, который создает документ, определяет, в каком состоянии создается первоначальный документ. И в дальнейшем воздействие на данный документ с помощью его методов, в зависимости от того, какой конкретный стейт был передан документу, этот метод отработает так, как ему нужно.
+10. Что объединяет все паттерны этой лекции?
 
-Давайте попробуем рассмотреть структуру и потом, как обычно, пример такой канонической реализации и более-менее реалистичной.
+::: details Ответ
+Они распределяют поведение между объектами и уменьшают прямую связанность. Часто они заменяют большой условный оператор
+или прямой вызов объектом с понятной ролью и общим интерфейсом.
+:::
 
-Значит, паттерн состоит из контекста, это то, что мы собираемся менять. Вода, которая имеет несколько состояний, документ, который мы создаем, подписываем, финализируем.
+## Мини-практика
 
-Дальше, сам интерфейс состояния, потому что контексту необходимо понимать. понимать, как он может воздействовать на этот стейт. И конкретные реализации состояния. Ну и клиент, который, собственно, оперирует контекстом, определяет, какое у него будет изначальное состояние, и в дальнейшем работает с этим контекстом, воздействуя на него, переводит из одного состояния в другое состояние. Но чем прекрасно это все? Тем, что сам контекст будет open-close, он будет... закрыт для изменений, но мы его можем постоянно расширять и модифицировать даже вот эти вот стейты, что из одного состояния у нас появится какое-то промежуточное состояние, которое изначально не было учтено заказчикам. Мы без проблем изменим конкретные стейты, объясним им, что ты сейчас...
+Продолжите историю приложения доставки из лекции.
 
-При подписании переходишь не в финальную стадию, а переходишь в стадию на ревизию управляющему директору. А лишь только новое состояние на ревизию управляющего директора переведет уже в финальную. То есть нам гораздо проще будет менять вот этот вот... Ну, если бы у нас не было стейта, у нас был бы условный оператор. И постоянные изменения, когда... наш контекст переходит из одного состояния в другое, а возможно не в другое, а во вновь появившееся, нам бы пришлось этот if постоянно переписывать. Он бы был достаточно сложным, и действительно постоянно бы менялся. И неизвестно, как бы это отражалось на том коде, который использует контекст. Здесь же у нас это состояние нужно будет... Допустим, была у нас цепочка из пяти состояний между...
+Система должна:
 
-Четвертым и пятым появилось 4А состояние. Мы правим четвертое состояние, объясняем, что оно переходит в 4А, ну и, соответственно, из 4А, говорим, переходишь в 5. То есть гораздо меньше придется затратить усилий по изменению вот этих переходов из одного состояния в другое.
+- выбирать способ расчета маршрута: самый быстрый, самый дешевый, с минимальным числом пересадок;
+- переводить заказ между состояниями `Draft`, `Paid`, `Packed`, `Shipped`, `Delivered`, `Cancelled`;
+- отправлять уведомления клиенту, складу и аналитике;
+- хранить действия оператора для последующего audit log;
+- поддержать экспорт дерева документов в PDF и HTML.
 
-Давайте рассмотрим такой классический пример, абстрактный, и потом более-менее реалистичный.
+Разложите требования по паттернам:
 
-Значит, абстрактный пример. может у нас описывать данным паттерном следующим образом. Есть абстракция либо интерфейс состояния и метод, который определяет контекст, то, на что это состояние будет влиять. Ну, если пример с водой, то здесь у нас состояние жидкое и будет передаваться конкретный контекст или конкретный документ, на который мы будем влиять.
+1. Где нужен Strategy, а где State?
+2. Где Observer лучше прямого вызова конкретных сервисов?
+3. Где Command дает больше пользы, чем обычный callback?
+4. Где Visitor оправдан, а где проще оставить полиморфизм?
 
-Дальше описано несколько состояний. Ну и разумеется, из состояния А он переходит в состояние Б. Ну а здесь по аналогии только из состояния Б он переходит обратно в состояние А. Ну и для нас, наверное, важно, это контекст, это то, на что мы воздействуем, и то, что будет менять свое состояние. У него есть состояние, он получает его при инициализации, и в дальнейшем мы можем... воздействовать на наш контекст, меняя его состояние. Ну и код программы, который клиентский, мог бы выглядеть следующим образом. Мы создаем контекст, определяя начальное состояние, и воздействуем на этот контекст. Реквест. Напомню, что реквест у нас в зависимости от того, какое сейчас состояние, переведет в другое состояние.
-
-Ну, возможно, не просто, не только переведет. в определенное состояние, изменит еще какие-то поля контекста. Очень часто бывает необходимо изменить поля контекста.
-
-Таким образом, у нас он был в состоянии А. Здесь он перейдет при вызове реквест в состояние Б, но при повторном вызове реквест перейдет опять в состояние А. Но давайте пример посмотрим как раз про воду. Это более будет понятно. Вода у нас будет иметь три состояния. Жидкость, пар, лед. И, ну, понимаете, да, при воздействии, воздействовать мы сможем двумя способами. Нагревать воду и охлаждать воду. Если бы у нас не было стейта, то выглядело бы примерно следующим образом.
-
-Давайте, то есть показываю, как можно было бы, да, наплевав на общеизвестный паттерн, испытывая, наверное, колоссальную любовь к условным операторам, написать вот такую вот ерунду. При этом вы понимаете, что три всего лишь навсего состояния и два метода воздействия. Но даже при таком варианте, вот мне пришлось сворачивать код, потому что, ну, иначе это было бы в каждом условном операторе, происходила бы какая-то небольшая логика, ну, в моем случае это просто вывод информации, в какое состояние оно переходит, ну и дальше изменение этого состояния.
-
-Значит, что у меня есть? У меня есть некий Enum, который содержит различные состояния, чтобы мне не перепутать. И этот Enum определяет у контекста состояние. Правда, сейчас я решаю данную проблему. Не с помощью паттерна, поэтому давайте я так дальше рассуждать не буду, что вот это контекст, а это у меня состояние. Ну вот примитивно. Вода имеет некое состояние, и дальше при нагреве я начинаю вот эти вот развесистые ветки условных операторов городить. Если у меня есть заморозка, то там всё то же самое. В зависимости от его текущего состояния он будет переходить в другое состояние.
-
-А теперь представьте, что если у меня появляется четвертое, пятое состояние, мне придется вот эти достаточно замудренные условные операторы куда-то внедрять if-else, ну и все это еще потом тестировать. Альтернатива, да? Но. Как бы мы это могли использовать? В основной программе мы бы создали воду и могли бы переводить ее, вызывая определенные методы, в разное состояние.
-
-На самом деле прекрасно.
-
-Давайте посмотрим, как ту же самую задачу можно было бы решить более элегантно, используя PatternState. Так, все, этот пример останавливается.
-
-Теперь пишем более качественный код. Хотел сказать, более лаконичный. Но на тех небольших примерах, на которых мы рассматриваем, вам может показаться, что напротив. Кода становится больше. Но дело в том, что сложность решаемых примеров гораздо меньше, чем в реальной жизни. Поэтому использовать паттерны на небольших примерах может показаться абсурдным. Поэтому просто смотрим элегантный код. Не такой может быть лаконичный, как бы мог быть.
-
-Значит, справа у нас описан класс вода, все то же самое. При этом никакой логики, никаких условных операторов в методе нагревания и заморозка. Мы просто говорим, что у тебя есть некий стейт, и при нагревании ты воздействуешь на этот стейт, нагреваешь и передаем туда ZIS, текущий объект. Ну, то же самое при заморозке. Мы говорим, что ты у текущего состояния. Будешь вызывать метод. То есть, видите, мы опять алгоритм по изменению объекта выносим в отдельный класс. Это было и в двух предыдущих паттернах. Что стратегия, когда мы заменяли алгоритм, опять же, отдельными классами. Что здесь у стейта? Мы опять вынесли заморозку в отдельный класс.
-
-Давайте посмотрим, куда.
-
-Значит, слева теперь у нас описан... Интерфейс будущих возможных состояний. Это нужно для того, чтобы контекст, который будет использовать эти состояния, понимал, как можно воздействовать. У нас сказано, можно нагревать, можно охлаждать. С документом можно его подписать, отклонить, перевести в предыдущее состояние. Интерфейс состояния описывает, как в принципе можно воздействовать из контекста, из этого класса вода, на наше состояние. Ну, мы договорились, что воду можно нагревать, охлаждать.
-
-Дальше мы описываем не то, что все возможные, а все известные на данный момент. Они потом пусть добавляются, изменяются. Самое главное, что мы теперь не будем трогать воду в контекст. Он теперь у нас open-close. Он закрыт для модификации, но расширять количество его состояний мы можем через появление новых конкретных состояний. Лед. При нагревании он переходит в жидкое состояние. То есть мы переопределяем текущее состояние. А здесь у нас поступает контекст. Это вода. Так, вода поступила. И мы говорим, да, при нагревании, если ты сейчас был льдом, то ты перейдешь в жидкость. А если ты уже при заморозке, если ты сейчас лед, то ты останешься быть льдом.
-
-Ну и также, тоже у меня не влезло, но по аналогии, если жидкость мы нагреваем, она переходит в пар, если охлаждаем, она переходит в лёд, ну и то же самое с газом, при охлаждении она в жидкость. То есть прописали все эти сценарии. При этом, если добавится новое состояние, там лёд будет переходить в супер лёд, добавляем новое состояние, изменяем переход у льда, что при заморозке ты переходишь в новое четвертое состояние. При этом класс контекста, который обладает состоянием, мы трогать не будем. Этим всем пользоваться можно абсолютно так же, как и в предыдущей программе. Создать воду с текущим состоянием. Ну и дальше воздействовать на текущее состояние у контекста. Охлаждать, нагревать. Код абсолютно тот же самый. Но еще раз повторюсь.
-
-При варианте не используя **state** мы постоянно будем мучиться с этими условными операторами. При использовании state нам достаточно описать новое состояние и подправить предыдущее, которое переведет его в это новое состояние. Подправить предыдущий класс. Не алгоритм всего контекста, а предыдущий класс только. Применимость. Когда у нас есть объект. документ или вода поведение которого меняется в зависимости от состояния и когда этих состояний но достаточно много понятное дело применять стоит где у вас действительно два три состояния нет когда там речь о 70 и они постоянно меняется может быть порядок их меняется либо появляется новое но тогда это разумно из минусов если состоянии немного то, возможно, это все будет напрасно.
-
-То есть у вас значительно увеличится количество классов и повысится архитектурная сложность проекта. Ну и ради чего? Ради двух состояний. Из состояния А в Б, а из Б в А. Тут, конечно, проще обойтись условным оператором. Там вы точно не запутаетесь. Но если таких состояний много, то вы можете разгрузить класс контекста. Вот это вода. Не писать там кучу условных операторов. а просто сделать методы, что мы можем делать с водой. Нагревать, охлаждать. То есть упростить класс контекста с помощью этого паттерна можно. Контекст в данном случае тот класс, который подвержен изменению состояния. Ну и можно таким образом еще сконцентрировать в одном месте логику по изменению состояния.
-
-Переходим к следующему. Он вам уже будет знаком.
-
-### Template Method
-
-Мы его рассматривали при... прохождение solid принципов это шаблонный метод представим такую ситуацию когда у нас есть сложный алгоритм который реализован в большом количестве классов и в целом он реализован практически у всех одинаково но с небольшими отличиями допустим допустим вот мы рассмотрим пример Обучение. Вроде бы обучение в школе, обучение в ВУЗе, обучение на курсах ДПО, в целом одинаково. Нужно поступить, учиться, сдать экзамены, получить диплом. Но только где-то сдать экзамены, это сдать экзамены и закрыть производственную практику в университете. Где-то поступить, это просто прийти в школу, а в ВУЗ сдать вступительные экзамены.
-
-Но в целом... определенные шаги есть у всех более того чаще всего определенные шаги повторяются повторяет одну и ту же реализацию но возможно в каких-то конкретных случаях реализации нужно будет изменить но если вспомните пример с поваром который у нас умел готовить все что угодно для абсолютно любое блюдо мы говорили без проблем сначала Сделаешь предварительную готовку, готовку и финальную подачу. Все, у нас был шикарный повар. То, что он принимал во входной параметр себе рецепт, ему было сказано. Предварительная готовка, подменялся метод и так далее. Финальная подача.
-
-Давайте смотрим, какая проблема. Мы пишем программу по анализу больших данных, и данные необходимо извлекать из разного набора, ну, из разного формата документов. Это, возможно, PDF, DOC файл, XML, JSON. И способ анализа данных, он один и тот же. Но мы понимаем, что в каких-то моментах анализ PDF документа, анализ JSON, он может отличаться. Именно распознавание данных. Но последующий анализ, когда данные уже оттуда получены, метод будет один и тот же, с базовой какой-то реализацией. Вот при таком варианте шаблонный метод может определить ключевые этапы. Если мы понимаем, что базовая **реализация** у всех будет одинакова, то можем прямо в шаблонном методе прописать базовую реализацию.
-
-И здесь, к слову, один из тех случаев, когда интерфейс нам явно не подойдет. Потому что, напомню, в интерфейсе мы можем переопределить все. Ну, хотя, да, сейчас стали появляться, тенденция пошла в сторону, что интерфейс может иметь реализацию по умолчанию, и мы можем не переопределять ее. Но, тем не менее, как бы в классике считается, что данный паттерн реализуется через абстрактный класс, а не интерфейс.
-
-Значит, что мы имеем? Для решения той задачи с анализом документов мы можем написать класс, у которого будет публичный шаблонный метод, но в этом шаблонном публичном методе будут выполняться определенные шаги. При этом часть шагов мы способны будем переопределить, если захотим. Часть шагов мы должны обязательно переопределить, если они были помечены как абстрактные, а часть можем использовать с реализацией по умолчанию. Есть конкретные классы, которые наследуются от абстрактного класса и реализуют эти конкретные шаги, которые действительно необходимо переопределить, реализуют их по-своему. Пример жизни – это стройка дома. У нас есть основные шаги – поставить стены, двери, окна, крышу и получить дом.
-
-Это шаблонное решение. либо со вторым этажом, либо с окном на крыше, мы можем часть конкретных шагов в шаблонном методе заменить на нашу реализацию, которая нам нужна в том или ином случае. Структура паттерна будет выглядеть таким образом. Есть абстрактный класс с шаблонным методом, который будет состоять из нескольких шагов. И есть конкретные классы, которые... будут переопределять эти конкретные шаги. Классическая **реализация** несложная. Выглядит следующим образом. У нас есть абстрактный класс с шаблонным методом, который вызывает определенные шаги. И эти определенные шаги отмечены как абстрактные, то есть мы заставляем, провоцируем их определить в классах-наследниках. И вот конкретный наследник переопределяет эти конкретные шаги по-своему.
-
-Теперь давайте на конкретном примере. Процесс обучения, как я и говорил, в принципе очень схож, где бы мы ни учились, в школе, в университете, на курсах ДПО. Есть такие этапы, как поступление, обучение, сдать экзамены, получить документ об образовании. При этом, вероятно, сдача экзаменов в большинстве образовательных учреждений происходит одинаково, что на курсах ДПО, что в университете, что в школе. Поэтому мы можем написать даже реализацию по умолчанию. Сделать ее виртуальной, потому что если вдруг где-то своеобразно проходит сдача выпускных экзаменов, то тогда для этого случая можно будет перезаписать данный шаг. Но если устраивает **реализация** по умолчанию, то ради бога, давайте так и оставим.
-
-Как мог бы выглядеть **реализация** данной задачи с помощью шаблонного метода? Мы создаем абстрактный класс Education. с шаблонным методом обучения, где говорим, какие шаги необходимо выполнить в данном шаблонном методе. И дальше идут эти шаблонные методы, объявленные либо как 100% виртуальные, то есть абстрактные, для того, чтобы мы обязаны были определить, либо виртуальные, с какой-то реализацией по умолчанию. И тогда каждый из конкретных уже... которые будет реализовывать данный шаблонный метод, будет по-своему переопределять эти абстрактные классы и, если нужно, то и этот виртуальный метод. Справа код, который показывает процесс обучения и переопределение тех методов, которые были абстрактны. Это поступление в школу и, собственно...
-
-А, ну да, здесь я свернул. Процесс обучения, процесс получения диплома. В университете тоже данные шаги шаблонного метода реализуются по-своему. Возможно, там, где сдача выпускных экзаменов, будет дополнительный пункт пройти еще производственную практику. И тогда процесс использования данного кода, клиент, который будет использовать данные классы, с реализованными шаблонными методами выглядит следующим образом. Есть школа, университет, два класса, в которых заложены шаблонные методы. Ну и дальше мы просто запускаем этот шаблонный метод, и каждый класс будет реализовывать его по-своему. Мы с вами видели, что на самом деле вот сейчас клиентам данного... класса с шаблонным методом или двух объектов с шаблонным методом является метод main.
-
-Но если вспомнить пример про повара, когда мы повару передавали блюдо, а у блюда были переопределенные шаги шаблонного метода, и повар просто получал это блюдо и начинал согласно шаблонному методу выполнять определенные шаги. И в повара мы могли передать... Любые реализации шаблонных методов, готовка салата, готовка второго, и получается повар у нас из-за этого начинал приобретать свойства открытости-закрытости. Мы его никогда не переписывали, но за счет того, что он принимал класс, реализующий шаблонный метод, вызывал у него, соответственно, исполнение этого шаблонного метода. И таким образом мог работать с любыми еще ранее... недавно неизвестными нам рецептами. То есть плюс этого паттерна помогает нам реализовать принцип открытости-закрытости.
-
-При этом, обратите внимание, сами классы, которые наследуются от абстрактного класса, они расширяют базовый алгоритм, при этом не меняя его какой-либо структуры. То есть у нас есть шаблонный метод, выполни первое, пятое, десятое. Но при этом первое, пятое, десятое остается, но реализуя конкретные шаги шаблонного метода, мы начинаем расширять стандартный алгоритм. Ну вот это одна из причин применить данный паттерн. Ну и вторая причина. Если мы видим, что у нас начинает разрастаться иерархия, Чуть-чуть меняется алгоритм, но базовые вещи делаются одни и те же в методе, то есть смысл разделить метод на части. Шаблонный метод будет вызывать эти части, а наследники будут переопределять лишь те места, где действительно есть различия.
-
-Ну и тогда у нас, если произойдет изменение какой-то базовой части, мы в абстрактном классе поменяем этот шаг. И у всех наследников он тоже изменится. А так бы пришлось лезть в каждый класс и менять. При этом это не просто **наследование**, где мы все бы прописали в одном методе. А это именно шаблонный метод, который по частям, шаг за шагом может вызвать части какого-то большого алгоритма. А в дальнейшем уже наследники могут переопределить именно определенные кусочки этого алгоритма. Но тут на самом деле почему так много минусов? Потому что им легко воспользоваться неправильно. В зависимости от языка мы можем перекрыть какой-то метод.
-
-С помощью, допустим, в .NET, с помощью оператора new мы можем перекрыть метод в наследнике, и он будет с таким же именем, но будет перекрывать тот базовый. И таким образом непонятно, ну, точнее... испортим заложенный алгоритм. Мы нарушаем принцип подстановки Барбары Лискоу, потому что наши наследники за счет неизвестного нам переопределения могут работать не так, как базовая **реализация** данного класса. Мы, к сожалению, себя сами ограничиваем таким жестким скелетом, и очень плохо иногда бывает спустя время, когда... Появляется какой-то новый класс, которому половина шагов вообще не нужна. Или необходима другая последовательность. А мы себя уже ограничили вот таким жестким шаблонным методом. Но зато мы получаем тот единственный плюс от наследования.
-
-Повторное использование кода из базового класса. Следующий паттерн во многих языках реализован уже из коробки. Очень часто в виде коллекций, допустим, коллекция, за которой мы можем наблюдать, и она может уведомлять о том, что она изменилась. Если до этого вы изучали .NET, то, может быть, встречались с Observable Collection. Это та коллекция, которая уведомит подписчика о том, что в ней произошли изменения. Но на самом деле паттерн очень популярен на UI. Потому что очень часто, ну, при архитектуре мы будем рассматривать архитектуру **MVVM**, очень часто элементы управления на UI хотят знать о том, что произошли изменения в каком-то классе из бизнес-логики, из view-модели. И получается, что у нас есть тот, за кем наблюдают, и тот, кто наблюдает.
-
-При этом, в принципе, они могут за другом наблюдать. Если меняется что-то в бизнес-логике, меняется на UI. Если мы что-то на UI делаем, это может изменить данные, которые лежат в бизнес-логике.
-
-### Observer
-
-Паттерн-наблюдатель. Ну и, как я сказал, давайте рассмотрим такой пример. Допустим, у нас есть магазин и есть покупатель, который ждет поступления товара. И время от времени он каждый час ходит в магазин и спрашивает, Есть товар, пришел мой товар, пришел мой заказ. Вот у нас две стратегии, причем обе они неправильны. Мы можем заставить человека вот так вот бегать, чтобы он проверял, ему же надо. А можем в принципе сказать, слушайте, ну вот у нас тут граммофон в магазине, мы сейчас будем каждые пять минут кричать, пришел такой-то товар. Но тот, кому он пришел, он реально обрадуется, а все остальные скажут, что за фигня. Получается, что мы как бы перегружаем. излишней информации объекты, которые этого не хотят знать.
-
-Поэтому идея паттерна наблюдатель уведомлять только тех, кто об этом попросил. Решение нашей проблемы с уведомлением покупателей могла бы свестись к тому, что есть тот, кто публикует событие, говорит о том, что вот произошла такая вещь. И он оповещает только тех, кто на это событие подписывался. И когда это событие происходит, Когда меняется состояние паблишера, он запускает цикл уведомления своих подписчиков. Структура данного паттерна будет выглядеть следующим образом. У нас есть паблишер, это тот, у которого есть состояние, которое может меняться, и это состояние волнует подписчиков. Допустим, у нас в бизнес-логике может быть на View-модели коллекция юзеров.
-
-И если мы из базы данных считали в эту коллекцию новых юзеров или кого-то удалили, согласно заданной бизнес-логике, то у этой коллекции есть подписчики. Какой-то листбокс, который отображает данную коллекцию на экране. И он, разумеется, захочет об этом узнать. У издателя, тот, кто будет генерировать, что произошло событие, Есть состояние. И, собственно, когда состояние меняется, он начинает говорить о том, что моё состояние изменилось. Но только не всем говорить, а только тем подписчикам, которые подписались. Когда внутреннее состояние меняется, он об этом говорит. Подписчики должны определить интерфейс, о котором должен знать издатель. Потому что издатель будет дергать те методы, которые объявлены в интерфейсе подписчика.
-
-Ну и конкретные подписчики реализуют этот интерфейс, реакцию на это информирование. Вам пришла посылка, ура! Или коллекция изменилась, сейчас я это все перерисую. Ну и, собственно, клиент это тот, кто будет создавать объекты нашего издателя и будет регистрировать подписчиков. у данного издателя на его обновление.
-
-Давайте рассмотрим классический пример и потом посмотрим на более-менее реальную реализацию. Классический пример можно представить следующим образом. Есть интерфейс наблюдателя, который может позволить зарегистрировать тех слушателей, которые хотят наблюдать за этим объектом. Это метод добавить наблюдателя. Это интерфейс наблюдаемого объекта. Мы можем удалить. То есть тот, кто раньше следил за объектом. Ну, допустим, мы на UI следили за определенной коллекцией. Но, возможно, по каким-то причинам нам нужно перестать обновлять UI и не зависеть от изменения этой коллекции. И есть метод у наблюдаемого объекта, у паблишера. Это метод, который говорит о том, что... необходимо уведомить о том, что мое состояние изменилось.
-
-Собственно, конкретный объект, за которым можно наблюдать. У него есть коллекция тех, кто за ним наблюдает. Потому что как только в нем произойдут изменения, ему надо пробежаться будет по этой коллекции и уведомить всех тех, кто на него подписывался. Ну и есть методы. Это добавить и удалить. То есть подписаться на этот паблишер, либо отписаться от него. И метод notify — уведомить все те объекты, которые подписались на наблюдаемый объект, уведомить о том, что произошли изменения. Да, здесь пока не объявлен интерфейс iObserver. Сейчас он появится на экране. Данный интерфейс iObserver говорит о том, какой метод необходимо запустить. в случае, если произошли изменения.
-
-Поэтому наш паблишер, в котором произошли изменения, уведомляя всех наблюдателей, знает, какой у них метод необходимо дернуть, чтобы сказать, чтобы они могли адекватно отреагировать на произошедшие изменения.
-
-Таким образом, нам нужен интерфейс наблюдателя. Он нужен паблишеру, который будет говорить о том, что событие произошло. Апдейтни себя. Очень часто... В момент, когда происходит событие, в метод Update передают еще дополнительную информацию о том, какое именно событие произошло у того объекта, за которым наблюдают. Допустим, если мы из бизнес-логики наблюдаем за листбоксом, который отображает элементы, возможно, в этом листбоксе что-то удалили. Или нет, давайте наоборот. Наш листбокс наблюдает за коллекцией юзеров. Возможно, сейчас коллекция юзеров была изменена в ходе бизнес-логики, удалили кого-то. Листбокс должен получить информацию, что коллекция, за которой он наблюдал, там было 5 юзеров, сейчас она изменилась.
-
-Он говорит, а что именно произошло? Удаление. А какой объект именно удалили? Все это ему приходит в качестве параметров. И он, анализируя эти параметры, перерисовывает UI. Ну и таким образом, да, мы, кстати... Избавили UI-разработчиков от написания вот этого, ну, такого не слишком-то умного кода, но который занимал очень много времени по перерисовке. Контроллы это взяли на себя за счет того, что появился такой прекрасный интерфейс в .NET, как inetify-collection-changed, inetify-property-changed. В .NET этот паттерн используется повсеместно в разработке UI. Особенно в фреймверке WPF, MAUI используются вот эти коллекции. И контроллы умеют работать с этим интерфейсом. И с интерфейсом этих коллекций. Мы остановились, что есть интерфейс Eye **Observer**.
-
-И конкретный наблюдатель, который будет реализовывать данный интерфейс. То есть конкретный наблюдатель прописывает метод реакции на действие. При этом есть разные реализации этого паттерна. Pull и Push. В одном случае, когда возникает изменение состояния у паблишера, мы можем самостоятельно передать информацию в метод Update. И тогда наблюдатель получит эту информацию и сделает свою реакцию. А возможно наоборот, что наблюдаемый объект, паблишер, говорит, что изменения произошли, может передать себя. И наш наблюдатель может... потом вытягивать из него какие конкретные поля. Его интересует и просматривать их, а что там у него изменилось.
-
-Но чаще всего все-таки тот объект, за которым наблюдают, он в момент возникновения события, когда Notified уведомляет тех, кто наблюдает, передает как раз дополнительный набор аргументов, чтобы показать, что с ним произошло.
-
-Давайте посмотрим пример. Биржевая торговля. У нас будет с вами Биржа, на которой будут происходить сделки, ну и в ходе которых будет изменяться стоимость валют. И будут наблюдатели, это наши брокеры и банки. Потому что банкам нужно тоже обновить стоимость валют, а брокерам нужно понять, стоит ли продавать или покупать валюту. Поэтому, кто у нас здесь будет? Паблишером будет биржа. Она будет генерировать события, подписываться на нее будут наблюдатели, это банк и брокер. Но банк, давайте, он не имеет права отписаться, а брокер, в принципе, рабочий день закончился, он наблюдать за биржей не обязан. Так, смотрим, как это могло выглядеть. Слева у нас описан интерфейс. того, за кем наблюдают.
-
-Он позволяет зарегистрировать наблюдателя, отписать наблюдателя от себя и уведомить всех наблюдателей.
-
-Дальше у нас есть сама биржа, которая имплементирует данный интерфейс. У нее есть список тех, кто за ней наблюдает. Методы, которые могут зарегистрировать наблюдателя и отписать наблюдателя. Ну и в Notify мы запускаем цикл. И так как мы понимаем, что любой наблюдатель реализует интерфейс iObserver, я наблюдатель, и мы понимаем, что у него есть метод Update. И мы, запуская уведомления всех наблюдателей, говорим о том, что Update, Update, Update. И видите, здесь мы передаем как раз ту информацию, необходимую для наблюдателя, а именно структуру. Стокинфо, которая содержит курс валют доллар и евро. Здесь я ее на презентацию не стал выносить. Там просто два поля. Стоимость доллара, стоимость евро. И у биржи есть метод, который меняет состояние.
-
-Как раз меняет состояние стоимости валют. Это торговля. Получается, время от времени будет происходить. Вызываться метод. Торговля будет обновляться, ну в нашем случае имитация идет, обновляется стоимость валют случайным образом, банки и брокеры получают эту информацию, как подписчики, и принимают решение, будут ли они реагировать и каким образом будут реагировать, продавать, покупать или просто игнорировать данное событие. Тогда справа у нас появляются обзерверы, наблюдатели. Они задают свой интерфейс. Этот интерфейс нужен паблишеру, потому что в момент, когда он оповещает о своих изменениях, он должен понимать, какой метод запустить у наблюдателей. Он понимает, что наблюдатели имплементируют интерфейс iObserver.
-
-Соответственно, у нас два наблюдателя. Здесь у меня один брокер. Он получает информацию, ссылку на биржу. Он у биржи вызывает, зарегистрируй меня как наблюдателя. И когда метод апдейт биржа вызовет, в связи с тем, что она хочет уведомить наблюдателей, он скажет, что да, я произведу анализ входного параметра. Если входной параметр – это информация. Но видите, здесь object, потому что биржа могла сделать апдейт по разным причинам. в ней могли измениться стоимость валют, или она просто могла сказать, что на бирже пожар. Поэтому здесь мы получаем object, начинаем приводить к типу, если это информация о валютах, то тогда брокер начинает реагировать. И в зависимости от того, какое там состояние валют, делает то или иное действие.
-
-При этом он может прекратить наблюдать, то есть отписаться от биржи. У банка... У него тоже есть свой метод update, но он реагирует только на евро и опять же при определенных стоимости. Тогда клиентский код мог бы выглядеть следующим образом. Мы создаем тот объект, за которым наблюдает, это наша биржа. Мы создаем двух наблюдателей, банк и брокер. Биржа, за которой наблюдают, изменяет свое состояние. И в момент изменения своего состояния она говорит наблюдателям, что, собственно, произошло изменение состояния. И наблюдатели уже на это подписано начинают реагировать. Здесь мы показываем, что брокер может отписаться от биржи, в которой он был подписан.
-
-Ну и вторая торговля, если бы мы запустили эту программу, то она бы показала, что брокер больше не реагирует.
-
-Значит, когда мы применяем? Ну, когда нам действительно необходимо, чтобы... Один объект, допустим, на UI элементы управления наблюдали за другими объектами, которые находятся в другом классе. Допустим, у нас UI и ViewModel, то есть бизнес-логика, которая обеспечивает этот UI. Но они разнесены на два класса, и UI знает, что... Эта ViewModel обеспечивает ее данными. И она подписывается. Но механизмы подписки будем смотреть. Допустим, те же биндинги обеспечивают подписку на определенные объекты. У нас есть наблюдаемые объекты и наблюдатель. Когда наблюдаемый объект меняет свое состояние, коллекция изменилась, кидается событие, и UI об этом узнает, ловит это событие и перерисовывается.
-
-Это стандартная... **реализация** уже заложенная в дотнете данного паттерна ну и когда у нас есть объект который меняет состояние но вы пока не знаете кто в принципе будет реагировать на это состояние и каким образом будут реагировать на это состояние поэтому хороший задел наперед реализовать этот паттерн что в дальнейшем будут появляться наблюдатели из плюсов это Тот, кто публикует события о том, что он изменился, он вообще не зависит от того, кто за ним наблюдает. Мы можем в рантайме подписаться на какое-то событие, тоже важно, и также в рантайме отписаться. То есть это не статически заданное. На этапе компиляции в рантайме можем сказать, сейчас наблюдаем, сейчас прекращаем наблюдать.
-
-### Command
-
-И опять же, если мы хотим сделать класс закрытым для изменений, но открытым для расширений, можем... сколько угодно делать новых наблюдателей главное чтобы они имплементировали интерфейс я наблюдатель и таким образом добиваемся принципа открытости закрытости паттерн команда сложный паттерн давайте с такого примера зайду не знаю когда вы в ресторане делаете заказ вот если бы не было официанта который фиксирует ваш заказ но сейчас в мобильных приложениях но допустим на бумажке то ваш заказ, он бы остался в виде фразы. Или, не знаю, в армии генерал даёт приказ, вот этот приказ, он в виде фразы, он нигде не остаётся. Ваш заказ, озвученный официанту, он тоже мог бы нигде не остаться. Но официант ваш заказ записывает.
-
-То есть он действие, которое вы произнесли, он оформляет его в виде объекта. А если действие оформленное в виде объекта, вот этот заказ в виде бумажки, то это можно положить на стол повару, и у него может быть копиться эти бумажки, эти приказы, но они никуда не денутся. Он через какое-то время сможет взять эту бумажку и увидеть, какой был заказ.
-
-То есть команда – это способ. обернуть алгоритм который нужно выполнить да приготовь мне обед обернуть этот алгоритм в объект а если он обернут в объект его можно сериализовать в строку в джейсон передать с клиента с одного сервиса в другой сервис можно сохранить в базу можно потом выполнить а можно выполнить а потом отменить выполненные действия Потому что теперь у вас действие, оно как бы записано на бумажке в виде команды. И их можно фиксировать, потом эту транзакцию, эти действия взять и отменить. Потом опять выполнить. Или отложить, а потом выполнить. То есть этот паттерн на самом деле очень мощный. Мы с ним столкнемся не раз. На нем как бы реализованы и механизмы очереди сообщений. Но реализовать можно разными вариантами.
-
-Но команда – это, наверное, один из самых популярных паттернов, который позволяет нам как-то осязательно увидеть действия в виде объекта. А если он в виде объекта, вот это вот действие представлено в виде переменной, то есть какой-то алгоритм, то вы можете передать его в функцию. Вы можете его сохранить, отменить и так далее.
-
-Значит, погнали. Ну вот пример с официантом. Разобрали, что по сути здесь произнесенная команда клиентам, который пришел в ресторан, она становится командой. И вот официант с бумажкой – это и есть команда. И эту команду он может отнести повару. И повар может ее выполнить сейчас или позже. То есть он может ее сохранить, а потом выполнить. Представим такую ситуацию, что у нас есть меню какого-нибудь визуального, не знаю, редактор. Пишем мы визуальный редактор. И мы сделали красивую кнопку. Но при нажатии на этой кнопке должно происходить, допустим, сохранение данных. Как бы все круто. Мы сделали кнопку, при ее нажатии должно произойти сохранение документа. Но все портится, когда у вас разные кнопки.
-
-Допустим, можно в меню файл сохранить, где-нибудь еще контекстное меню сохранить. Может быть, в принципе, Ctrl-S, комбинация клавиш, это тоже выполнение команды. То есть, видите, когда действие, которое необходимо выполнить, оно может быть оторвано от самой кнопки. И нам, получается, необходимо вот это вот действие сохранить, оформить в виде команды. И как раз этот паттерн это и позволяет сделать.
-
-Давайте вот на таком еще примере.
-
-Значит, у нас с UI при нажатии на кнопку, но при этом кнопок тьма, есть контекстное меню, по которому необходимо произвести захоронение в базу, есть выпадающее меню, есть комбинация клавиш. И вот при каждом этом действии необходимо выполнить одно и то же. Либо мы начинаем дублировать, делать в одном объекте, прописывать алгоритм, в другом объекте тот же самый алгоритм, в третьем объекте тот же самый алгоритм. А можно алгоритм оформить в виде команды и дальше передавать эту команду на сервер. И эта команда будет выполняться. И тогда эта команда, она не зависит... от какого-то конкретного класса. Она самостоятельный объект. Если она самостоятельный объект, можно ее передавать. Структура класса сложновата, но на примере должно проясниться.
-
-Значит, у нас будет команда, которую мы будем передавать от источника получателю.
-
-Давайте посмотрим абстрактный пример.
-
-Значит, есть команда. У команды, это абстрактный класс, либо интерфейс, обычно минимальный набор действий определяется... выполнить команду и отменить команду. Иногда бывает плюс-минус еще пару действий. Есть конкретная команда, которая реализует данный интерфейс. Конкретная команда знает о ресивере, то есть на кого она направлена, кто будет ее получатель. Конкретная команда получает этот ресивер в конструкторе. И когда происходит момент execute, она обращается к ресиверу. И говорит, выполни операцию. Ну и, соответственно, при отмене мы можем написать, что отмени это действие, но здесь я не реализовал. Ресивер, в свою очередь, определяет то действие, которое должно быть выполненным в момент возникновения команды.
-
-Потому что команда, она, собственно, ресивером управляет. И говорит, выполни операцию.
-
-Значит, у ресивера должен быть метод operation. Ну, когда официант приносит команду, повар выполняет эту команду, начинает готовить. Ну, в зависимости, возможно, от каких-то параметров, да, ресивер может по-разному делать оперейшн. Инвокер – это тот, кто провоцирует запуск всего этого процесса. Инвокер знает о команде, он принимает эту команду, и, собственно, в какой-то момент он ее запускает командой run. Либо командой cancel он говорит, что все, прекрати выполнение. Код, который бы использовал данный паттерн, следующий. Создаем вот этого инвокатора, который будет запускать весь процесс. Создаем ресивера, тот, кто будет выполнять команду. Создаем конкретную команду и знакомим ее с ресивером. То есть кто ее исполнит, когда она произойдет.
-
-И вот этот инвокатор в какой-то момент говорит команда, выполняйся. В UI это было бы либо нажатие на кнопку, либо нажатие комбинации клавиш. И вот когда кнопка нажимается, мы отдаем приказ инвокатору о том, чтобы он запустил команду на выполнение. Так, ну вот последний пример.
-
-Значит, пульт от телевизора. Тоже может быть ярким примером о том, что есть команда включить-выключить телевизор. Есть телевизор, который выполняет эту команду. Есть, собственно... Пульт управления это тот, кто инвочит, провоцирует запуск этой команды. Тогда код мог бы выглядеть следующим образом. У нас есть телевизор как получатель. У него есть две реакции. Он может выполнить команду on, команду off. Соответственно, команда должна понимать, на какую реакцию она воздействует. У нас есть инвокатор. Это пульт, который будет отправлять команды в виде объектов. Наш инвокатор получает команду, которую необходимо будет направить на телевизор. И в зависимости, когда происходит нажатие кнопки, он заставляет команду исполниться.
-
-Ну и сама команда реализует интерфейс «Выполни и отмени». И команда TV-ON знает, на кого она направлена на телевизор. Когда ее инвокатор, то есть пульт, заставит выполниться, она выполнится, сделает у телевизора, выполнит операцию ON. Ну а когда ее скажут, сделай отмену, она сделает у телевизора операцию OFF. И последний, как мы этим можем воспользоваться. Создаем инвокатор, создаем приемник нашей команды, пульту назначаем команду, которую он должен выполнить, и, собственно, в какой-то момент времени пульт выполняет команду. Когда использовать мы будем? Допустим, когда нам в системе необходимо действительно добиться некой транзакционности.
-
-Допустим, мы делаем операцию, операцию, операцию, но если не дошли до третьей операции, до финальной, надо необходимо отменить все предыдущие. То есть очень удобно, опять же, фиксировать в системе все команды, чтобы потом можно было сделать их откат.
-
-- Из плюсов.
-
-Мы убираем зависимость между тем, кто вызывает операцию, и тем, кто ее будет выполнять. Мы можем реализовать отложенный запуск выполнения команд. То есть мы можем сделать ряд команд создать, сохранить в базу, через какое-то время, на следующий запуск или через сутки, вытащить эти команды. То есть мы можем команду, раз это объект, сериализовать. И вот это вот сериализованное состояние, бинарное или строковое, и там JSON, сохранить в базу, потом из базы считать и выполнить через день эти команды. Или можем, в принципе, сериализованный вариант отправить в другой микросервис и там выполнить эти команды. Так, ну и с минусов, да, достаточно сложный паттерн.
-
-### Visitor
-
-Значит, из нерассмотренных паттернов, которые нужно будет разобрать самостоятельно, у нас остается визитер. Если в двух словах, то у вас есть объект, в который вы хотите внедрить новый кусок алгоритма. При этом этот кусок алгоритма у вас описан в совершенно другом объекте, в визитёре. У вас визитёр, в данном случае какой-нибудь страховой агент, имеет алгоритм, и в зависимости от того, куда он приходит, в частный дом, он предлагает страховку жизни. Приходит на фабрику, предлагает страховку от пожара. Приходит в банк, предлагает страховку от банкротства. То есть, смотрите, у нас, получается, есть некие классы, не имеющие определенных алгоритмов, но мы можем с помощью визитера этот алгоритм в них внедрить.
-
-Только в данном случае визитер будет содержать тот алгоритм, который необходимо выполнить. Правда, минус этого паттерна вы должны заранее предполагать, что он вам понадобится. Потому что вам придется заложить в вашу архитектуру возможность принимать этого визитера. В ваш класс, функциональность которого вы хотите расширить. То есть изначально проектируя класс, вы должны заложить возможность принять визитера со своим алгоритмом. Но достаточно тоже интересный паттерн. Его мы будем разбирать на семинаре.
-
-### Итоги
-
-Так, источники. Всё, ребят, задержал вас. Спасибо.
+После выбора добавьте по одному аргументу против каждого паттерна. Это упражнение важно: хороший инженер умеет не
+только узнать паттерн, но и отказаться от него, если цена выше пользы.
