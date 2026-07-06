@@ -16,10 +16,11 @@
 
 ## Сквозной сценарий
 
-Представьте, что после [Лекции 2](/lectures/02#di-и-тесты) у нас появился `OrderService`: он считает итог заказа,
-проверяет скидку, обращается к платежному шлюзу и публикует событие. Первый импульс - открыть приложение вручную,
-нажать кнопку "Оплатить" и посмотреть, что случится. Это полезно один раз, но плохо работает как инженерная обратная
-связь: ручная проверка медленная, неполная и зависит от внешних систем.
+В [Лекции 2](/lectures/02#di-и-тесты) мы передали `FakePaymentGateway` в `OrderService` вместо реального шлюза — это
+был тестовый двойник. Но мы не обсуждали, *как* написать тест, который использует этот fake правильно. Теперь
+`OrderService` считает итог заказа, проверяет скидку, обращается к платежному шлюзу и публикует событие. Первый импульс —
+открыть приложение вручную, нажать кнопку "Оплатить" и посмотреть, что случится. Это полезно один раз, но плохо работает
+как инженерная обратная связь: ручная проверка медленная, неполная и зависит от внешних систем.
 
 В этой лекции мы будем постепенно сужать вопрос. Вместо "работает ли все приложение?" спросим:
 
@@ -97,6 +98,13 @@ flowchart LR
 
 ## Карта видов тестирования
 
+Для разработчика главное разделение — по уровню: что именно проверяет тест и сколько инфраструктуры ему нужно. Три
+уровня, которые вам реально нужно понимать: unit, integration и e2e.
+
+Обычно уровни тестирования объясняют пирамидой. Внизу много быстрых дешевых тестов, наверху меньше дорогих и медленных
+тестов, которые зато ближе к реальному пользовательскому сценарию.
+
+::: details Полная карта классификаций
 Тестирование классифицируют по разным признакам. Эти классификации не конкурируют: один и тот же тест может быть
 автоматизированным, динамическим, функциональным, white-box и unit-тестом одновременно.
 
@@ -108,9 +116,7 @@ flowchart LR
 | Требования        | Функциональное / нефункциональное | Проверяем поведение продукта или свойства вроде скорости, удобства, безопасности.                |
 | Знание системы    | Black box / gray box / white box  | Тестировщик не знает внутренности, знает часть контракта или работает с кодом.                   |
 | Уровень           | Unit / integration / system / e2e | Проверяем маленькую единицу поведения, связь модулей, систему целиком или пользовательский путь. |
-
-Обычно уровни тестирования объясняют пирамидой. Внизу много быстрых дешевых тестов, наверху меньше дорогих и медленных
-тестов, которые зато ближе к реальному пользовательскому сценарию.
+:::
 
 ```mermaid
 flowchart BT
@@ -376,6 +382,136 @@ flowchart LR
 ::: only go
 > **Go.** Стандартный пакет `testing` считает тестом функцию вида `TestXxx(t *testing.T)`. Ошибка фиксируется через
 > `t.Fatal`, `t.Fatalf` или похожие методы.
+>
+> Самый характерный Go-паттерн тестирования — **table-driven tests**. Вместо отдельной функции на каждый случай, все
+> входы и ожидаемые результаты собираются в таблицу:
+>
+> ```go
+> func TestApplyDiscount(t *testing.T) {
+>     tests := []struct {
+>         name     string
+>         total    int
+>         expected int
+>     }{
+>         {"below threshold", 500, 500},
+>         {"at threshold", 1000, 900},
+>         {"above threshold", 1500, 1350},
+>     }
+>     for _, tt := range tests {
+>         t.Run(tt.name, func(t *testing.T) {
+>             got := ApplyDiscount(tt.total)
+>             if got != tt.expected {
+>                 t.Errorf("ApplyDiscount(%d) = %d, want %d", tt.total, got, tt.expected)
+>             }
+>         })
+>     }
+> }
+> ```
+>
+> `t.Run` создаёт подтест для каждой строки — при падении видно, какой именно случай сломался.
+:::
+
+### Параметризованные тесты
+
+Когда одну и ту же логику нужно проверить на нескольких наборах данных, каждый язык предлагает свой механизм. Вместо
+дублирования тестовых функций, данные собираются в таблицу:
+
+::: multi-code "Параметризованные тесты" {default=kotlin}
+
+```kotlin
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.CsvSource
+import kotlin.test.assertEquals
+
+class DiscountTest {
+    @ParameterizedTest
+    @CsvSource("500,500", "1000,900", "1500,1350")
+    fun appliesDiscount(total: Int, expected: Int) {
+        assertEquals(expected, applyDiscount(total))
+    }
+}
+
+fun applyDiscount(total: Int): Int =
+    if (total >= 1000) total * 90 / 100 else total
+```
+
+```csharp
+using Xunit;
+
+public class DiscountTests
+{
+    [Theory]
+    [InlineData(500, 500)]
+    [InlineData(1000, 900)]
+    [InlineData(1500, 1350)]
+    public void AppliesDiscount(int total, int expected)
+    {
+        Assert.Equal(expected, ApplyDiscount(total));
+    }
+
+    static int ApplyDiscount(int total) =>
+        total >= 1000 ? total * 90 / 100 : total;
+}
+```
+
+```java
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
+class DiscountTest {
+    @ParameterizedTest
+    @CsvSource({"500,500", "1000,900", "1500,1350"})
+    void appliesDiscount(int total, int expected) {
+        assertEquals(expected, applyDiscount(total));
+    }
+
+    static int applyDiscount(int total) {
+        return total >= 1000 ? total * 90 / 100 : total;
+    }
+}
+```
+
+```go
+func TestApplyDiscount(t *testing.T) {
+    tests := []struct {
+        total, expected int
+    }{
+        {500, 500}, {1000, 900}, {1500, 1350},
+    }
+    for _, tt := range tests {
+        got := ApplyDiscount(tt.total)
+        if got != tt.expected {
+            t.Errorf("ApplyDiscount(%d) = %d, want %d",
+                tt.total, got, tt.expected)
+        }
+    }
+}
+```
+
+:::
+
+::: only kotlin
+> **Kotlin.** Помимо JUnit `@ParameterizedTest`, библиотека Kotest предлагает другой DSL:
+>
+> ```kotlin
+> class DiscountSpec : StringSpec({
+>     "applies 10% discount above threshold" {
+>         applyDiscount(1500) shouldBe 1350
+>     }
+>     "no discount below threshold" {
+>         applyDiscount(500) shouldBe 500
+>     }
+> })
+> ```
+>
+> `shouldBe` читается как утверждение на естественном языке. Выбор между `kotlin.test` и Kotest — вопрос вкуса команды.
+:::
+
+::: only csharp
+> **C#.** `[Fact]` — тест без параметров. `[Theory]` с `[InlineData]` — параметризованный тест. Для сложных данных
+> есть `[MemberData]` и `[ClassData]`, позволяющие передавать объекты вместо примитивов.
 :::
 
 ## Что именно проверяет тест
@@ -823,8 +959,14 @@ func (FakePaymentGateway) Charge(amount int) Receipt {
 
 ## Test doubles: fake, stub, mock
 
-Тестовый двойник - объект, который заменяет настоящую зависимость в тесте. В разговоре часто говорят "мок" про любой
-двойник, но для точности полезно различать роли.
+Тестовый двойник — объект, который заменяет настоящую зависимость в тесте. В разговоре часто говорят "мок" про любой
+двойник, но для точности полезно различать роли. Проще всего увидеть разницу через историю нарастающих потребностей:
+
+1. Сначала конструктор требует `Logger`, но в тесте логирование неважно. Нужен объект, который просто компилируется — это **dummy** (`NoOpLogger`).
+2. Потом тесту нужна валюта, но реальный API курсов недоступен. Нужен объект, который *отвечает заранее* — это **stub** (`StubExchangeRates(rate = 90)`).
+3. Тест становится сложнее: нужен полноценный репозиторий, который хранит и отдаёт данные, но без настоящей БД. Нужна *упрощённая рабочая реализация* — это **fake** (`InMemoryOrderRepository`).
+4. Теперь важно знать, *что именно* тестируемый код отправил во внешний сервис. Нужен объект, который *запоминает вызовы* — это **spy** (`SpyMailer` с полем `sent`).
+5. Наконец, нужно убедиться, что метод `send` был вызван *ровно один раз с конкретным аргументом*. Нужен объект, который *проверяет ожидание* — это **mock**.
 
 | Вид двойника | Что делает                                                                 | Пример                                                        |
 |--------------|----------------------------------------------------------------------------|---------------------------------------------------------------|
@@ -1142,7 +1284,7 @@ verify(renderer).renderBody(message)
 verify(renderer).renderFooter(message)
 ```
 
-Более устойчивый тест:
+Более устойчивый тест проверяет *результат*, а не *процесс*:
 
 ```kotlin
 import kotlin.test.Test
@@ -1160,6 +1302,10 @@ class MessageRendererTest {
     }
 }
 ```
+
+Теперь представьте рефакторинг: разработчик объединил `renderHeader` и `renderBody` в один метод `renderContent`.
+Хрупкий тест с `verify` упал — хотя итоговый HTML не изменился. Устойчивый тест прошёл, потому что он проверяет
+наблюдаемый результат. Именно это делает его ценным.
 
 ::: warning Главный признак хрупкости
 Если после рефакторинга без изменения внешнего поведения тест нужно переписывать, тест слишком сильно привязан к
@@ -1187,6 +1333,12 @@ flowchart TD
     Tradeoff --> Functional["Функциональные тесты<br/>хорошо ловят баги<br/>но дают медленную обратную связь"]
     Tradeoff --> Valuable["Ценные unit-тесты<br/>важная логика<br/>быстро<br/>без привязки к реализации"]
 ```
+
+Конкретный пример trade-off: тест с mock проверяет, что `OrderService` вызвал `repository.save(order)` ровно один раз
+с конкретным аргументом. Это хорошая защита от бага (если `save` не вызовется — тест поймает). Но тест привязан к
+реализации: если разработчик вынесет сохранение в `UnitOfWork` и вызовет `unitOfWork.commit()`, тест сломается, хотя
+заказ по-прежнему сохраняется. Тест, проверяющий *результат* через fake repository (`assertEquals(order, repo.findById(id))`),
+устойчивее к рефакторингу, но может пропустить баг, если fake некорректно имитирует real storage.
 
 ::: tip Как относиться к coverage
 Низкое покрытие важной бизнес-логики - тревожный сигнал. Высокое покрытие само по себе не доказывает качество: можно
@@ -1242,6 +1394,42 @@ flowchart TD
     Controller --> Http[External client]
     Service --> Rules[Бизнес-правила]
 ```
+
+Конкретный пример. До рефакторинга — метод читает файл И считает статистику:
+
+```kotlin
+class ReportGenerator {
+    fun generate(path: String): String {
+        val lines = File(path).readLines()         // I/O
+        val total = lines.sumOf { it.toInt() }     // logic
+        val avg = total / lines.size               // logic
+        return "total=$total, avg=$avg"             // formatting
+    }
+}
+```
+
+Тестировать `generate` без настоящего файла невозможно. После рефакторинга — чистая функция отдельно, тонкая обёртка
+с I/O отдельно:
+
+```kotlin
+data class Stats(val total: Int, val avg: Int)
+
+fun computeStats(values: List<Int>): Stats {
+    val total = values.sum()
+    return Stats(total, total / values.size)
+}
+
+class ReportGenerator {
+    fun generate(path: String): String {
+        val values = File(path).readLines().map { it.toInt() }
+        val stats = computeStats(values)
+        return "total=${stats.total}, avg=${stats.avg}"
+    }
+}
+```
+
+Теперь `computeStats` тестируется мгновенно без файловой системы, а `ReportGenerator` — humble object, который только
+связывает I/O и логику.
 
 В MVC это проявляется естественно: controller не должен быть местом, где живет вся предметная область. Он связывает
 входной запрос, модель и ответ. Сложные правила уходят в модель или доменный сервис, где их можно быстро проверить
