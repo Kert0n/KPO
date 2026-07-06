@@ -1,4 +1,5 @@
 import type MarkdownIt from 'markdown-it'
+import { askAiBlockAttribute } from './askAiAnchors'
 
 export type MermaidLintDiagnostic = {
   message: string
@@ -34,7 +35,7 @@ export function mermaidPlugin(md: MarkdownIt): void {
       })
 
       const diagramId = `kpo-mermaid-${stableHash(`${lineOffset}:${token.content}`)}`
-      return '<div class="kpo-content-block kpo-content-block--mermaid kpo-content-block--wide kpo-wide-block kpo-wide-block--mermaid">\n'
+      return `<div class="kpo-content-block kpo-content-block--mermaid kpo-content-block--wide kpo-wide-block kpo-wide-block--mermaid"${askAiBlockAttribute(token)}>\n`
         + `<MermaidDiagram code="${encodeURIComponent(token.content)}" diagram-id="${diagramId}"></MermaidDiagram>\n`
         + '</div>\n'
     }

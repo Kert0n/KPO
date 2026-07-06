@@ -9,6 +9,12 @@ declare module 'kotlin-playground' {
     server?: string
     version?: string
     onChange?: (code: string) => void
+    getInstance?: (instance: {
+      getCode: () => string
+      codemirror?: {
+        getSelection?: () => string
+      }
+    }) => void
     onRun?: () => void
     onError?: () => void
     callback?: (targetNode: HTMLElement, mountNode: HTMLElement) => void

@@ -35,13 +35,15 @@ const props = withDefaults(defineProps<{
   authorDefaultLang?: string
   allowPlayground?: boolean
   playgroundCode?: string
+  askBlockId?: string
 }>(), {
   title: '',
   labels: '',
   initialLang: '',
   authorDefaultLang: '',
   allowPlayground: false,
-  playgroundCode: ''
+  playgroundCode: '',
+  askBlockId: ''
 })
 
 const { activeLanguage, setActiveLanguage } = useCodeLanguage()
@@ -185,7 +187,7 @@ function onTabsKeydown(event: KeyboardEvent): void {
 </script>
 
 <template>
-  <section ref="root" class="kpo-switcher">
+  <section ref="root" class="kpo-switcher" :data-kpo-ask-block-id="askBlockId || undefined">
     <header class="kpo-switcher__header">
       <span v-if="title" class="kpo-switcher__title">{{ title }}</span>
 
@@ -236,6 +238,7 @@ function onTabsKeydown(event: KeyboardEvent): void {
       v-if="playgroundEverShown"
       v-show="playgroundActive"
       :code="kotlinCode"
+      :ask-block-id="askBlockId"
       @failed="playgroundFailed = true"
     />
   </section>
