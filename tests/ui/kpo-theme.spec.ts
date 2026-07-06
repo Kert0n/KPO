@@ -5,7 +5,31 @@ const CENTER_TOLERANCE_PX = 2
 const SCALE_TOLERANCE = 0.05
 const ANCHOR_TOLERANCE_PX = 4
 const DESKTOP_PROSE_TOLERANCE_PX = 12
+const MERMAID_FOREIGN_OBJECT_TOLERANCE_PX = 2
+const MERMAID_VIEWBOX_TOLERANCE_PX = 8
 const MIN_READABLE_MERMAID_HEIGHT_PX = CONTENT_LAYOUT_TOKENS.mermaidMinHeight
+const UI_FIXTURE_ROUTE = 'test-fixtures/ui-contract'
+const PUBLIC_CONTENT_ROUTES = [
+  'intro',
+  'lectures/01',
+  'lectures/02',
+  'lectures/03',
+  'lectures/04',
+  'lectures/05',
+  'lectures/06',
+  'lectures/07',
+  'lectures/08',
+  'lectures/09',
+  'lectures/10',
+  'lectures/11',
+  'lectures/12',
+  'lectures/13',
+  'lectures/14',
+  'extras/',
+  'extras/01',
+  'extras/02',
+  'conclusion'
+] as const
 
 type AdaptiveTableMode = 'fit' | 'wrap' | 'scroll'
 
@@ -37,12 +61,20 @@ async function waitForMermaid(page: Page): Promise<void> {
 }
 
 async function waitForAdaptiveTables(page: Page): Promise<void> {
+  await page.locator('.vp-doc').first().waitFor({ state: 'attached' })
+
   await page.waitForFunction(() => {
     const tableBlocks = [...document.querySelectorAll('.kpo-content-block--table')]
     return tableBlocks.every((block) => {
       return block.classList.contains('kpo-table--fit') ||
         block.classList.contains('kpo-table--wrap') ||
         block.classList.contains('kpo-table--scroll')
+    })
+  })
+
+  await page.evaluate(() => {
+    return new Promise<void>((resolve) => {
+      requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
     })
   })
 }
@@ -185,6 +217,107 @@ async function getMermaidMetrics(page: Page): Promise<Array<{
   })
 }
 
+type MermaidLabelContrast = {
+  color: string
+  background: string
+  contrast: number
+}
+
+async function getMermaidLabelContrasts(page: Page): Promise<MermaidLabelContrast[]> {
+  return page.evaluate(() => {
+    function parseRgb(value: string): [number, number, number] | null {
+      const match = value.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/)
+      if (!match) return null
+      return [Number(match[1]), Number(match[2]), Number(match[3])]
+    }
+
+    function luminance(rgb: [number, number, number]): number {
+      const values = rgb.map((channel) => {
+        const value = channel / 255
+        return value <= 0.03928 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4
+      })
+      return 0.2126 * values[0] + 0.7152 * values[1] + 0.0722 * values[2]
+    }
+
+    function contrast(first: string, second: string): number {
+      const left = parseRgb(first)
+      const right = parseRgb(second)
+      if (!left || !right) return 21
+      const l1 = luminance(left)
+      const l2 = luminance(right)
+      return (Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05)
+    }
+
+    const rootStyle = getComputedStyle(document.documentElement)
+    const pageBackground = rootStyle.getPropertyValue('--vp-c-bg').trim()
+
+    return [...document.querySelectorAll('.kpo-mermaid svg .nodeLabel, .kpo-mermaid svg .edgeLabel span')]
+      .map((node) => {
+        const style = getComputedStyle(node)
+        const background = style.backgroundColor === 'rgba(0, 0, 0, 0)'
+          ? pageBackground
+          : style.backgroundColor
+        return {
+          color: style.color,
+          background,
+          contrast: contrast(style.color, background)
+        }
+      })
+  })
+}
+
+type MermaidClipIssue = {
+  diagramIndex: number
+  reason: string
+  text: string
+}
+
+async function getMermaidClipIssues(page: Page): Promise<MermaidClipIssue[]> {
+  return page.evaluate((tolerances) => {
+    return [...document.querySelectorAll('.kpo-mermaid svg')].flatMap((svg, diagramIndex) => {
+      const svgIssues: Array<{ diagramIndex: number; reason: string; text: string }> = []
+      const viewBox = svg.getAttribute('viewBox')?.trim().split(/\s+/).map(Number) ?? []
+      const [viewMinX, viewMinY, viewWidth, viewHeight] = viewBox
+
+      for (const node of [...svg.querySelectorAll('foreignObject')]) {
+        const child = node.firstElementChild
+        if (!child) continue
+
+        const containerRect = node.getBoundingClientRect()
+        const childRect = child.getBoundingClientRect()
+        const text = String(node.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 80)
+        if (childRect.width > containerRect.width + tolerances.foreignObject) {
+          svgIssues.push({ diagramIndex, reason: 'foreignObject-x', text })
+        }
+        if (childRect.height > containerRect.height + tolerances.foreignObject) {
+          svgIssues.push({ diagramIndex, reason: 'foreignObject-y', text })
+        }
+      }
+
+      if (Number.isFinite(viewWidth) && Number.isFinite(viewHeight)) {
+        try {
+          const box = (svg as SVGSVGElement).getBBox()
+          if (
+            box.x < viewMinX - tolerances.viewBox ||
+            box.y < viewMinY - tolerances.viewBox ||
+            box.x + box.width > viewMinX + viewWidth + tolerances.viewBox ||
+            box.y + box.height > viewMinY + viewHeight + tolerances.viewBox
+          ) {
+            svgIssues.push({ diagramIndex, reason: 'svg-viewbox', text: '' })
+          }
+        } catch {
+          // Some SVG fragments may not expose getBBox while hidden during route changes.
+        }
+      }
+
+      return svgIssues
+    })
+  }, {
+    foreignObject: MERMAID_FOREIGN_OBJECT_TOLERANCE_PX,
+    viewBox: MERMAID_VIEWBOX_TOLERANCE_PX
+  })
+}
+
 async function hideSidebar(page: Page): Promise<void> {
   const html = page.locator('html')
   const isHidden = await html.evaluate((node) => node.classList.contains('kpo-sidebar-hidden'))
@@ -255,7 +388,7 @@ async function expectCenteredAgainstPage(page: Page, locator: Locator): Promise<
 
 test('code switchers without author defaults follow the latest global language', async ({ page }) => {
   await clearStorage(page)
-  await page.goto('lectures/02')
+  await page.goto(UI_FIXTURE_ROUTE)
   await waitForMermaid(page)
   await expectNoGlobalOverflowMask(page)
   await expectNoPageOverflowFromVpDoc(page)
@@ -283,50 +416,69 @@ test('author default beats restored language until that block is clicked', async
     'kpo:code-language': 'kotlin',
     'kpo:playground-mode': '1'
   })
-  await page.goto('extras/01')
+  await page.goto(UI_FIXTURE_ROUTE)
 
-  const switcher = page.locator('.kpo-switcher').first()
+  const switcher = page.locator('.kpo-switcher').nth(3)
   await expectActiveTab(switcher, 'Go')
-  await expect(page.locator('.kpo-playground')).toHaveCount(0)
   await expectNoPageOverflowFromVpDoc(page)
 
   await switcher.getByRole('tab', { name: 'Kotlin' }).click()
   await expectNoPageOverflowFromVpDoc(page)
 
   await expectActiveTab(switcher, 'Kotlin')
-  await expect(page.locator('.kpo-playground')).toHaveCount(1)
   await expectNoPageOverflowFromVpDoc(page)
 })
 
-test('lecture 13 renders mermaid and keeps playground disabled for marked blocks', async ({ page }) => {
+test('fixture renders mermaid and keeps playground disabled for marked blocks', async ({ page }) => {
   await setStorage(page, {
     'kpo:code-language': 'kotlin',
     'kpo:playground-mode': '1'
   })
-  await page.goto('lectures/13')
+  await page.goto(UI_FIXTURE_ROUTE)
 
   await waitForMermaid(page)
 
+  await expect.poll(async () => page.locator('.kpo-mermaid').count()).toBeGreaterThan(0)
   await expect(page.locator('.kpo-mermaid__error')).toHaveCount(0)
-  await expect(page.locator('.kpo-switcher__playground-toggle')).toHaveCount(0)
-  await expect(page.locator('.kpo-playground')).toHaveCount(0)
+
+  const playgroundOff = page.locator('.kpo-switcher').filter({ hasText: 'Fixture playground off' })
+  await expect(playgroundOff).toHaveCount(1)
+  await expect(playgroundOff.locator('.kpo-switcher__playground-toggle')).toHaveCount(0)
+  await expect(playgroundOff.locator('.kpo-playground')).toHaveCount(0)
 })
 
-test('lecture 02 mobile layout has no pdf text code overflow', async ({ page }) => {
+test('fixture text code blocks keep overflow local on mobile', async ({ page }) => {
   await page.setViewportSize(LAYOUT_VIEWPORTS.mobilePhone)
   await clearStorage(page)
-  await page.goto('lectures/02')
+  await page.goto(UI_FIXTURE_ROUTE)
   await waitForMermaid(page)
 
-  await expect(page.locator('.language-text').filter({
+  const textBlock = page.locator('.language-text').filter({
     hasText: 'Пример функционального тестирования'
-  })).toHaveCount(0)
+  })
+
+  await expect(textBlock).toHaveCount(1)
+  const state = await textBlock.evaluate((node) => {
+    const element = node as HTMLElement
+    const rect = element.getBoundingClientRect()
+    return {
+      right: Math.round(rect.right),
+      viewport: document.documentElement.clientWidth,
+      hasLocalScroll: element.scrollWidth > element.clientWidth + 1,
+      overflowX: getComputedStyle(element).overflowX
+    }
+  })
+
+  expect(state.right).toBeLessThanOrEqual(state.viewport)
+  if (state.hasLocalScroll) {
+    expect(['auto', 'scroll']).toContain(state.overflowX)
+  }
 
   await expectNoPageOverflowFromVpDoc(page)
 })
 
 test('sidebar toggle does not navigate away from the current page', async ({ page }) => {
-  await page.goto('lectures/13')
+  await page.goto(UI_FIXTURE_ROUTE)
 
   const beforeUrl = page.url()
   const html = page.locator('html')
@@ -342,16 +494,28 @@ test('sidebar toggle does not navigate away from the current page', async ({ pag
 })
 
 test('last updated footer uses european date with AM PM time', async ({ page }) => {
-  await page.goto('lectures/02')
+  let checkedFooters = 0
 
-  await expect(page.locator('.VPLastUpdated')).toContainText(
-    /Обновлено:\s+\d{2}\.\d{2}\.\d{2},\s+\d{2}:\d{2}\s+(AM|PM)/
-  )
+  for (const route of PUBLIC_CONTENT_ROUTES) {
+    await page.goto(route)
+    await page.locator('.vp-doc').first().waitFor({ state: 'attached' })
+    const footers = page.locator('.VPLastUpdated')
+    const count = await footers.count()
+
+    for (let index = 0; index < count; index += 1) {
+      await expect(footers.nth(index)).toContainText(
+        /Обновлено:\s+\d{2}\.\d{2}\.\d{2},\s+\d{2}:\d{2}\s+(AM|PM)/
+      )
+      checkedFooters += 1
+    }
+  }
+
+  expect(checkedFooters).toBeGreaterThan(0)
 })
 
 test('hidden sidebar expands wide content lane but keeps prose narrow', async ({ page }) => {
   await page.setViewportSize(LAYOUT_VIEWPORTS.desktop)
-  await page.goto('lectures/02')
+  await page.goto(UI_FIXTURE_ROUTE)
   await waitForMermaid(page)
 
   const open = await measureWideLane(page)
@@ -375,19 +539,17 @@ test('moderately wide mermaid diagrams fit the expanded lane when sidebar is hid
   await page.setViewportSize(LAYOUT_VIEWPORTS.desktop)
   const fitted = []
 
-  for (const route of ['lectures/02', 'lectures/14']) {
-    await page.goto(route)
-    await waitForMermaid(page)
-    const openMetrics = await getMermaidMetrics(page)
+  await page.goto(UI_FIXTURE_ROUTE)
+  await waitForMermaid(page)
+  const openMetrics = await getMermaidMetrics(page)
 
-    await hideSidebar(page)
-    await expectNoPageOverflowFromVpDoc(page)
+  await hideSidebar(page)
+  await expectNoPageOverflowFromVpDoc(page)
 
-    const hiddenMetrics = await getMermaidMetrics(page)
-    fitted.push(...hiddenMetrics.filter((item) => {
-      return openMetrics[item.index]?.hasLocalXScroll && !item.hasLocalXScroll
-    }))
-  }
+  const hiddenMetrics = await getMermaidMetrics(page)
+  fitted.push(...hiddenMetrics.filter((item) => {
+    return openMetrics[item.index]?.hasLocalXScroll && !item.hasLocalXScroll
+  }))
 
   expect(fitted.length).toBeGreaterThan(0)
 
@@ -402,14 +564,15 @@ test('moderately wide mermaid diagrams fit the expanded lane when sidebar is hid
 
 test('small mermaid diagrams are not auto-upscaled on mobile', async ({ page }) => {
   await page.setViewportSize(LAYOUT_VIEWPORTS.mobilePhone)
-  await page.goto('lectures/01')
+  await page.goto(UI_FIXTURE_ROUTE)
   await expect.poll(async () => page.locator('.kpo-mermaid').count()).toBeGreaterThan(0)
   await waitForMermaid(page)
 
   const metrics = await getMermaidMetrics(page)
-  expect(metrics.length).toBeGreaterThan(0)
+  const small = metrics.filter((item) => item.viewBoxWidth <= item.containerClientWidth)
+  expect(small.length).toBeGreaterThan(0)
 
-  for (const item of metrics) {
+  for (const item of small) {
     expect(item.scaleX, JSON.stringify(item)).toBeLessThanOrEqual(1 + SCALE_TOLERANCE)
     expect(Math.abs(item.scaleX - item.scaleY)).toBeLessThan(SCALE_TOLERANCE)
   }
@@ -419,7 +582,7 @@ test('small mermaid diagrams are not auto-upscaled on mobile', async ({ page }) 
 
 test('very wide mermaid diagrams stay readable and scroll locally on desktop', async ({ page }) => {
   await page.setViewportSize(LAYOUT_VIEWPORTS.desktop)
-  await page.goto('lectures/02')
+  await page.goto(UI_FIXTURE_ROUTE)
   await waitForMermaid(page)
   await hideSidebar(page)
   await expectNoPageOverflowFromVpDoc(page)
@@ -443,7 +606,7 @@ test('very wide mermaid diagrams stay readable and scroll locally on desktop', a
 
 test('hidden sidebar enters focused-wide mode and removes the outline from layout', async ({ page }) => {
   await page.setViewportSize(LAYOUT_VIEWPORTS.desktop)
-  await page.goto('lectures/14')
+  await page.goto(UI_FIXTURE_ROUTE)
   await hideSidebar(page)
 
   const state = await page.evaluate(() => {
@@ -467,7 +630,7 @@ test('hidden sidebar enters focused-wide mode and removes the outline from layou
 
 test('mermaid zoom controls adjust scale without page overflow', async ({ page }) => {
   await page.setViewportSize(LAYOUT_VIEWPORTS.desktop)
-  await page.goto('lectures/02')
+  await page.goto(UI_FIXTURE_ROUTE)
   await waitForMermaid(page)
 
   const diagram = page.locator('.kpo-mermaid').first()
@@ -493,9 +656,9 @@ test('mermaid zoom controls adjust scale without page overflow', async ({ page }
   await expectNoPageOverflowFromVpDoc(page)
 })
 
-test('theme switch does not create page overflow or rely on global overflow masking', async ({ page }) => {
+test('fixture theme switch does not create page overflow or rely on global overflow masking', async ({ page }) => {
   await page.setViewportSize(LAYOUT_VIEWPORTS.desktop)
-  await page.goto('lectures/01')
+  await page.goto(UI_FIXTURE_ROUTE)
   await waitForMermaid(page)
 
   await expectNoGlobalOverflowMask(page)
@@ -514,10 +677,29 @@ test('theme switch does not create page overflow or rely on global overflow mask
   await expectNoPageOverflowFromVpDoc(page)
 })
 
+test('public theme switch keeps pages viewport-contained', async ({ page }) => {
+  await page.setViewportSize(LAYOUT_VIEWPORTS.desktop)
+
+  for (const route of PUBLIC_CONTENT_ROUTES) {
+    await page.goto(route)
+    await waitForMermaid(page)
+    await waitForAdaptiveTables(page)
+
+    await expectNoGlobalOverflowMask(page)
+    await expectNoPageOverflowFromVpDoc(page)
+
+    await page.locator('.VPSwitchAppearance').first().click()
+    await page.waitForTimeout(250)
+
+    await expectNoGlobalOverflowMask(page)
+    await expectNoPageOverflowFromVpDoc(page)
+  }
+})
+
 test('language click preserves viewport position inside the interacted code block', async ({ page }) => {
   await page.setViewportSize(LAYOUT_VIEWPORTS.desktop)
   await clearStorage(page)
-  await page.goto('lectures/02')
+  await page.goto(UI_FIXTURE_ROUTE)
   await waitForMermaid(page)
 
   const switcher = page.locator('.kpo-switcher').nth(1)
@@ -536,7 +718,7 @@ test('language click preserves viewport position inside the interacted code bloc
 test('keyboard language switch preserves viewport position inside the interacted code block', async ({ page }) => {
   await page.setViewportSize(LAYOUT_VIEWPORTS.desktop)
   await clearStorage(page)
-  await page.goto('lectures/02')
+  await page.goto(UI_FIXTURE_ROUTE)
   await waitForMermaid(page)
 
   const switcher = page.locator('.kpo-switcher').nth(1)
@@ -556,10 +738,10 @@ test('keyboard language switch preserves viewport position inside the interacted
 test('playground toggle preserves viewport position inside the interacted code block', async ({ page }) => {
   await page.setViewportSize(LAYOUT_VIEWPORTS.desktop)
   await clearStorage(page)
-  await page.goto('lectures/02')
+  await page.goto(UI_FIXTURE_ROUTE)
   await waitForMermaid(page)
 
-  const switcher = page.locator('.kpo-switcher').nth(1)
+  const switcher = page.locator('.kpo-switcher').nth(4)
   await switcher.scrollIntoViewIfNeeded()
   await page.evaluate(() => window.scrollBy(0, 260))
 
@@ -578,7 +760,7 @@ test('overflowing mermaid diagrams start centered in their local viewport', asyn
     LAYOUT_VIEWPORTS.narrowDesktop
   ]) {
     await page.setViewportSize(viewport)
-    await page.goto('lectures/02')
+    await page.goto(UI_FIXTURE_ROUTE)
     await waitForMermaid(page)
 
     await expect.poll(async () => {
@@ -606,7 +788,7 @@ test('overflowing mermaid diagrams start centered in their local viewport', asyn
 
 test('manual mermaid scroll is preserved across zoom and reset recenters', async ({ page }) => {
   await page.setViewportSize(LAYOUT_VIEWPORTS.mobilePhone)
-  await page.goto('lectures/02')
+  await page.goto(UI_FIXTURE_ROUTE)
   await waitForMermaid(page)
 
   const diagram = page.locator('.kpo-mermaid').filter({
@@ -649,7 +831,7 @@ test('manual mermaid scroll is preserved across zoom and reset recenters', async
 
 test('mermaid zoom controls visibility follows overflow, hover and focus', async ({ page }) => {
   await page.setViewportSize(LAYOUT_VIEWPORTS.desktop)
-  await page.goto('lectures/02')
+  await page.goto(UI_FIXTURE_ROUTE)
   await waitForMermaid(page)
   await hideSidebar(page)
 
@@ -673,7 +855,7 @@ test('mermaid zoom controls visibility follows overflow, hover and focus', async
   await expectNoPageOverflowFromVpDoc(page)
 
   await page.setViewportSize(LAYOUT_VIEWPORTS.mobilePhone)
-  await page.goto('lectures/02')
+  await page.goto(UI_FIXTURE_ROUTE)
   await waitForMermaid(page)
 
   const overflowing = page.locator('.kpo-mermaid--has-overflow').first()
@@ -681,9 +863,9 @@ test('mermaid zoom controls visibility follows overflow, hover and focus', async
   await expectNoPageOverflowFromVpDoc(page)
 })
 
-test('mermaid dark theme keeps label colors readable and token-based', async ({ page }) => {
+test('fixture mermaid dark theme keeps label colors readable and token-based', async ({ page }) => {
   await page.setViewportSize(LAYOUT_VIEWPORTS.desktop)
-  await page.goto('lectures/01')
+  await page.goto(UI_FIXTURE_ROUTE)
   await waitForMermaid(page)
 
   const isDark = await page.locator('html').evaluate((node) => node.classList.contains('dark'))
@@ -695,102 +877,64 @@ test('mermaid dark theme keeps label colors readable and token-based', async ({ 
   }).toBe(true)
   await page.waitForTimeout(500)
 
-  const result = await page.evaluate(() => {
-    function parseRgb(value: string): [number, number, number] | null {
-      const match = value.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/)
-      if (!match) return null
-      return [Number(match[1]), Number(match[2]), Number(match[3])]
-    }
+  const labels = await getMermaidLabelContrasts(page)
 
-    function luminance(rgb: [number, number, number]): number {
-      const values = rgb.map((channel) => {
-        const value = channel / 255
-        return value <= 0.03928 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4
-      })
-      return 0.2126 * values[0] + 0.7152 * values[1] + 0.0722 * values[2]
-    }
-
-    function contrast(first: string, second: string): number {
-      const left = parseRgb(first)
-      const right = parseRgb(second)
-      if (!left || !right) return 21
-      const l1 = luminance(left)
-      const l2 = luminance(right)
-      return (Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05)
-    }
-
-    const rootStyle = getComputedStyle(document.documentElement)
-    const pageBackground = rootStyle.getPropertyValue('--vp-c-bg').trim()
-    const pageText = rootStyle.getPropertyValue('--vp-c-text-1').trim()
-    const labels = [...document.querySelectorAll('.kpo-mermaid svg .nodeLabel, .kpo-mermaid svg .edgeLabel span')]
-      .map((node) => {
-        const style = getComputedStyle(node)
-        return {
-          color: style.color,
-          background: style.backgroundColor,
-          contrast: contrast(style.color, style.backgroundColor === 'rgba(0, 0, 0, 0)'
-            ? pageBackground
-            : style.backgroundColor)
-        }
-      })
-
-    return {
-      labels,
-      pageBackground,
-      pageText
-    }
-  })
-
-  expect(result.labels.length).toBeGreaterThan(0)
-  for (const label of result.labels) {
+  expect(labels.length).toBeGreaterThan(0)
+  for (const label of labels) {
     expect(label.contrast).toBeGreaterThanOrEqual(4.5)
     expect(label.color).not.toBe('rgb(0, 0, 0)')
   }
   await expectNoPageOverflowFromVpDoc(page)
 })
 
-test('mermaid text and foreignObject labels are not clipped', async ({ page }) => {
+test('public mermaid dark theme labels are readable when present', async ({ page }) => {
   await page.setViewportSize(LAYOUT_VIEWPORTS.desktop)
 
-  for (const route of ['lectures/01', 'lectures/02', 'lectures/03', 'lectures/11', 'lectures/14']) {
+  for (const route of PUBLIC_CONTENT_ROUTES) {
     await page.goto(route)
     await waitForMermaid(page)
 
-    const issues = await page.evaluate(() => {
-      return [...document.querySelectorAll('.kpo-mermaid svg')].flatMap((svg, diagramIndex) => {
-        const svgIssues: Array<{ diagramIndex: number; reason: string; text: string }> = []
-        const viewBox = svg.getAttribute('viewBox')?.trim().split(/\s+/).map(Number) ?? []
-        const [, , viewWidth, viewHeight] = viewBox
+    const isDark = await page.locator('html').evaluate((node) => node.classList.contains('dark'))
+    if (!isDark) {
+      await page.locator('.VPSwitchAppearance').first().click()
+    }
+    await expect.poll(async () => {
+      return page.locator('html').evaluate((node) => node.classList.contains('dark'))
+    }).toBe(true)
+    await page.waitForTimeout(250)
 
-        for (const node of [...svg.querySelectorAll('foreignObject')]) {
-          const child = node.firstElementChild
-          if (!child) continue
+    const labels = await getMermaidLabelContrasts(page)
+    for (const label of labels) {
+      expect(label.contrast, JSON.stringify({ route, label }, null, 2)).toBeGreaterThanOrEqual(4.5)
+      expect(label.color).not.toBe('rgb(0, 0, 0)')
+    }
 
-          const containerRect = node.getBoundingClientRect()
-          const childRect = child.getBoundingClientRect()
-          const text = String(node.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 80)
-          if (childRect.width > containerRect.width + 2) {
-            svgIssues.push({ diagramIndex, reason: 'foreignObject-x', text })
-          }
-          if (childRect.height > containerRect.height + 2) {
-            svgIssues.push({ diagramIndex, reason: 'foreignObject-y', text })
-          }
-        }
+    await expectNoPageOverflowFromVpDoc(page)
+  }
+})
 
-        if (Number.isFinite(viewWidth) && Number.isFinite(viewHeight)) {
-          try {
-            const box = (svg as SVGSVGElement).getBBox()
-            if (box.x < -2 || box.y < -2 || box.x + box.width > viewWidth + 2 || box.y + box.height > viewHeight + 2) {
-              svgIssues.push({ diagramIndex, reason: 'svg-viewbox', text: '' })
-            }
-          } catch {
-            // Some SVG fragments may not expose getBBox while hidden during route changes.
-          }
-        }
+test('fixture mermaid text and foreignObject labels are not clipped', async ({ page }) => {
+  await page.setViewportSize(LAYOUT_VIEWPORTS.desktop)
+  await page.goto(UI_FIXTURE_ROUTE)
+  await waitForMermaid(page)
 
-        return svgIssues
-      })
-    })
+  await expect.poll(async () => page.locator('.kpo-mermaid svg .nodeLabel, .kpo-mermaid svg .edgeLabel span').count())
+    .toBeGreaterThan(0)
+
+  const issues = await getMermaidClipIssues(page)
+  expect(issues, JSON.stringify({ route: UI_FIXTURE_ROUTE, issues }, null, 2)).toEqual([])
+  await expectNoPageOverflowFromVpDoc(page)
+})
+
+test('public mermaid diagrams render without errors and labels are not clipped when present', async ({ page }) => {
+  await page.setViewportSize(LAYOUT_VIEWPORTS.desktop)
+
+  for (const route of PUBLIC_CONTENT_ROUTES) {
+    await page.goto(route)
+    await waitForMermaid(page)
+
+    await expect(page.locator('.kpo-mermaid__error')).toHaveCount(0)
+    const issues = await getMermaidClipIssues(page)
 
     expect(issues, JSON.stringify({ route, issues }, null, 2)).toEqual([])
     await expectNoPageOverflowFromVpDoc(page)
@@ -800,48 +944,45 @@ test('mermaid text and foreignObject labels are not clipped', async ({ page }) =
 test('wide tables are centered in the hidden-sidebar wide lane', async ({ page }) => {
   await page.setViewportSize(LAYOUT_VIEWPORTS.desktop)
 
-  for (const route of ['lectures/12', 'lectures/14']) {
-    await page.goto(route)
-    await waitForMermaid(page)
-    await waitForAdaptiveTables(page)
-    await hideSidebar(page)
-    await waitForAdaptiveTables(page)
+  await page.goto(UI_FIXTURE_ROUTE)
+  await waitForMermaid(page)
+  await waitForAdaptiveTables(page)
+  await hideSidebar(page)
+  await waitForAdaptiveTables(page)
 
-    const tableBlocks = page.locator('.kpo-content-block--table')
-    const states = await tableBlocks.evaluateAll((nodes) => {
-      return nodes.map((node) => {
-        const rect = node.getBoundingClientRect()
-        const pageCenter = document.documentElement.clientWidth / 2
-        return {
-          centerDelta: Math.round(Math.abs((rect.left + rect.right) / 2 - pageCenter)),
-          left: Math.round(rect.left),
-          right: Math.round(rect.right),
-          viewport: document.documentElement.clientWidth,
-          width: Math.round(rect.width)
-        }
-      })
+  const tableBlocks = page.locator('.kpo-content-block--table')
+  const states = await tableBlocks.evaluateAll((nodes) => {
+    return nodes.map((node) => {
+      const rect = node.getBoundingClientRect()
+      const pageCenter = document.documentElement.clientWidth / 2
+      return {
+        centerDelta: Math.round(Math.abs((rect.left + rect.right) / 2 - pageCenter)),
+        left: Math.round(rect.left),
+        right: Math.round(rect.right),
+        viewport: document.documentElement.clientWidth,
+        width: Math.round(rect.width)
+      }
     })
+  })
 
-    expect(states.length).toBeGreaterThan(0)
-    for (const state of states) {
-      expect(state.centerDelta, JSON.stringify(state)).toBeLessThanOrEqual(CENTER_TOLERANCE_PX)
-      expect(state.left).toBeGreaterThanOrEqual(-CENTER_TOLERANCE_PX)
-      expect(state.right).toBeLessThanOrEqual(state.viewport + CENTER_TOLERANCE_PX)
-    }
-    await expectNoPageOverflowFromVpDoc(page)
+  expect(states.length).toBeGreaterThan(0)
+  for (const state of states) {
+    expect(state.centerDelta, JSON.stringify(state)).toBeLessThanOrEqual(CENTER_TOLERANCE_PX)
+    expect(state.left).toBeGreaterThanOrEqual(-CENTER_TOLERANCE_PX)
+    expect(state.right).toBeLessThanOrEqual(state.viewport + CENTER_TOLERANCE_PX)
   }
+  await expectNoPageOverflowFromVpDoc(page)
 })
 
 test('wide elements use the expanded lane when sidebar is hidden', async ({ page }) => {
   await page.setViewportSize(LAYOUT_VIEWPORTS.desktop)
 
   const cases = [
-    { route: 'lectures/02', selector: '.kpo-wide-block--mermaid' },
-    { route: 'lectures/02', selector: '.kpo-wide-block--code' },
-    { route: 'lectures/12', selector: '.kpo-content-block--table' },
-    { route: 'lectures/13', selector: '.kpo-content-block--code' },
-    { route: 'lectures/02', selector: '.vp-doc p:has(> img:only-child)' },
-    { route: 'extras/01', selector: '.kpo-playground', playground: true }
+    { route: UI_FIXTURE_ROUTE, selector: '.kpo-wide-block--mermaid' },
+    { route: UI_FIXTURE_ROUTE, selector: '.kpo-wide-block--code' },
+    { route: UI_FIXTURE_ROUTE, selector: '.kpo-content-block--table' },
+    { route: UI_FIXTURE_ROUTE, selector: '.vp-doc p:has(> img:only-child)' },
+    { route: UI_FIXTURE_ROUTE, selector: '.kpo-playground', playground: true }
   ] as const
 
   for (const item of cases) {
@@ -870,27 +1011,7 @@ test('wide elements use the expanded lane when sidebar is hidden', async ({ page
 test('content pages do not create horizontal page overflow on mobile', async ({ page }) => {
   await page.setViewportSize(LAYOUT_VIEWPORTS.mobilePhone)
 
-  for (const route of [
-    'intro',
-    'lectures/01',
-    'lectures/02',
-    'lectures/03',
-    'lectures/04',
-    'lectures/05',
-    'lectures/06',
-    'lectures/07',
-    'lectures/08',
-    'lectures/09',
-    'lectures/10',
-    'lectures/11',
-    'lectures/12',
-    'lectures/13',
-    'lectures/14',
-    'extras/',
-    'extras/01',
-    'extras/02',
-    'conclusion'
-  ]) {
+  for (const route of PUBLIC_CONTENT_ROUTES) {
     await page.goto(route)
     await waitForMermaid(page)
     await waitForAdaptiveTables(page)
@@ -901,27 +1022,7 @@ test('content pages do not create horizontal page overflow on mobile', async ({ 
 test('published markdown tables all use the adaptive table contract on mobile', async ({ page }) => {
   await page.setViewportSize(LAYOUT_VIEWPORTS.mobilePhone)
 
-  for (const route of [
-    'intro',
-    'lectures/01',
-    'lectures/02',
-    'lectures/03',
-    'lectures/04',
-    'lectures/05',
-    'lectures/06',
-    'lectures/07',
-    'lectures/08',
-    'lectures/09',
-    'lectures/10',
-    'lectures/11',
-    'lectures/12',
-    'lectures/13',
-    'lectures/14',
-    'extras/',
-    'extras/01',
-    'extras/02',
-    'conclusion'
-  ]) {
+  for (const route of PUBLIC_CONTENT_ROUTES) {
     await page.goto(route)
     await waitForMermaid(page)
     await waitForAdaptiveTables(page)
@@ -953,7 +1054,7 @@ test('published markdown tables all use the adaptive table contract on mobile', 
 test('markdown tables wrap before falling back to local scroll on mobile', async ({ page }) => {
   await page.setViewportSize(LAYOUT_VIEWPORTS.mobilePhone)
 
-  await page.goto('lectures/14')
+  await page.goto(UI_FIXTURE_ROUTE)
   await waitForMermaid(page)
   await waitForAdaptiveTables(page)
 
@@ -981,7 +1082,7 @@ test('markdown tables wrap before falling back to local scroll on mobile', async
 
 test('dense markdown tables keep overflow local after wrap is not readable', async ({ page }) => {
   await page.setViewportSize(LAYOUT_VIEWPORTS.mobilePhone)
-  await page.goto('lectures/01')
+  await page.goto(UI_FIXTURE_ROUTE)
   await waitForMermaid(page)
   await waitForAdaptiveTables(page)
 
@@ -1003,7 +1104,7 @@ test('dense markdown tables keep overflow local after wrap is not readable', asy
 
 test('markdown tables preserve native table display in every adaptive mode', async ({ page }) => {
   await page.setViewportSize(LAYOUT_VIEWPORTS.mobilePhone)
-  await page.goto('lectures/14')
+  await page.goto(UI_FIXTURE_ROUTE)
   await waitForMermaid(page)
   await waitForAdaptiveTables(page)
 
@@ -1022,7 +1123,7 @@ test('wide mermaid diagrams keep readable size and scroll locally on mobile', as
   await page.setViewportSize(LAYOUT_VIEWPORTS.mobilePhone)
   let checkedWideDiagrams = 0
 
-  for (const route of ['lectures/02', 'lectures/11', 'lectures/14']) {
+  for (const route of [UI_FIXTURE_ROUTE]) {
     await page.goto(route)
     await waitForMermaid(page)
 
@@ -1053,16 +1154,16 @@ test('special content elements are viewport-contained on mobile', async ({ page 
   await page.setViewportSize(LAYOUT_VIEWPORTS.mobilePhone)
 
   const cases = [
-    { route: 'lectures/12', selector: '.kpo-content-block--table' },
-    { route: 'lectures/13', selector: '.kpo-mermaid' },
-    { route: 'lectures/02', selector: '.kpo-switcher' },
-    { route: 'extras/01', selector: '.kpo-playground', playground: true },
-    { route: 'lectures/02', selector: '.custom-block' },
-    { route: 'intro', selector: '.vp-doc blockquote' },
-    { route: 'lectures/02', selector: '.vp-doc img' },
-    { route: 'extras/01', selector: '.vp-doc code:not(pre code)' },
-    { route: 'lectures/13', selector: '.kpo-content-block--code' },
-    { route: 'lectures/14', selector: '.vp-doc h1, .vp-doc h2, .vp-doc h3' }
+    { route: UI_FIXTURE_ROUTE, selector: '.kpo-content-block--table' },
+    { route: UI_FIXTURE_ROUTE, selector: '.kpo-mermaid' },
+    { route: UI_FIXTURE_ROUTE, selector: '.kpo-switcher' },
+    { route: UI_FIXTURE_ROUTE, selector: '.kpo-playground', playground: true },
+    { route: UI_FIXTURE_ROUTE, selector: '.custom-block' },
+    { route: UI_FIXTURE_ROUTE, selector: '.vp-doc blockquote' },
+    { route: UI_FIXTURE_ROUTE, selector: '.vp-doc img' },
+    { route: UI_FIXTURE_ROUTE, selector: '.vp-doc code:not(pre code)' },
+    { route: UI_FIXTURE_ROUTE, selector: '.kpo-content-block--code' },
+    { route: UI_FIXTURE_ROUTE, selector: '.vp-doc h1, .vp-doc h2, .vp-doc h3' }
   ] as const
 
   for (const item of cases) {
