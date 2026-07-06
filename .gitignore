@@ -3,12 +3,14 @@ node_modules/
 .vitepress/cache/
 .vitepress/dist/
 test-results/
+\#/
 
 # Системное, IDE и логи
 .DS_Store
 .idea/
 .claude/settings.local.json
 npm-debug.log*
+*.log
 
 # Материалы редактора в папках лекций и дополнений:
 # публикуются (и коммитятся) только vitepress.md и его ресурсы (assets/).
