@@ -681,6 +681,89 @@ test('medium breakpoint ask ai provider selection syncs with desktop flyout', as
   await expect(flyout.locator('.KpoAskAiProviderMenu__item[aria-checked="true"]')).toHaveCount(1)
 })
 
+test('tablet navbar has correct element ordering', async ({ page }) => {
+  await clearStorage(page)
+  await page.setViewportSize(LAYOUT_VIEWPORTS.tablet)
+  await page.goto('')
+
+  const search = page.locator('.VPNavBar .VPNavBarSearch')
+  const menu = page.locator('.VPNavBar .VPNavBarMenu')
+  const extra = page.locator('.VPNavBar .KpoNavBarExtra')
+
+  await expect(search).toBeVisible()
+  await expect(menu).toBeVisible()
+  await expect(extra).toBeVisible()
+
+  const searchOrder = await search.evaluate((n) => getComputedStyle(n).order)
+  const menuOrder = await menu.evaluate((n) => getComputedStyle(n).order)
+  const extraOrder = await extra.evaluate((n) => getComputedStyle(n).order)
+
+  expect(Number(searchOrder)).toBeLessThan(Number(menuOrder))
+  expect(Number(menuOrder)).toBeLessThan(Number(extraOrder))
+})
+
+test('tablet search is compact and does not expand', async ({ page }) => {
+  await clearStorage(page)
+  await page.setViewportSize(LAYOUT_VIEWPORTS.tablet)
+  await page.goto('')
+
+  const search = page.locator('.VPNavBar .VPNavBarSearch')
+  const flexGrow = await search.evaluate((n) => getComputedStyle(n).flexGrow)
+  const paddingLeft = await search.evaluate((n) => getComputedStyle(n).paddingLeft)
+
+  expect(flexGrow).toBe('0')
+  expect(paddingLeft).toBe('0px')
+})
+
+test('tablet DocSearch button uses KPO compact styling', async ({ page }) => {
+  await clearStorage(page)
+  await page.setViewportSize(LAYOUT_VIEWPORTS.tablet)
+  await page.goto('')
+
+  const btn = page.locator('.VPNavBar .DocSearch-Button')
+  const height = await btn.evaluate((n) => getComputedStyle(n).height)
+  const borderRadius = await btn.evaluate((n) => getComputedStyle(n).borderRadius)
+  const width = await btn.evaluate((n) => getComputedStyle(n).width)
+
+  expect(parseInt(height)).toBe(28)
+  expect(borderRadius).toBe('6px')
+  expect(width).not.toBe(`${LAYOUT_VIEWPORTS.tablet.width}px`)
+})
+
+test('tablet nav links have KPO styling', async ({ page }) => {
+  await clearStorage(page)
+  await page.setViewportSize(LAYOUT_VIEWPORTS.tablet)
+  await page.goto('')
+
+  const link = page.locator('.VPNavBar .VPNavBarMenuLink').first()
+  const fontSize = await link.evaluate((n) => getComputedStyle(n).fontSize)
+  const fontWeight = await link.evaluate((n) => getComputedStyle(n).fontWeight)
+
+  expect(fontSize).toBe('14px')
+  expect(Number(fontWeight)).toBeGreaterThanOrEqual(650)
+})
+
+test('tablet hides native VPNavBarExtra and hamburger', async ({ page }) => {
+  await clearStorage(page)
+  await page.setViewportSize(LAYOUT_VIEWPORTS.tablet)
+  await page.goto('')
+
+  await expect(page.locator('.VPNavBar .VPNavBarExtra.extra')).toBeHidden()
+  await expect(page.locator('.VPNavBar .VPNavBarHamburger')).toBeHidden()
+  await expect(page.locator('.VPNavBar .KpoNavBarExtra')).toBeVisible()
+})
+
+test('tablet viewport has no horizontal page overflow', async ({ page }) => {
+  await clearStorage(page)
+  await page.setViewportSize(LAYOUT_VIEWPORTS.tablet)
+  await page.goto('')
+
+  const overflow = await page.evaluate(() => {
+    return document.documentElement.scrollWidth > document.documentElement.clientWidth
+  })
+  expect(overflow).toBe(false)
+})
+
 test('ask ai provider menu keeps selected and hover states clear', async ({ page }) => {
   await clearStorage(page)
   await page.setViewportSize({ width: 1600, height: 900 })
