@@ -1150,6 +1150,47 @@ test('wide mermaid diagrams keep readable size and scroll locally on mobile', as
   expect(checkedWideDiagrams).toBeGreaterThan(0)
 })
 
+test('LSP MathJax formula fits the mobile tip block without local scroll', async ({ page }) => {
+  await page.setViewportSize(LAYOUT_VIEWPORTS.mobilePhone)
+  await page.goto('lectures/01#lsp')
+  await page.locator('#lsp').waitFor()
+
+  const metrics = await page.evaluate(() => {
+    const lsp = document.querySelector('#lsp')
+    let node = lsp?.nextElementSibling ?? null
+    let tip: Element | null = null
+
+    while (node && node.tagName !== 'H2') {
+      if (node.matches('.tip.custom-block')) {
+        tip = node
+        break
+      }
+      node = node.nextElementSibling
+    }
+
+    const math = tip?.querySelector('mjx-container.MathJax') as HTMLElement | null
+    const tipElement = tip as HTMLElement | null
+    const tipRect = tipElement?.getBoundingClientRect()
+
+    return {
+      hasTip: Boolean(tipElement),
+      hasMath: Boolean(math),
+      rawDollarMath: tipElement?.innerText.includes('$$') ?? true,
+      mathScrollWidth: math?.scrollWidth ?? 0,
+      mathClientWidth: math?.clientWidth ?? 0,
+      tipRight: Math.round(tipRect?.right ?? 0),
+      viewport: document.documentElement.clientWidth
+    }
+  })
+
+  expect(metrics.hasTip).toBe(true)
+  expect(metrics.hasMath).toBe(true)
+  expect(metrics.rawDollarMath).toBe(false)
+  expect(metrics.mathScrollWidth).toBeLessThanOrEqual(metrics.mathClientWidth + 1)
+  expect(metrics.tipRight).toBeLessThanOrEqual(metrics.viewport)
+  await expectNoPageOverflowFromVpDoc(page)
+})
+
 test('special content elements are viewport-contained on mobile', async ({ page }) => {
   await page.setViewportSize(LAYOUT_VIEWPORTS.mobilePhone)
 

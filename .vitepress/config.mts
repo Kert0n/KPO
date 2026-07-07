@@ -36,6 +36,7 @@ export default defineConfig({
 
   markdown: {
     lineNumbers: true,
+    math: true,
     theme: { light: kpoLight, dark: kpoDark },
     config(md) {
       applyMarkdownExtensions(md)

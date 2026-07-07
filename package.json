@@ -25,6 +25,7 @@
     "gray-matter": "4.0.3",
     "markdown-it": "^14.1.0",
     "markdown-it-container": "4.0.0",
+    "markdown-it-mathjax3": "^4.3.2",
     "shiki": "2.5.0",
     "typescript": "5.9.3",
     "vitepress": "1.6.4",
