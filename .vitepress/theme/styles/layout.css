@@ -18,25 +18,11 @@
    в потоке слева, поиск и меню справа. Ничто в баре не меняет позицию
    от состояния сайдбара или типа страницы. */
 
-@media (min-width: 960px) {
-  .VPNavBar:not(.home.top) {
-    background-color: var(--vp-nav-bg-color) !important;
-  }
+/* ---- Навбар: общая раскладка (≥768px) ----
+   VitePress показывает меню навигации с 768px (прячет гамбургер).
+   Все стили, не зависящие от сайдбара, работают от этого брейкпоинта. */
 
-  .VPNavBar:not(.home.top) .content-body {
-    background-color: transparent !important;
-  }
-
-  /* Линия под топбаром — сплошная, без отступа на ширину сайдбара */
-  .VPNavBar .divider {
-    padding-left: 0 !important;
-  }
-
-  /* Дублирующая линия под логотипом не нужна */
-  .VPNavBarTitle.has-sidebar .title {
-    border-bottom-color: transparent !important;
-  }
-
+@media (min-width: 768px) {
   .VPNavBar .wrapper {
     padding: 0 var(--kpo-nav-inline-pad) !important;
   }
@@ -45,22 +31,7 @@
     max-width: 100% !important;
   }
 
-  .VPNavBar .container > .title {
-    position: static !important;
-    width: auto !important;
-    padding: 0 !important;
-  }
-
-  .VPNavBar .container > .content {
-    padding-right: 0 !important;
-    padding-left: 0 !important;
-  }
-
-
-  /* ---- Поиск: компактный контрол в правом кластере ----
-     Высота — общая для всех контролов (--kpo-control-height),
-     текст 13px под масштаб меню. DocSearch-стили глобальные,
-     поэтому !important не нужен. */
+  /* ---- Порядок элементов в навбаре ---- */
   .VPNavBar .VPNavBarSearch {
     order: 1;
     flex-grow: 0 !important;
@@ -103,7 +74,13 @@
     color: var(--vp-c-brand-1) !important;
   }
 
+  /* ---- Поиск: компактный контрол в правом кластере ----
+     Высота — общая для всех контролов (--kpo-control-height),
+     текст 13px под масштаб меню. DocSearch-стили глобальные,
+     поэтому !important не нужен. width: auto отменяет VitePress-овский
+     width: 100%, который действует с 768px. */
   .VPNavBar .DocSearch-Button {
+    width: auto;
     height: var(--kpo-control-height);
     margin: 0;
     padding: 0 8px 0 10px;
@@ -132,12 +109,7 @@
     font-weight: 500;
   }
 
-  /* Шорткат ⌘K — один цельный чип: рамка на контейнере. Тема рисует
-     его как две половинки <kbd> со своими рамками, сдвигами margin 2px
-     и асимметричными паддингами (селекторы вида
-     `.DocSearch-Button .DocSearch-Button-Key + .DocSearch-Button-Key`) —
-     из-за них символы обрезались. Селекторы ниже длиннее родных,
-     чтобы гарантированно их перекрыть. */
+  /* Шорткат ⌘K — один цельный чип: рамка на контейнере. */
   .VPNavBar .DocSearch-Button .DocSearch-Button-Keys {
     display: flex;
     align-items: center;
@@ -169,21 +141,50 @@
     line-height: 1;
   }
 
-  /* Символ ⌘/Ctrl тема подставляет псевдоэлементом — приводим к тому же
-     размеру и цвету, что и «K» */
   .VPNavBar .DocSearch-Button .DocSearch-Button-Key:first-child::after {
     color: var(--vp-c-text-3);
     font-size: 11px;
     line-height: 1;
   }
 
-  /* Иконка луны/солнца в тумблере темы — строго по центру кружка.
-     Тема позиционирует её top/left: 3px — на дробных DPR это даёт
-     видимый сдвиг; transform-центрирование устойчиво к округлению */
   .VPSwitch .check .icon [class^='vpi-'] {
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
+  }
+}
+
+/* ---- Навбар: сайдбар-зависимые оверрайды (≥960px) ----
+   VitePress включает раскладку с сайдбаром при 960px: навбар становится
+   прозрачным, логотип привязан к зоне сайдбара, контент смещён. Здесь
+   мы отменяем эти трансформации, чтобы навбар выглядел единообразно. */
+
+@media (min-width: 960px) {
+  .VPNavBar:not(.home.top) {
+    background-color: var(--vp-nav-bg-color) !important;
+  }
+
+  .VPNavBar:not(.home.top) .content-body {
+    background-color: transparent !important;
+  }
+
+  .VPNavBar .divider {
+    padding-left: 0 !important;
+  }
+
+  .VPNavBarTitle.has-sidebar .title {
+    border-bottom-color: transparent !important;
+  }
+
+  .VPNavBar .container > .title {
+    position: static !important;
+    width: auto !important;
+    padding: 0 !important;
+  }
+
+  .VPNavBar .container > .content {
+    padding-right: 0 !important;
+    padding-left: 0 !important;
   }
 }
 

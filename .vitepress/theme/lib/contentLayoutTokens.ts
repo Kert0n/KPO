@@ -3,6 +3,7 @@ export const CONTENT_LAYOUT_TOKENS = {
   wideWidth: '960px',
   sidebarWidth: '272px',
   navHeight: '56px',
+  tabletBreakpoint: '768px',
   desktopBreakpoint: '960px',
   wideDesktopBreakpoint: '1280px',
   maxMobileMermaidViewportHeight: '70vh',
@@ -20,6 +21,7 @@ export const CONTENT_LAYOUT_TOKENS = {
 
 export const LAYOUT_VIEWPORTS = {
   mobilePhone: { width: 414, height: 896 },
+  tablet: { width: 800, height: 900 },
   narrowDesktop: { width: 960, height: 900 },
   desktop: { width: 1440, height: 900 },
   wideDesktop: { width: 1876, height: 1000 }
