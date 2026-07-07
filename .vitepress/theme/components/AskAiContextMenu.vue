@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { useData, useRoute, withBase } from 'vitepress'
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
+import { clamp } from '../../lib/math'
 import { useAskAiProvider } from '../composables/useAskAiProvider'
 import {
   ASK_AI_PROVIDERS,
@@ -8,8 +9,10 @@ import {
   resolveAskAiProviderAction,
   routePathToAskAiContextKey,
   type AskAiBlock,
+  type AskAiProviderAction,
   type AskAiPageContext
 } from '../lib/askAiModel'
+import { copyPromptToClipboard } from '../lib/clipboardPrompt'
 import {
   readPlaygroundCode,
   readPlaygroundSelection
@@ -19,6 +22,12 @@ type SelectionSnapshot = {
   selectedText: string
   blockIds: string[]
   playgroundBlockId: string
+}
+
+type PreparedAskAiAction = {
+  snapshot: SelectionSnapshot
+  action: AskAiProviderAction
+  contextUnavailable: boolean
 }
 
 const route = useRoute()
@@ -32,16 +41,25 @@ const menu = reactive({
   mode: 'desktop' as 'desktop' | 'mobile'
 })
 const snapshot = ref<SelectionSnapshot | null>(null)
+const preparedAction = ref<PreparedAskAiAction | null>(null)
+const prepareError = ref<unknown>(null)
+const preparing = ref(false)
 const toast = ref('')
 const manualPrompt = ref('')
 const contextCache = new Map<string, AskAiPageContext>()
 
 let toastTimer: number | null = null
 let mobileSelectionTimer: number | null = null
+let prepareVersion = 0
 
 const menuLabel = computed(() => {
   return ASK_AI_PROVIDERS.find((provider) => provider.id === askAiProvider.value)?.menuLabel
     ?? 'Ask AI about this'
+})
+
+const askAiButtonLabel = computed(() => {
+  if (preparing.value) return menu.mode === 'mobile' ? 'Preparing...' : 'Preparing prompt...'
+  return menu.mode === 'mobile' ? 'Ask AI' : menuLabel.value
 })
 
 onMounted(() => {
@@ -52,6 +70,7 @@ onMounted(() => {
   document.addEventListener('pointerup', onPointerUp)
   window.addEventListener('scroll', hideMenu, true)
   window.addEventListener('resize', hideMenu)
+  queuePageContextPrefetch()
 })
 
 onBeforeUnmount(() => {
@@ -68,6 +87,13 @@ onBeforeUnmount(() => {
 
 watch(() => route.path, () => {
   hideMenu()
+  clearPreparedAction()
+  queuePageContextPrefetch()
+})
+
+watch(askAiProvider, () => {
+  if (!menu.visible || !snapshot.value) return
+  void prepareAskAiAction(snapshot.value)
 })
 
 function onContextMenu(event: MouseEvent): void {
@@ -79,6 +105,7 @@ function onContextMenu(event: MouseEvent): void {
   event.preventDefault()
   snapshot.value = nextSnapshot
   menu.mode = 'desktop'
+  void prepareAskAiAction(nextSnapshot)
   showMenu(event.clientX, event.clientY)
 }
 
@@ -95,6 +122,7 @@ function onSelectionChange(): void {
 
     snapshot.value = nextSnapshot
     menu.mode = 'mobile'
+    void prepareAskAiAction(nextSnapshot)
     showMenu(rect.left + rect.width / 2, rect.top - 12)
   }, 220)
 }
@@ -118,28 +146,25 @@ function onKeydown(event: KeyboardEvent): void {
 }
 
 async function askAi(): Promise<void> {
-  const currentSnapshot = snapshot.value
+  const prepared = preparedAction.value
   hideMenu()
-  if (!currentSnapshot || currentSnapshot.selectedText.trim() === '') return
+  if (!prepared) return
 
-  const openedWindow = askAiProvider.value === 'clipboard' ? null : openBlankWindow()
-
+  const { action, contextUnavailable } = prepared
+  let openedWindow: Window | null = null
   try {
-    let contextUnavailable = false
-    const pageContext = await loadPageContext().catch(() => {
-      contextUnavailable = true
-      return fallbackContext(currentSnapshot.selectedText)
-    })
-    const action = resolveAskAiProviderAction(askAiProvider.value, {
-      pageContext,
-      selectedText: currentSnapshot.selectedText,
-      blockIds: currentSnapshot.blockIds,
-      currentOverride: playgroundOverride(currentSnapshot.playgroundBlockId)
-    })
-
     let copied = false
+    let copyPromise: Promise<boolean> | null = null
     if (action.copyPrompt) {
-      copied = await copyPrompt(action.prompt)
+      copyPromise = copyPrompt(action.prompt)
+    }
+
+    if (action.openUrl) {
+      openedWindow = openBlankWindow()
+    }
+
+    if (copyPromise) {
+      copied = await copyPromise
     }
 
     if (action.openUrl) {
@@ -152,8 +177,49 @@ async function askAi(): Promise<void> {
   } catch (error) {
     closeOpenedWindow(openedWindow)
     showToast('Ask AI unavailable')
-    console.warn('[ask-ai] не удалось подготовить prompt:', error)
+    console.warn('[ask-ai] не удалось выполнить Ask AI:', error)
   }
+}
+
+async function prepareAskAiAction(nextSnapshot: SelectionSnapshot): Promise<void> {
+  const version = ++prepareVersion
+  preparing.value = true
+  preparedAction.value = null
+  prepareError.value = null
+
+  try {
+    let contextUnavailable = false
+    const pageContext = await loadPageContext().catch(() => {
+      contextUnavailable = true
+      return fallbackContext(nextSnapshot.selectedText)
+    })
+    const action = resolveAskAiProviderAction(askAiProvider.value, {
+      pageContext,
+      selectedText: nextSnapshot.selectedText,
+      blockIds: nextSnapshot.blockIds,
+      currentOverride: playgroundOverride(nextSnapshot.playgroundBlockId)
+    })
+
+    if (version !== prepareVersion) return
+    preparedAction.value = {
+      snapshot: nextSnapshot,
+      action,
+      contextUnavailable
+    }
+  } catch (error) {
+    if (version !== prepareVersion) return
+    prepareError.value = error
+    console.warn('[ask-ai] не удалось подготовить prompt:', error)
+  } finally {
+    if (version === prepareVersion) preparing.value = false
+  }
+}
+
+function clearPreparedAction(): void {
+  prepareVersion += 1
+  preparing.value = false
+  preparedAction.value = null
+  prepareError.value = null
 }
 
 function actionToast(
@@ -186,6 +252,12 @@ async function loadPageContext(): Promise<AskAiPageContext> {
   const context = await response.json() as AskAiPageContext
   contextCache.set(key, context)
   return context
+}
+
+function queuePageContextPrefetch(): void {
+  window.setTimeout(() => {
+    loadPageContext().catch(() => undefined)
+  }, 0)
 }
 
 function createSelectionSnapshot(target: EventTarget | null): SelectionSnapshot | null {
@@ -274,33 +346,13 @@ function playgroundOverride(blockId: string): { kind: 'playground'; language: 'k
 }
 
 async function copyPrompt(prompt: string): Promise<boolean> {
-  try {
-    await navigator.clipboard.writeText(prompt)
-    return true
-  } catch {
-    if (copyWithTextarea(prompt)) return true
-  }
+  const result = await copyPromptToClipboard(prompt)
+  if (result.ok) return true
 
   manualPrompt.value = prompt
   await nextTick()
   document.querySelector<HTMLTextAreaElement>('.kpo-ai-manual textarea')?.select()
   return false
-}
-
-function copyWithTextarea(prompt: string): boolean {
-  const textarea = document.createElement('textarea')
-  textarea.value = prompt
-  textarea.setAttribute('readonly', '')
-  textarea.style.position = 'fixed'
-  textarea.style.top = '-9999px'
-  document.body.appendChild(textarea)
-  textarea.select()
-
-  try {
-    return document.execCommand('copy')
-  } finally {
-    textarea.remove()
-  }
 }
 
 function fallbackContext(selectedText: string): AskAiPageContext {
@@ -392,9 +444,6 @@ function clearMobileSelectionTimer(): void {
   mobileSelectionTimer = null
 }
 
-function clamp(value: number, min: number, max: number): number {
-  return Math.min(max, Math.max(min, value))
-}
 </script>
 
 <template>
@@ -406,8 +455,14 @@ function clamp(value: number, min: number, max: number): number {
       :style="{ left: `${menu.x}px`, top: `${menu.y}px` }"
       role="menu"
     >
-      <button type="button" class="kpo-ai-menu__item" role="menuitem" @click="askAi">
-        {{ menu.mode === 'mobile' ? 'Ask AI' : menuLabel }}
+      <button
+        type="button"
+        class="kpo-ai-menu__item"
+        role="menuitem"
+        :disabled="preparing || !preparedAction"
+        @click="askAi"
+      >
+        {{ askAiButtonLabel }}
       </button>
     </div>
 

@@ -57,7 +57,12 @@ export default defineConfig({
     siteTitle: 'КПО',
     logo: { light: '/logo-light.svg', dark: '/logo-dark.svg' },
 
-    nav: [{ component: 'AskAiProviderSelect' }],
+    nav: [
+      { text: 'Введение', link: '/intro' },
+      { text: 'Лекции', link: '/lectures/01', activeMatch: '^/lectures/' },
+      { text: 'Дополнения', link: '/extras/', activeMatch: '^/extras/' },
+      { text: 'Заключение', link: '/conclusion' }
+    ],
     sidebar: getSidebar(),
 
     search: {

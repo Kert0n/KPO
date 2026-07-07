@@ -62,9 +62,49 @@
      текст 13px под масштаб меню. DocSearch-стили глобальные,
      поэтому !important не нужен. */
   .VPNavBar .VPNavBarSearch {
+    order: 1;
     flex-grow: 0 !important;
     padding-left: 0 !important;
     margin-right: 12px;
+  }
+
+  .VPNavBar .VPNavBarMenu {
+    order: 10;
+    gap: 4px;
+  }
+
+  .VPNavBar .KpoAskAiProvider {
+    order: 25;
+  }
+
+  .VPNavBar .VPNavBarAppearance {
+    order: 30;
+  }
+
+  .VPNavBar .VPNavBarExtra {
+    display: none !important;
+  }
+
+  .VPNavBar .KpoNavBarExtra,
+  .VPNavBar .VPNavBarHamburger {
+    order: 40;
+  }
+
+  .VPNavBar .menu + .appearance::before,
+  .VPNavBar .translations + .appearance::before {
+    display: none !important;
+  }
+
+  .VPNavBar .VPNavBarMenuLink {
+    color: var(--vp-c-text-2) !important;
+    font-size: 14px !important;
+    font-weight: 650 !important;
+    transition: color 0.15s;
+  }
+
+  .VPNavBar .VPNavBarMenuLink:hover,
+  .VPNavBar .VPNavBarMenuLink.active {
+    color: var(--vp-c-brand-1) !important;
   }
 
   .VPNavBar .DocSearch-Button {

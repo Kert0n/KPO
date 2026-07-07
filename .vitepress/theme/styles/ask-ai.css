@@ -1,63 +1,125 @@
-.kpo-ai-provider {
+.vpi-sparkles {
+  --icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' stroke='currentColor' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' viewBox='0 0 24 24'%3E%3Cpath d='M12 3l1.7 5.3L18 10l-5.3 1.7L11 17l-1.7-5.3L4 10l5.3-1.7L12 3Z'/%3E%3Cpath d='M19 14l.7 2.3L22 17l-2.3.7L19 20l-.7-2.3L16 17l2.3-.7L19 14Z'/%3E%3C/svg%3E");
+}
+
+.KpoAskAiProvider {
+  display: none;
+}
+
+@media (min-width: 1280px) {
+  .KpoAskAiProvider {
+    display: flex;
+    align-items: center;
+  }
+
+  .KpoAskAiProvider::before {
+    content: "";
+    width: 1px;
+    height: 24px;
+    margin-right: 8px;
+    margin-left: 8px;
+    background-color: var(--vp-c-divider);
+  }
+}
+
+.KpoNavBarExtra {
+  display: none;
+  margin-right: -12px;
+}
+
+@media (min-width: 768px) {
+  .KpoNavBarExtra {
+    display: block;
+  }
+}
+
+@media (min-width: 1280px) {
+  .KpoNavBarExtra {
+    display: none;
+  }
+}
+
+.KpoNavBarExtra__divider {
+  height: 1px;
+  margin: 8px 0;
+  background: var(--vp-c-divider);
+}
+
+.KpoNavBarExtra__appearance {
   display: flex;
   align-items: center;
-  gap: 6px;
-  margin-right: 12px;
-  height: var(--kpo-control-height);
-  border-radius: 6px;
-  background: var(--kpo-control-bg);
+  min-width: 176px;
+  padding: 0 12px;
+}
+
+.KpoNavBarExtra__label {
+  margin-right: auto;
+  padding-right: 24px;
+  line-height: 32px;
+  color: var(--vp-c-text-2);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.KpoAskAiProvider .option-icon {
   color: var(--vp-c-text-2);
 }
 
-.kpo-ai-provider__desktop-label {
-  display: inline-flex;
-  align-items: center;
-  padding-left: 9px;
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--vp-c-brand-1);
+.KpoAskAiProviderMenu {
+  min-width: 188px;
 }
 
-.kpo-ai-provider__select {
-  max-width: 112px;
-  height: var(--kpo-control-height);
-  padding: 0 24px 0 2px;
+.KpoAskAiProviderMenu__title {
+  padding: 0 24px 0 12px;
+  line-height: 32px;
+  color: var(--vp-c-text-1);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.KpoAskAiProviderMenu__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  min-height: 32px;
+  padding: 0 12px;
   border: 0;
   border-radius: 6px;
   background: transparent;
-  color: var(--vp-c-text-2);
+  color: var(--vp-c-text-1);
   font: inherit;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 500;
+  text-align: left;
+  white-space: nowrap;
   cursor: pointer;
+  transition: background-color 0.25s, color 0.25s;
 }
 
-.kpo-ai-provider__select:focus-visible {
-  outline: 2px solid var(--vp-c-brand-1);
-  outline-offset: 2px;
+.KpoAskAiProviderMenu__item:hover,
+.KpoAskAiProviderMenu__item:focus-visible {
+  background-color: var(--vp-c-default-soft);
+  color: var(--vp-c-brand-1);
+  outline: 0;
 }
 
-.kpo-ai-provider--screen {
-  justify-content: space-between;
-  gap: 16px;
-  height: auto;
-  margin: 24px 0 0;
-  padding: 12px 14px 12px 16px;
-  border-radius: 8px;
-  background: var(--vp-c-bg-soft);
+.KpoAskAiProviderMenu__item[aria-checked='true'] {
+  color: var(--vp-c-brand-1);
 }
 
-.kpo-ai-provider--screen .kpo-ai-provider__select {
-  width: 128px;
-  max-width: 128px;
-  background: var(--vp-c-bg);
+.KpoAskAiProviderMenu__check {
+  color: var(--vp-c-brand-1);
 }
 
-.kpo-ai-provider__screen-label {
-  font-size: 12px;
-  font-weight: 500;
-  line-height: 24px;
-  color: var(--vp-c-text-2);
+.KpoAskAiProviderMenu__divider {
+  height: 1px;
+  margin: 8px 0;
+  background: var(--vp-c-divider);
+}
+
+.KpoAskAiProviderScreen {
+  padding-top: 12px;
 }
 
 .kpo-ai-menu {
@@ -97,6 +159,11 @@
 .kpo-ai-menu__item:focus-visible {
   background: var(--vp-c-bg-soft);
   outline: 0;
+}
+
+.kpo-ai-menu__item:disabled {
+  cursor: wait;
+  opacity: 0.65;
 }
 
 .kpo-ai-toast {
