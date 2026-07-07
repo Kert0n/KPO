@@ -919,15 +919,13 @@ _Абстрактный_ класс - это некоторый объект в 
 для объектов `y` типа `S`.
 
 $$
+\begin{aligned}
 S <: T
-\quad\Longrightarrow\quad
-\left(
-\forall x : T,\ \varphi(x)
-\right)
-\Rightarrow
-\left(
-\forall y : S,\ \varphi(y)
-\right)
+&\quad\Longrightarrow\quad
+(\forall x : T,\ \varphi(x)) \\
+&\quad\Rightarrow\quad
+(\forall y : S,\ \varphi(y))
+\end{aligned}
 $$
 
 Где:
