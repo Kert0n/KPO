@@ -54,6 +54,16 @@ flowchart LR
 
 ### Наивное решение
 
+```kotlin
+fun placeOrder(request: HttpRequest): HttpResponse {
+    val drink = request.param("drink")
+    val price = if (drink == "latte") 350 else 250          // бизнес-правило
+    db.execute("INSERT INTO orders (drink, price) VALUES (?, ?)", drink, price)
+    paymentSdk.charge(request.header("X-Token"), price)     // внешний SDK
+    return HttpResponse(201, """{"status":"ok"}""")
+}
+```
+
 Оставить controller главным местом бизнес-логики. Когда появляется скидка, новый способ оплаты и тестовый storage,
 добавить еще несколько зависимостей прямо туда.
 
@@ -381,6 +391,21 @@ DDD не является архитектурой приложения. Это 
 Ключевой сдвиг: не база данных определяет модель, а бизнесовые понятия. Таблицы важны, но они не обязаны диктовать имена
 классов, границы модулей и место бизнес-правил.
 
+```mermaid
+flowchart LR
+    subgraph DBFirst["Database-first"]
+        DB1[DB schema] --> Model1[Model] --> Service1[Service]
+    end
+```
+
+```mermaid
+flowchart LR
+    subgraph DomainFirst["Domain-first"]
+        Service2[Service] --> Model2[Domain Model] 
+        Adapter["DB adapter"] -.-> Model2
+    end
+```
+
 | Database-first | Domain-first |
 |---|---|
 | Сначала таблицы. | Сначала бизнес-понятия. |
@@ -422,6 +447,26 @@ flowchart LR
     OutPort --> DbAdapter["PostgreSQL adapter"]
     DbAdapter --> DB[("Database")]
 ```
+
+Классическая гексагональная диаграмма:
+
+```mermaid
+flowchart TD
+    HTTP["HTTP controller"] --> Core
+    CLI["CLI"] --> Core
+    Tests["Tests"] --> Core
+
+    subgraph Core["Application Core"]
+        UseCases["Use Cases"]
+        Domain["Domain Model"]
+    end
+
+    Core --> DBPort["DB adapter"]
+    Core --> PayPort["Payment adapter"]
+    Core --> MsgPort["Message adapter"]
+```
+
+Primary-адаптеры (слева/сверху) *вызывают* ядро. Secondary-адаптеры (справа/снизу) *вызываются* ядром через порты.
 
 В этой схеме есть два вида адаптеров:
 
@@ -828,6 +873,18 @@ flowchart TD
 - **Infrastructure** реализует технические детали: база, ORM, HTTP, файлы, очереди;
 - **UI/API** является внешним способом вызвать приложение.
 
+Типичная проектная структура Onion:
+
+```
+src/
+├── Domain/           # Entity, Value Object, Domain Service
+├── Application/      # Use Cases, DTOs, port-интерфейсы
+├── Infrastructure/   # DB adapters, HTTP clients, файлы
+└── Api/              # Controllers, middleware, startup
+```
+
+Это те же файлы из Ports & Adapters, но с явным разделением внутри ядра.
+
 `Domain Service` не должен становиться мусорной корзиной для всей логики. Его используют, когда операция действительно
 доменная, но ее нельзя честно положить внутрь одного объекта. Например, перевод денег между двумя счетами или расчет
 скидки, зависящий от нескольких агрегатов.
@@ -920,6 +977,9 @@ flowchart LR
 монолит с четкими границами.
 
 ## MV-паттерны на клиенте
+
+До сих пор мы организовывали backend: как отделить домен от базы, HTTP и ORM. Но клиентская часть тоже нуждается в
+структуре — UI-логика, состояние экрана и пользовательский ввод быстро превращаются в клубок, если не провести границы.
 
 До этого мы говорили в основном о бэкенде: как отделить домен от базы, HTTP, ORM и внешних сервисов. На клиенте боль
 похожая: нужно отделить отображение от состояния и логики интерфейса.
