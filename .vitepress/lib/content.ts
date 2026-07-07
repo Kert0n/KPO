@@ -154,7 +154,7 @@ function toPage(
 }
 
 /** Число из имени: «Lec7» → 7, «03.md» → 3; без числа — в конец списка */
-function extractNumber(name: string): number {
+export function extractNumber(name: string): number {
   const match = name.match(/(\d+)/)
   return match ? Number.parseInt(match[1], 10) : Number.MAX_SAFE_INTEGER
 }

@@ -7,13 +7,13 @@ export default defineConfig({
     timeout: 15_000
   },
   use: {
-    baseURL: 'http://127.0.0.1:5173/KPO/',
+    baseURL: 'http://127.0.0.1:5174/KPO/',
     trace: 'on-first-retry'
   },
   webServer: {
-    command: 'npm run dev -- --host 127.0.0.1 --port 5173',
-    url: 'http://127.0.0.1:5173/KPO/',
-    reuseExistingServer: true,
+    command: 'npm run dev -- --host 127.0.0.1 --port 5174',
+    url: 'http://127.0.0.1:5174/KPO/',
+    reuseExistingServer: false,
     timeout: 120_000
   },
   projects: [

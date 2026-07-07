@@ -1,0 +1,247 @@
+.vpi-sparkles {
+  --icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' stroke='currentColor' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' viewBox='0 0 24 24'%3E%3Cpath d='M12 3l1.7 5.3L18 10l-5.3 1.7L11 17l-1.7-5.3L4 10l5.3-1.7L12 3Z'/%3E%3Cpath d='M19 14l.7 2.3L22 17l-2.3.7L19 20l-.7-2.3L16 17l2.3-.7L19 14Z'/%3E%3C/svg%3E");
+}
+
+.KpoAskAiProvider {
+  display: none;
+}
+
+@media (min-width: 1280px) {
+  .KpoAskAiProvider {
+    display: flex;
+    align-items: center;
+  }
+
+  .KpoAskAiProvider::before {
+    content: "";
+    width: 1px;
+    height: 24px;
+    margin-right: 8px;
+    margin-left: 8px;
+    background-color: var(--vp-c-divider);
+  }
+}
+
+.KpoNavBarExtra {
+  display: none;
+  margin-right: -12px;
+}
+
+@media (min-width: 768px) {
+  .KpoNavBarExtra {
+    display: block;
+  }
+}
+
+@media (min-width: 1280px) {
+  .KpoNavBarExtra {
+    display: none;
+  }
+}
+
+.KpoNavBarExtra__divider {
+  height: 1px;
+  margin: 8px 0;
+  background: var(--vp-c-divider);
+}
+
+.KpoNavBarExtra__appearance {
+  display: flex;
+  align-items: center;
+  min-width: 176px;
+  padding: 0 12px;
+}
+
+.KpoNavBarExtra__label {
+  margin-right: auto;
+  padding-right: 24px;
+  line-height: 32px;
+  color: var(--vp-c-text-2);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.KpoAskAiProvider .option-icon {
+  color: var(--vp-c-text-2);
+}
+
+.KpoAskAiProviderMenu {
+  min-width: 188px;
+}
+
+.KpoAskAiProviderMenu__title {
+  padding: 0 24px 0 12px;
+  line-height: 32px;
+  color: var(--vp-c-text-1);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.KpoAskAiProviderMenu__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  min-height: 32px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--vp-c-text-1);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color 0.25s, color 0.25s;
+}
+
+.KpoAskAiProviderMenu__item:hover,
+.KpoAskAiProviderMenu__item:focus-visible {
+  background-color: var(--vp-c-default-soft);
+  color: var(--vp-c-brand-1);
+  outline: 0;
+}
+
+.KpoAskAiProviderMenu__item[aria-checked='true'] {
+  color: var(--vp-c-brand-1);
+}
+
+.KpoAskAiProviderMenu__check {
+  color: var(--vp-c-brand-1);
+}
+
+.KpoAskAiProviderMenu__divider {
+  height: 1px;
+  margin: 8px 0;
+  background: var(--vp-c-divider);
+}
+
+.KpoAskAiProviderScreen {
+  padding-top: 12px;
+}
+
+.kpo-ai-menu {
+  position: fixed;
+  z-index: 100;
+  transform: translateX(-50%);
+  min-width: 220px;
+  padding: 4px;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 8px;
+  background: var(--vp-c-bg);
+  box-shadow: var(--vp-shadow-3);
+}
+
+.kpo-ai-menu--mobile {
+  min-width: 112px;
+  transform: translate(-50%, -100%);
+}
+
+.kpo-ai-menu__item {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 34px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--vp-c-text-1);
+  font-size: 13px;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+}
+
+.kpo-ai-menu__item:hover,
+.kpo-ai-menu__item:focus-visible {
+  background: var(--vp-c-bg-soft);
+  outline: 0;
+}
+
+.kpo-ai-menu__item:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.kpo-ai-toast {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 101;
+  max-width: calc(100vw - 36px);
+  padding: 8px 12px;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 8px;
+  background: var(--vp-c-bg);
+  box-shadow: var(--vp-shadow-3);
+  color: var(--vp-c-text-1);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.kpo-ai-manual {
+  position: fixed;
+  inset: 0;
+  z-index: 102;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgb(0 0 0 / 35%);
+}
+
+.kpo-ai-manual__panel {
+  width: min(720px, 100%);
+  padding: 16px;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 8px;
+  background: var(--vp-c-bg);
+  box-shadow: var(--vp-shadow-4);
+}
+
+.kpo-ai-manual__title {
+  margin: 0 0 10px;
+  color: var(--vp-c-text-1);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.kpo-ai-manual textarea {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 260px;
+  padding: 10px;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 6px;
+  background: var(--vp-c-bg-soft);
+  color: var(--vp-c-text-1);
+  font: 13px/1.5 var(--vp-font-family-mono);
+  resize: vertical;
+}
+
+.kpo-ai-manual button {
+  margin-top: 12px;
+  min-height: 32px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 6px;
+  background: var(--vp-c-brand-1);
+  color: var(--vp-c-white);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+@media (max-width: 767px) {
+  .kpo-ai-toast {
+    right: 12px;
+    bottom: 12px;
+    left: 12px;
+    max-width: none;
+    text-align: center;
+  }
+}

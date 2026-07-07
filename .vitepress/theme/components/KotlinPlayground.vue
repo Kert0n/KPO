@@ -1,5 +1,10 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref, useTemplateRef } from 'vue'
+import {
+  registerPlayground,
+  unregisterPlayground,
+  updatePlaygroundCode
+} from '../lib/playgroundRegistry'
 
 /**
  * Обёртка над официальным kotlin-playground (npm-пакет).
@@ -19,8 +24,10 @@ import { onBeforeUnmount, onMounted, ref, useTemplateRef } from 'vue'
 const props = withDefaults(defineProps<{
   code: string
   platform?: string
+  askBlockId?: string
 }>(), {
-  platform: 'java'
+  platform: 'java',
+  askBlockId: ''
 })
 
 const emit = defineEmits<{ failed: [] }>()
@@ -44,7 +51,14 @@ onMounted(async () => {
 
   try {
     const { default: createPlayground } = await import('kotlin-playground')
-    await createPlayground(targetElement)
+    await createPlayground(targetElement, {
+      onChange(code) {
+        updatePlaygroundCode(props.askBlockId, code)
+      },
+      getInstance(instance) {
+        registerPlayground(props.askBlockId, props.code, instance)
+      }
+    })
     ready.value = true
   } catch (error) {
     console.warn('[kotlin-playground] инициализация не удалась:', error)
@@ -55,6 +69,7 @@ onMounted(async () => {
 onBeforeUnmount(() => {
   const instance = (targetElement as { KotlinPlayground?: { destroy: () => void } } | undefined)?.KotlinPlayground
   instance?.destroy()
+  unregisterPlayground(props.askBlockId)
   targetElement = undefined
 })
 </script>

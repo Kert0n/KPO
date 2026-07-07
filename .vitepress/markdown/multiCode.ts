@@ -2,6 +2,8 @@ import type MarkdownIt from 'markdown-it'
 import type Token from 'markdown-it/lib/token.mjs'
 import container from 'markdown-it-container'
 import { normalizeLanguage } from '../theme/lib/codeBlockModel'
+import { askAiBlockAttribute, askAiBlockId } from './askAiAnchors'
+import { escapeAttribute } from './htmlUtils'
 
 /**
  * Контейнер ::: multi-code — один пример на нескольких языках.
@@ -82,8 +84,8 @@ export function multiCodePlugin(md: MarkdownIt): void {
 
       if (meta.languages.length === 0) {
         console.warn('[multi-code] контейнер без блоков кода:', token.info)
-        return '<div class="kpo-content-block kpo-content-block--multi-code kpo-content-block--wide kpo-wide-block kpo-wide-block--code">\n'
-          + `<CodeSwitcher title="${escapeAttribute(info.title)}" langs="">\n`
+        return `<div class="kpo-content-block kpo-content-block--multi-code kpo-content-block--wide kpo-wide-block kpo-wide-block--code"${askAiBlockAttribute(token)}>\n`
+          + `<CodeSwitcher title="${escapeAttribute(info.title)}" langs="" ask-block-id="${escapeAttribute(askAiBlockId(token))}">\n`
       }
 
       markInitialFenceActive(fences, meta.initialLang)
@@ -95,11 +97,12 @@ export function multiCodePlugin(md: MarkdownIt): void {
         ? ` playground-code="${encodeURIComponent(meta.playgroundCode)}"`
         : ''
 
-      return '<div class="kpo-content-block kpo-content-block--multi-code kpo-content-block--wide kpo-wide-block kpo-wide-block--code">\n'
+      return `<div class="kpo-content-block kpo-content-block--multi-code kpo-content-block--wide kpo-wide-block kpo-wide-block--code"${askAiBlockAttribute(token)}>\n`
         + `<CodeSwitcher title="${escapeAttribute(info.title)}"`
         + ` langs="${meta.languages.join(',')}"`
         + ` labels="${escapeAttribute(meta.labels.join(','))}"`
         + ` initial-lang="${meta.initialLang}"`
+        + ` ask-block-id="${escapeAttribute(askAiBlockId(token))}"`
         + authorDefaultAttribute
         + playgroundCodeAttribute
         + ` :allow-playground="${meta.allowPlayground}">\n`
@@ -244,10 +247,3 @@ function markInitialFenceActive(fences: MultiCodeFence[], initialLang: string): 
   }
 }
 
-function escapeAttribute(value: string): string {
-  return value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-}

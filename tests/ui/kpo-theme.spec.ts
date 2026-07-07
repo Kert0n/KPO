@@ -386,6 +386,801 @@ async function expectCenteredAgainstPage(page: Page, locator: Locator): Promise<
   expect(result.right).toBeLessThanOrEqual(result.viewport + CENTER_TOLERANCE_PX)
 }
 
+async function selectTextAndOpenAskAiMenu(page: Page, text: string, activate = false): Promise<void> {
+  await page.locator('.vp-doc [data-kpo-ask-block-id]').first().waitFor({ state: 'attached' })
+  await page.evaluate(async ({ targetText, activateMenuItem }) => {
+    const root = [...document.querySelectorAll('.vp-doc *')]
+      .filter((node) => node.textContent?.includes(targetText))
+      .sort((left, right) => {
+        return (left.textContent?.length ?? 0) - (right.textContent?.length ?? 0)
+      })[0]
+
+    if (!root) throw new Error(`Text not found: ${targetText}`)
+    root.scrollIntoView({ block: 'center', inline: 'nearest' })
+    await new Promise<void>((resolve) => {
+      requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+    })
+    await new Promise<void>((resolve) => window.setTimeout(resolve, 120))
+
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT)
+    const textNodes: Text[] = []
+    let combinedText = ''
+    while (walker.nextNode()) {
+      const textNode = walker.currentNode as Text
+      textNodes.push(textNode)
+      combinedText += textNode.nodeValue ?? ''
+    }
+
+    const start = combinedText.indexOf(targetText)
+    if (start === -1) throw new Error(`Text node not found: ${targetText}`)
+
+    const end = start + targetText.length
+    let cursor = 0
+    let startNode: Text | null = null
+    let endNode: Text | null = null
+    let startOffset = 0
+    let endOffset = 0
+
+    for (const textNode of textNodes) {
+      const value = textNode.nodeValue ?? ''
+      const nextCursor = cursor + value.length
+      if (!startNode && start >= cursor && start <= nextCursor) {
+        startNode = textNode
+        startOffset = start - cursor
+      }
+      if (!endNode && end >= cursor && end <= nextCursor) {
+        endNode = textNode
+        endOffset = end - cursor
+        break
+      }
+      cursor = nextCursor
+    }
+
+    if (!startNode || !endNode) throw new Error(`Text range not found: ${targetText}`)
+
+    const range = document.createRange()
+    range.setStart(startNode, startOffset)
+    range.setEnd(endNode, endOffset)
+
+    const selection = window.getSelection()
+    selection?.removeAllRanges()
+    selection?.addRange(range)
+
+    const rect = range.getBoundingClientRect()
+    const target = startNode.parentElement ?? root
+    const dispatchContextMenu = () => {
+      target.dispatchEvent(new MouseEvent('contextmenu', {
+        bubbles: true,
+        cancelable: true,
+        button: 2,
+        clientX: rect.left + Math.min(12, Math.max(2, rect.width / 2)),
+        clientY: rect.top + Math.min(10, Math.max(2, rect.height / 2))
+      }))
+    }
+
+    dispatchContextMenu()
+
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      await new Promise<void>((resolve) => {
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+      })
+      if (document.querySelector('.kpo-ai-menu__item')) break
+      dispatchContextMenu()
+      await new Promise<void>((resolve) => window.setTimeout(resolve, 80))
+    }
+
+    if (activateMenuItem) {
+      let button: HTMLElement | null = null
+      for (let attempt = 0; attempt < 50; attempt += 1) {
+        await new Promise<void>((resolve) => {
+          requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+        })
+        button = document.querySelector<HTMLElement>('.kpo-ai-menu__item')
+        if (button && !(button as HTMLButtonElement).disabled) break
+
+        if (!button) {
+          dispatchContextMenu()
+        }
+        await new Promise<void>((resolve) => window.setTimeout(resolve, 80))
+      }
+
+      if (!button || (button as HTMLButtonElement).disabled) throw new Error('Ask AI menu item is not ready')
+      button.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
+    }
+  }, { targetText: text, activateMenuItem: activate })
+
+  if (!activate) {
+    await expect(page.locator('.kpo-ai-menu')).toBeVisible()
+  }
+}
+
+async function selectTextAndClickAskAiMenuItem(page: Page, text: string): Promise<void> {
+  await selectTextAndOpenAskAiMenu(page, text, true)
+}
+
+async function stubAskAiSideEffects(page: Page): Promise<void> {
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: {
+        writeText: async (text: string) => {
+          ;(window as unknown as { __kpoCopiedPrompts: string[] }).__kpoCopiedPrompts ??= []
+          ;(window as unknown as { __kpoCopiedPrompts: string[] }).__kpoCopiedPrompts.push(text)
+        }
+      }
+    })
+
+    window.open = ((url?: string | URL) => {
+      ;(window as unknown as { __kpoOpenedUrls: string[] }).__kpoOpenedUrls ??= []
+      if (url) {
+        ;(window as unknown as { __kpoOpenedUrls: string[] }).__kpoOpenedUrls.push(String(url))
+      }
+
+      const fakeLocation = {}
+      Object.defineProperty(fakeLocation, 'href', {
+        set(value: string) {
+          ;(window as unknown as { __kpoOpenedUrls: string[] }).__kpoOpenedUrls.push(String(value))
+        },
+        get() {
+          return ''
+        }
+      })
+
+      return {
+        opener: null,
+        close: () => undefined,
+        location: fakeLocation
+      } as Window
+    }) as typeof window.open
+  })
+}
+
+async function selectAskAiProviderDesktop(page: Page, providerLabel: string): Promise<void> {
+  const flyout = page.locator('.VPNavBar .KpoAskAiProvider')
+  await flyout.hover()
+  await expect(flyout.locator('.VPMenu')).toBeVisible()
+  await flyout.locator('.KpoAskAiProviderMenu__item', { hasText: providerLabel }).click()
+}
+
+test('desktop ask ai provider uses vitepress flyout pattern', async ({ page }) => {
+  await clearStorage(page)
+  await page.setViewportSize({ width: 1600, height: 900 })
+  await page.goto('')
+
+  await expect(page.locator('.VPNavBar .VPNavBarMenuLink', { hasText: 'Введение' })).toBeVisible()
+  await expect(page.locator('.VPNavBar .VPNavBarMenuLink', { hasText: 'Лекции' })).toBeVisible()
+  await expect(page.locator('.VPNavBar .VPNavBarMenuLink', { hasText: 'Дополнения' })).toBeVisible()
+  await expect(page.locator('.VPNavBar .VPNavBarMenuLink', { hasText: 'Заключение' })).toBeVisible()
+  await expect(page.locator('.VPNavBar .KpoAskAiProvider')).toBeVisible()
+  await expect(page.locator('.VPNavBar .kpo-ai-provider__trigger')).toHaveCount(0)
+
+  const flyout = page.locator('.VPNavBar .KpoAskAiProvider')
+  await expect(flyout).toHaveClass(/VPFlyout/)
+  const button = flyout.locator('button[aria-label="Спросить ИИ"]')
+  await expect(button).toBeVisible()
+  await expect(button.locator('.vpi-sparkles')).toBeVisible()
+
+  await flyout.hover()
+  const menu = flyout.locator('.VPMenu')
+  await expect(button).toHaveAttribute('aria-expanded', 'true')
+  await expect(menu).toBeVisible()
+  await expect(menu).toContainText('СПРОСИТЬ ИИ')
+  await expect(menu).toContainText('ChatGPT')
+  await expect(menu).toContainText('Claude')
+  await expect(menu).toContainText('DeepSeek')
+  await expect(menu).toContainText('Копировать промпт')
+
+})
+
+test('desktop ask ai flyout uses default vitepress hover and open behavior', async ({ page }) => {
+  await clearStorage(page)
+  await page.setViewportSize({ width: 1600, height: 900 })
+  await page.goto('intro')
+
+  const flyout = page.locator('.VPNavBar .KpoAskAiProvider')
+  const button = flyout.locator('button[aria-label="Спросить ИИ"]')
+  const menu = flyout.locator('.VPMenu')
+
+  await expect(button).toHaveAttribute('aria-expanded', 'false')
+  await expect(menu).toBeHidden()
+
+  await flyout.hover()
+  await expect(button).toHaveAttribute('aria-expanded', 'true')
+  await expect(menu).toBeVisible()
+
+  await page.mouse.move(1, 1)
+  await expect.poll(async () => {
+    return button.getAttribute('aria-expanded')
+  }).toBe('false')
+  await expect(menu).toBeHidden()
+})
+
+test('ask ai provider selected from vitepress flyout persists', async ({ page }) => {
+  await clearStorage(page)
+  await page.setViewportSize({ width: 1600, height: 900 })
+  await page.goto('conclusion')
+
+  await selectAskAiProviderDesktop(page, 'Claude')
+
+  const flyout = page.locator('.VPNavBar .KpoAskAiProvider')
+  await flyout.hover()
+  const menu = flyout.locator('.VPMenu')
+  const chatGpt = menu.locator('.KpoAskAiProviderMenu__item', { hasText: 'ChatGPT' })
+  const claude = menu.locator('.KpoAskAiProviderMenu__item', { hasText: 'Claude' })
+  const deepSeek = menu.locator('.KpoAskAiProviderMenu__item', { hasText: 'DeepSeek' })
+  await expect(menu).toBeVisible()
+  await expect(claude).toHaveAttribute('aria-checked', 'true')
+  await expect(chatGpt).toHaveAttribute('aria-checked', 'false')
+  await expect(deepSeek).toHaveAttribute('aria-checked', 'false')
+  await expect(claude.locator('.KpoAskAiProviderMenu__check')).toBeVisible()
+  await expect(menu.locator('.KpoAskAiProviderMenu__item[aria-checked="true"]')).toHaveCount(1)
+})
+
+test('desktop ask ai flyout has a vertical divider separating it from navigation', async ({ page }) => {
+  await clearStorage(page)
+  await page.setViewportSize({ width: 1600, height: 900 })
+  await page.goto('')
+
+  const flyout = page.locator('.VPNavBar .KpoAskAiProvider')
+  await expect(flyout).toBeVisible()
+
+  const pseudo = await flyout.evaluate((node) => {
+    const style = getComputedStyle(node, '::before')
+    return {
+      content: style.content,
+      width: style.width,
+      height: style.height,
+      backgroundColor: style.backgroundColor
+    }
+  })
+
+  expect(pseudo.content).toBe('""')
+  expect(pseudo.width).toBe('1px')
+  expect(pseudo.height).toBe('24px')
+  expect(pseudo.backgroundColor).not.toBe('rgba(0, 0, 0, 0)')
+})
+
+test('medium breakpoint hides ask ai flyout and shows it inside extra menu', async ({ page }) => {
+  await clearStorage(page)
+  await page.setViewportSize({ width: 1000, height: 800 })
+  await page.goto('')
+
+  await expect(page.locator('.VPNavBar .KpoAskAiProvider')).toBeHidden()
+
+  const extra = page.locator('.VPNavBar .KpoNavBarExtra')
+  await expect(extra).toBeVisible()
+
+  await expect(page.locator('.VPNavBar .VPNavBarExtra.extra')).toBeHidden()
+
+  await extra.hover()
+  const menu = extra.locator('.VPMenu')
+  await expect(menu).toBeVisible()
+  await expect(menu).toContainText('СПРОСИТЬ ИИ')
+  await expect(menu).toContainText('ChatGPT')
+  await expect(menu).toContainText('Claude')
+  await expect(menu).toContainText('DeepSeek')
+  await expect(menu).toContainText('Копировать промпт')
+
+  await expect(extra.locator('.VPSwitchAppearance')).toBeVisible()
+})
+
+test('medium breakpoint ask ai provider selection syncs with desktop flyout', async ({ page }) => {
+  await clearStorage(page)
+  await page.setViewportSize({ width: 1000, height: 800 })
+  await page.goto('')
+
+  const extra = page.locator('.VPNavBar .KpoNavBarExtra')
+  await extra.hover()
+  await extra.locator('.KpoAskAiProviderMenu__item', { hasText: 'DeepSeek' }).click()
+
+  await page.setViewportSize({ width: 1600, height: 900 })
+  const flyout = page.locator('.VPNavBar .KpoAskAiProvider')
+  await flyout.hover()
+  const deepSeek = flyout.locator('.KpoAskAiProviderMenu__item', { hasText: 'DeepSeek' })
+  await expect(deepSeek).toHaveAttribute('aria-checked', 'true')
+  await expect(flyout.locator('.KpoAskAiProviderMenu__item[aria-checked="true"]')).toHaveCount(1)
+})
+
+test('tablet navbar has correct element ordering', async ({ page }) => {
+  await clearStorage(page)
+  await page.setViewportSize(LAYOUT_VIEWPORTS.tablet)
+  await page.goto('')
+
+  const search = page.locator('.VPNavBar .VPNavBarSearch')
+  const menu = page.locator('.VPNavBar .VPNavBarMenu')
+  const extra = page.locator('.VPNavBar .KpoNavBarExtra')
+
+  await expect(search).toBeVisible()
+  await expect(menu).toBeVisible()
+  await expect(extra).toBeVisible()
+
+  const searchOrder = await search.evaluate((n) => getComputedStyle(n).order)
+  const menuOrder = await menu.evaluate((n) => getComputedStyle(n).order)
+  const extraOrder = await extra.evaluate((n) => getComputedStyle(n).order)
+
+  expect(Number(searchOrder)).toBeLessThan(Number(menuOrder))
+  expect(Number(menuOrder)).toBeLessThan(Number(extraOrder))
+})
+
+test('tablet search is compact and does not expand', async ({ page }) => {
+  await clearStorage(page)
+  await page.setViewportSize(LAYOUT_VIEWPORTS.tablet)
+  await page.goto('')
+
+  const search = page.locator('.VPNavBar .VPNavBarSearch')
+  const flexGrow = await search.evaluate((n) => getComputedStyle(n).flexGrow)
+  const paddingLeft = await search.evaluate((n) => getComputedStyle(n).paddingLeft)
+
+  expect(flexGrow).toBe('0')
+  expect(paddingLeft).toBe('0px')
+})
+
+test('tablet DocSearch button uses KPO compact styling', async ({ page }) => {
+  await clearStorage(page)
+  await page.setViewportSize(LAYOUT_VIEWPORTS.tablet)
+  await page.goto('')
+
+  const btn = page.locator('.VPNavBar .DocSearch-Button')
+  const height = await btn.evaluate((n) => getComputedStyle(n).height)
+  const borderRadius = await btn.evaluate((n) => getComputedStyle(n).borderRadius)
+  const width = await btn.evaluate((n) => getComputedStyle(n).width)
+
+  expect(parseInt(height)).toBe(28)
+  expect(borderRadius).toBe('6px')
+  expect(width).not.toBe(`${LAYOUT_VIEWPORTS.tablet.width}px`)
+})
+
+test('tablet nav links have KPO styling', async ({ page }) => {
+  await clearStorage(page)
+  await page.setViewportSize(LAYOUT_VIEWPORTS.tablet)
+  await page.goto('')
+
+  const link = page.locator('.VPNavBar .VPNavBarMenuLink').first()
+  const fontSize = await link.evaluate((n) => getComputedStyle(n).fontSize)
+  const fontWeight = await link.evaluate((n) => getComputedStyle(n).fontWeight)
+
+  expect(fontSize).toBe('14px')
+  expect(Number(fontWeight)).toBeGreaterThanOrEqual(650)
+})
+
+test('tablet hides native VPNavBarExtra and hamburger', async ({ page }) => {
+  await clearStorage(page)
+  await page.setViewportSize(LAYOUT_VIEWPORTS.tablet)
+  await page.goto('')
+
+  await expect(page.locator('.VPNavBar .VPNavBarExtra.extra')).toBeHidden()
+  await expect(page.locator('.VPNavBar .VPNavBarHamburger')).toBeHidden()
+  await expect(page.locator('.VPNavBar .KpoNavBarExtra')).toBeVisible()
+})
+
+test('tablet viewport has no horizontal page overflow', async ({ page }) => {
+  await clearStorage(page)
+  await page.setViewportSize(LAYOUT_VIEWPORTS.tablet)
+  await page.goto('')
+
+  const overflow = await page.evaluate(() => {
+    return document.documentElement.scrollWidth > document.documentElement.clientWidth
+  })
+  expect(overflow).toBe(false)
+})
+
+test('ask ai provider menu keeps selected and hover states clear', async ({ page }) => {
+  await clearStorage(page)
+  await page.setViewportSize({ width: 1600, height: 900 })
+  await page.goto('conclusion')
+
+  const flyout = page.locator('.VPNavBar .KpoAskAiProvider')
+  await flyout.hover()
+  const menu = flyout.locator('.VPMenu')
+  const chatGpt = menu.locator('.KpoAskAiProviderMenu__item', { hasText: 'ChatGPT' })
+  const claude = menu.locator('.KpoAskAiProviderMenu__item', { hasText: 'Claude' })
+  const deepSeek = menu.locator('.KpoAskAiProviderMenu__item', { hasText: 'DeepSeek' })
+  await expect(chatGpt).toHaveAttribute('aria-checked', 'true')
+  await expect(claude).toHaveAttribute('aria-checked', 'false')
+  await expect(chatGpt.locator('.KpoAskAiProviderMenu__check')).toBeVisible()
+
+  const menuBackground = await menu.evaluate((node) => getComputedStyle(node).backgroundColor)
+  const selectedBackground = await chatGpt.evaluate((node) => getComputedStyle(node).backgroundColor)
+  const selectedColor = await chatGpt.evaluate((node) => getComputedStyle(node).color)
+  const claudeBackground = await claude.evaluate((node) => getComputedStyle(node).backgroundColor)
+  const claudeColor = await claude.evaluate((node) => getComputedStyle(node).color)
+  const deepSeekBackground = await deepSeek.evaluate((node) => getComputedStyle(node).backgroundColor)
+  expect(selectedBackground).toBe(claudeBackground)
+  expect(deepSeekBackground).toBe(claudeBackground)
+  expect(selectedColor).not.toBe(claudeColor)
+
+  await claude.hover()
+  await expect.poll(async () => {
+    return claude.evaluate((node) => getComputedStyle(node).backgroundColor)
+  }).not.toBe(claudeBackground)
+  await deepSeek.hover()
+  await expect.poll(async () => {
+    return deepSeek.evaluate((node) => getComputedStyle(node).backgroundColor)
+  }).not.toBe(menuBackground)
+  const deepSeekHoverBackground = await deepSeek.evaluate((node) => getComputedStyle(node).backgroundColor)
+  expect(deepSeekHoverBackground).not.toBe(menuBackground)
+})
+
+test('mobile nav uses default vitepress screen and includes ask ai provider', async ({ page }) => {
+  await clearStorage(page)
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto('lectures/01')
+
+  await page.locator('.VPNavBarHamburger').click()
+
+  await expect(page.locator('.VPNavScreen')).toBeVisible()
+  await expect(page.locator('.VPNavScreen .VPNavScreenMenu')).toBeVisible()
+  await expect(page.locator('.VPNavScreen .kpo-mobile-sheet-handle')).toHaveCount(0)
+  await expect(page.locator('.VPNavScreen .kpo-mobile-nav-tiles')).toHaveCount(0)
+  await expect(page.locator('.VPNavScreen')).toContainText('Введение')
+  await expect(page.locator('.VPNavScreen')).toContainText('Лекции')
+  await expect(page.locator('.VPNavScreen')).toContainText('Дополнения')
+  await expect(page.locator('.VPNavScreen')).toContainText('Заключение')
+
+  const provider = page.locator('.VPNavScreen .KpoAskAiProviderScreen')
+  await expect(provider).toBeVisible()
+  await expect(provider).toContainText('СПРОСИТЬ ИИ')
+  await expect(provider).toContainText('ChatGPT')
+  await expect(provider).toContainText('Claude')
+  await expect(provider).toContainText('DeepSeek')
+  await expect(provider).toContainText('Копировать промпт')
+  await expect(page.locator('.VPNavScreen .VPSwitchAppearance')).toBeVisible()
+})
+
+test('mobile ask ai provider changes and persists in default vitepress screen', async ({ page }) => {
+  await clearStorage(page)
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto('intro')
+
+  await page.locator('.VPNavBarHamburger').click()
+  const provider = page.locator('.VPNavScreen .KpoAskAiProviderScreen')
+  await provider.locator('.KpoAskAiProviderMenu__item', { hasText: 'Claude' }).click()
+
+  await page.locator('.VPNavBarHamburger').click()
+  await page.locator('.VPNavBarHamburger').click()
+  const reopened = page.locator('.VPNavScreen .KpoAskAiProviderScreen')
+  const claude = reopened.locator('.KpoAskAiProviderMenu__item', { hasText: 'Claude' })
+  await expect(claude).toHaveAttribute('aria-checked', 'true')
+  await expect(claude.locator('.KpoAskAiProviderMenu__check')).toBeVisible()
+  await expect(reopened.locator('.KpoAskAiProviderMenu__item[aria-checked="true"]')).toHaveCount(1)
+})
+
+test('intro documents ask ai workflow', async ({ page }) => {
+  await clearStorage(page)
+  await page.goto('intro')
+
+  await expect(page.getByRole('heading', { name: 'Спросить ИИ о фрагменте' })).toBeVisible()
+  await expect(page.locator('.vp-doc')).toContainText('ChatGPT')
+  await expect(page.locator('.vp-doc')).toContainText('Claude')
+  await expect(page.locator('.vp-doc')).toContainText('DeepSeek')
+  await expect(page.locator('.vp-doc')).toContainText('не вызывает AI API')
+  await expect(page.locator('.vp-doc')).toContainText('не отправляет текст на сервер')
+  await expect(page.locator('.vp-doc')).toContainText('правой кнопкой')
+  await expect(page.locator('.vp-doc')).toContainText('на мобильном')
+})
+
+test('ask ai context menu appears for selected document text', async ({ page }) => {
+  await clearStorage(page)
+  await page.goto(UI_FIXTURE_ROUTE)
+
+  await selectTextAndOpenAskAiMenu(page, 'This page is intentionally hidden from navigation.')
+
+  await expect(page.locator('.kpo-ai-menu')).toBeVisible()
+  await expect(page.locator('.kpo-ai-menu')).toContainText('Ask ChatGPT about this')
+})
+
+test('ask ai waits for prompt preparation before first clipboard copy', async ({ page }) => {
+  await clearStorage(page)
+  let releaseContext!: () => void
+  const contextGate = new Promise<void>((resolve) => {
+    releaseContext = resolve
+  })
+
+  await page.addInitScript(() => {
+    ;(window as unknown as { __kpoAllowCopy: boolean }).__kpoAllowCopy = false
+    ;(window as unknown as { __kpoCopyAttempts: Array<Record<string, unknown>> }).__kpoCopyAttempts = []
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: {
+        writeText: async (text: string) => {
+          const state = window as unknown as {
+            __kpoAllowCopy: boolean
+            __kpoCopyAttempts: Array<Record<string, unknown>>
+          }
+          state.__kpoCopyAttempts.push({
+            method: 'clipboard-api',
+            allowed: state.__kpoAllowCopy,
+            active: navigator.userActivation?.isActive ?? false,
+            focus: document.hasFocus(),
+            length: text.length
+          })
+          if (!state.__kpoAllowCopy) {
+            throw new DOMException('copy not allowed yet', 'NotAllowedError')
+          }
+        }
+      }
+    })
+  })
+
+  await page.route('**/__ask-ai-context/**', async (route) => {
+    await contextGate
+    await route.continue()
+  })
+
+  await page.goto('lectures/10')
+  await selectAskAiProviderDesktop(page, 'Копировать промпт')
+  await selectTextAndOpenAskAiMenu(page, 'RESTful API')
+
+  const menuItem = page.locator('.kpo-ai-menu__item')
+  await expect(menuItem).toBeDisabled()
+  await expect(menuItem).toHaveText('Preparing prompt...')
+  await expect(page.locator('.kpo-ai-manual')).toHaveCount(0)
+
+  await page.evaluate(() => {
+    ;(window as unknown as { __kpoAllowCopy: boolean }).__kpoAllowCopy = true
+  })
+  releaseContext()
+  await expect(menuItem).toBeEnabled()
+  await menuItem.click()
+
+  await expect(page.locator('.kpo-ai-toast')).toHaveText('Prompt copied')
+  await expect(page.locator('.kpo-ai-manual')).toHaveCount(0)
+
+  const attempts = await page.evaluate(() => {
+    return (window as unknown as { __kpoCopyAttempts: Array<Record<string, unknown>> }).__kpoCopyAttempts
+  })
+  expect(attempts).toHaveLength(1)
+  expect(attempts[0]).toMatchObject({
+    method: 'clipboard-api',
+    allowed: true,
+    focus: true
+  })
+})
+
+test('ask ai starts clipboard copy before opening provider tab', async ({ page }) => {
+  await clearStorage(page)
+  await page.addInitScript(() => {
+    ;(window as unknown as { __kpoSideEffectOrder: string[] }).__kpoSideEffectOrder = []
+    ;(window as unknown as { __kpoOpenedUrls: string[] }).__kpoOpenedUrls = []
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: {
+        writeText: async () => {
+          ;(window as unknown as { __kpoSideEffectOrder: string[] }).__kpoSideEffectOrder.push('copy')
+        }
+      }
+    })
+
+    window.open = ((url?: string | URL) => {
+      const state = window as unknown as {
+        __kpoSideEffectOrder: string[]
+        __kpoOpenedUrls: string[]
+      }
+      state.__kpoSideEffectOrder.push('open')
+      if (url) state.__kpoOpenedUrls.push(String(url))
+
+      const fakeLocation = {}
+      Object.defineProperty(fakeLocation, 'href', {
+        set(value: string) {
+          state.__kpoSideEffectOrder.push('navigate')
+          state.__kpoOpenedUrls.push(String(value))
+        },
+        get() {
+          return ''
+        }
+      })
+
+      return {
+        opener: null,
+        close: () => undefined,
+        location: fakeLocation
+      } as Window
+    }) as typeof window.open
+  })
+
+  await page.goto('lectures/10')
+  await selectAskAiProviderDesktop(page, 'Claude')
+  await selectTextAndClickAskAiMenuItem(page, 'RESTful API')
+
+  await expect(page.locator('.kpo-ai-toast')).toHaveText('Prompt copied, opened Claude')
+  await expect(page.locator('.kpo-ai-manual')).toHaveCount(0)
+
+  const result = await page.evaluate(() => {
+    const state = window as unknown as {
+      __kpoSideEffectOrder: string[]
+      __kpoOpenedUrls: string[]
+    }
+    return {
+      order: state.__kpoSideEffectOrder,
+      openedUrls: state.__kpoOpenedUrls
+    }
+  })
+  expect(result.order.slice(0, 2)).toEqual(['copy', 'open'])
+  expect(result.openedUrls).toContain('https://claude.ai/new')
+})
+
+test('ask ai manual prompt appears only after clipboard methods fail', async ({ page }) => {
+  await clearStorage(page)
+  await page.addInitScript(() => {
+    ;(window as unknown as { __kpoCopyAttempts: string[] }).__kpoCopyAttempts = []
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: {
+        writeText: async () => {
+          ;(window as unknown as { __kpoCopyAttempts: string[] }).__kpoCopyAttempts.push('clipboard-api')
+          throw new DOMException('blocked', 'NotAllowedError')
+        }
+      }
+    })
+    document.execCommand = ((command: string) => {
+      ;(window as unknown as { __kpoCopyAttempts: string[] }).__kpoCopyAttempts.push(`textarea-${command}`)
+      return false
+    }) as typeof document.execCommand
+  })
+
+  await page.goto('lectures/10')
+  await selectAskAiProviderDesktop(page, 'Копировать промпт')
+  await selectTextAndClickAskAiMenuItem(page, 'RESTful API')
+
+  await expect(page.locator('.kpo-ai-toast')).toHaveText('Copy prompt manually')
+  await expect(page.locator('.kpo-ai-manual')).toBeVisible()
+
+  const attempts = await page.evaluate(() => {
+    return (window as unknown as { __kpoCopyAttempts: string[] }).__kpoCopyAttempts
+  })
+  expect(attempts).toEqual(['clipboard-api', 'textarea-copy'])
+})
+
+test('ask ai copies full page context without duplicating VitePress base', async ({ page }) => {
+  await clearStorage(page)
+  const contextPaths: string[] = []
+
+  await stubAskAiSideEffects(page)
+
+  await page.route('**/__ask-ai-context/**', async (route) => {
+    contextPaths.push(new URL(route.request().url()).pathname)
+    await route.continue()
+  })
+
+  await page.goto('lectures/10')
+  await selectAskAiProviderDesktop(page, 'Копировать промпт')
+
+  const selectedText = 'idempotency: повтор некоторых запросов должен быть безопасен для итогового состояния;'
+  await selectTextAndClickAskAiMenuItem(page, selectedText)
+
+  await expect(page.locator('.kpo-ai-toast')).toHaveText('Prompt copied')
+  expect(contextPaths).toContain('/KPO/__ask-ai-context/lectures/10.json')
+  expect(contextPaths).not.toContain('/KPO/__ask-ai-context/KPO/lectures/10.json')
+
+  const copiedPrompt = await page.evaluate(() => {
+    return (window as unknown as { __kpoCopiedPrompts?: string[] }).__kpoCopiedPrompts?.at(-1) ?? ''
+  })
+
+  expect(copiedPrompt).toContain('[Контекст после]\nПример REST-дизайна')
+  expect(copiedPrompt).toContain('Основные идеи RESTful API:')
+  expect(copiedPrompt).toContain('- idempotency: повтор некоторых запросов')
+  expect(copiedPrompt).toContain(`[Выделенный фрагмент]\n${selectedText}`)
+})
+
+test('ask ai keeps clipboard fallback when page context is unavailable', async ({ page }) => {
+  await clearStorage(page)
+
+  await stubAskAiSideEffects(page)
+
+  await page.route('**/__ask-ai-context/**', async (route) => {
+    await route.fulfill({
+      status: 404,
+      contentType: 'text/plain',
+      body: 'missing context'
+    })
+  })
+
+  await page.goto('lectures/10')
+  await selectAskAiProviderDesktop(page, 'Копировать промпт')
+
+  const selectedText = 'idempotency: повтор некоторых запросов должен быть безопасен для итогового состояния;'
+  await selectTextAndClickAskAiMenuItem(page, selectedText)
+
+  await expect(page.locator('.kpo-ai-toast')).toHaveText('Prompt copied without page context')
+
+  const copiedPrompt = await page.evaluate(() => {
+    return (window as unknown as { __kpoCopiedPrompts?: string[] }).__kpoCopiedPrompts?.at(-1) ?? ''
+  })
+
+  expect(copiedPrompt).toContain(`[Текущий блок]\n${selectedText}`)
+  expect(copiedPrompt).toContain(`[Выделенный фрагмент]\n${selectedText}`)
+})
+
+test('ask ai copies prompt and opens base ChatGPT without query parameter', async ({ page }) => {
+  await clearStorage(page)
+  await stubAskAiSideEffects(page)
+
+  await page.goto('lectures/10')
+  await selectAskAiProviderDesktop(page, 'ChatGPT')
+
+  const selectedText = 'string status = 2;'
+  await selectTextAndClickAskAiMenuItem(page, selectedText)
+
+  await expect(page.locator('.kpo-ai-toast')).toHaveText('Prompt copied, opened ChatGPT')
+
+  const result = await page.evaluate(() => {
+    return {
+      prompt: (window as unknown as { __kpoCopiedPrompts?: string[] }).__kpoCopiedPrompts?.at(-1) ?? '',
+      openedUrls: (window as unknown as { __kpoOpenedUrls?: string[] }).__kpoOpenedUrls ?? []
+    }
+  })
+
+  expect(result.openedUrls).toContain('https://chatgpt.com/')
+  expect(result.openedUrls.some((url) => url.startsWith('https://chatgpt.com/?q='))).toBe(false)
+  expect(result.prompt).toContain('message OrderResponse')
+  expect(result.prompt).toContain(selectedText)
+})
+
+test('ask ai includes bridge and HTTP response after report endpoint selection', async ({ page }) => {
+  await clearStorage(page)
+  await stubAskAiSideEffects(page)
+
+  await page.goto('lectures/10')
+  await waitForAdaptiveTables(page)
+  await selectAskAiProviderDesktop(page, 'Копировать промпт')
+
+  const selectedText = '/api/v1/reports/jobs/{jobId}'
+  await selectTextAndClickAskAiMenuItem(page, selectedText)
+
+  await expect(page.locator('.kpo-ai-toast')).toHaveText('Prompt copied')
+
+  const copiedPrompt = await page.evaluate(() => {
+    return (window as unknown as { __kpoCopiedPrompts?: string[] }).__kpoCopiedPrompts?.at(-1) ?? ''
+  })
+
+  expect(copiedPrompt).toContain('[Текущий блок]')
+  expect(copiedPrompt).toContain('| Проверить задачу | `/api/v1/reports/jobs/{jobId}`')
+  expect(copiedPrompt).toContain('Ответ на запуск может выглядеть так:')
+  expect(copiedPrompt).toContain('HTTP/1.1 202 Accepted')
+  expect(copiedPrompt).toContain('Location: /api/v1/reports/jobs/job-7')
+})
+
+test('ask ai copies and opens Claude without showing manual prompt', async ({ page }) => {
+  await clearStorage(page)
+  await stubAskAiSideEffects(page)
+
+  await page.goto('lectures/10')
+  await selectAskAiProviderDesktop(page, 'Claude')
+
+  await selectTextAndClickAskAiMenuItem(page, 'RESTful API')
+
+  await expect(page.locator('.kpo-ai-toast')).toHaveText('Prompt copied, opened Claude')
+  await expect(page.locator('.kpo-ai-manual')).toHaveCount(0)
+
+  const result = await page.evaluate(() => {
+    return {
+      prompt: (window as unknown as { __kpoCopiedPrompts?: string[] }).__kpoCopiedPrompts?.at(-1) ?? '',
+      openedUrls: (window as unknown as { __kpoOpenedUrls?: string[] }).__kpoOpenedUrls ?? []
+    }
+  })
+
+  expect(result.prompt).toContain('RESTful API')
+  expect(result.openedUrls).toContain('https://claude.ai/new')
+})
+
+test('ask ai mobile bubble appears after text selection', async ({ page }) => {
+  await clearStorage(page)
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto(UI_FIXTURE_ROUTE)
+
+  await page.locator('.vp-doc p').first().evaluate((node) => {
+    const range = document.createRange()
+    range.selectNodeContents(node)
+    const selection = window.getSelection()
+    selection?.removeAllRanges()
+    selection?.addRange(range)
+    document.dispatchEvent(new Event('selectionchange'))
+  })
+
+  await expect(page.locator('.kpo-ai-menu--mobile')).toBeVisible()
+  await expect(page.locator('.kpo-ai-menu--mobile')).toContainText('Ask AI')
+})
+
 test('code switchers without author defaults follow the latest global language', async ({ page }) => {
   await clearStorage(page)
   await page.goto(UI_FIXTURE_ROUTE)

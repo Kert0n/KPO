@@ -1,5 +1,6 @@
 import { defineConfig } from 'vitepress'
-import { getNav, getRewrites, getSidebar } from './lib/content'
+import { askAiContextPlugin } from './lib/askAiContextPlugin'
+import { getRewrites, getSidebar } from './lib/content'
 import { paletteCss } from './lib/paletteCss'
 import { kpoDark, kpoLight } from './lib/shikiThemes'
 import { applyMarkdownExtensions } from './markdown'
@@ -42,11 +43,26 @@ export default defineConfig({
     }
   },
 
+  vite: {
+    plugins: [
+      askAiContextPlugin({
+        base: '/KPO/',
+        courseTitle: 'Конструирование ПО',
+        courseDescription: 'Конспект лекций по архитектуре приложений и инженерным практикам'
+      })
+    ]
+  },
+
   themeConfig: {
     siteTitle: 'КПО',
     logo: { light: '/logo-light.svg', dark: '/logo-dark.svg' },
 
-    nav: getNav(),
+    nav: [
+      { text: 'Введение', link: '/intro' },
+      { text: 'Лекции', link: '/lectures/01', activeMatch: '^/lectures/' },
+      { text: 'Дополнения', link: '/extras/', activeMatch: '^/extras/' },
+      { text: 'Заключение', link: '/conclusion' }
+    ],
     sidebar: getSidebar(),
 
     search: {

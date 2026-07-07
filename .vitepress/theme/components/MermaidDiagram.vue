@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { useData } from 'vitepress'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { stableHash } from '../../lib/hash'
+import { clamp } from '../../lib/math'
 import { CONTENT_LAYOUT_TOKENS } from '../lib/contentLayoutTokens'
 import {
   readSvgViewBox,
@@ -381,17 +383,6 @@ function cssNumber(style: CSSStyleDeclaration, property: string, fallback: numbe
   return Number.isFinite(parsed) ? parsed : fallback
 }
 
-function stableHash(value: string): string {
-  let hash = 5381
-  for (let i = 0; i < value.length; i += 1) {
-    hash = (hash * 33) ^ value.charCodeAt(i)
-  }
-  return (hash >>> 0).toString(36)
-}
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.min(max, Math.max(min, value))
-}
 </script>
 
 <template>

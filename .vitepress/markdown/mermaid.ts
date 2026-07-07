@@ -1,4 +1,6 @@
 import type MarkdownIt from 'markdown-it'
+import { stableHash } from '../lib/hash'
+import { askAiBlockAttribute } from './askAiAnchors'
 
 export type MermaidLintDiagnostic = {
   message: string
@@ -34,7 +36,7 @@ export function mermaidPlugin(md: MarkdownIt): void {
       })
 
       const diagramId = `kpo-mermaid-${stableHash(`${lineOffset}:${token.content}`)}`
-      return '<div class="kpo-content-block kpo-content-block--mermaid kpo-content-block--wide kpo-wide-block kpo-wide-block--mermaid">\n'
+      return `<div class="kpo-content-block kpo-content-block--mermaid kpo-content-block--wide kpo-wide-block kpo-wide-block--mermaid"${askAiBlockAttribute(token)}>\n`
         + `<MermaidDiagram code="${encodeURIComponent(token.content)}" diagram-id="${diagramId}"></MermaidDiagram>\n`
         + '</div>\n'
     }
@@ -100,12 +102,4 @@ function markdownEnvPath(env: unknown): string | undefined {
   }
 
   return candidate.relativePath ?? candidate.path ?? candidate.file
-}
-
-function stableHash(value: string): string {
-  let hash = 5381
-  for (let i = 0; i < value.length; i += 1) {
-    hash = (hash * 33) ^ value.charCodeAt(i)
-  }
-  return (hash >>> 0).toString(36)
 }

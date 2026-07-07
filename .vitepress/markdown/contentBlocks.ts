@@ -1,11 +1,10 @@
 import type MarkdownIt from 'markdown-it'
 import type Token from 'markdown-it/lib/token.mjs'
+import { askAiBlockAttribute } from './askAiAnchors'
+import { isImageOnlyParagraph } from './tokenUtils'
 
-const TABLE_OPEN = '<div class="kpo-content-block kpo-content-block--table kpo-content-block--wide" data-kpo-content-kind="table">\n'
 const TABLE_CLOSE = '</div>\n'
-const CODE_OPEN = '<div class="kpo-content-block kpo-content-block--code kpo-content-block--wide">\n'
 const CODE_CLOSE = '</div>\n'
-const IMAGE_OPEN = '<div class="kpo-content-block kpo-content-block--image kpo-content-block--wide">\n'
 const IMAGE_CLOSE = '</div>\n'
 
 export function contentBlocksPlugin(md: MarkdownIt): void {
@@ -18,14 +17,14 @@ export function contentBlocksPlugin(md: MarkdownIt): void {
       return defaultFence(tokens, index, options, env, self)
     }
 
-    return CODE_OPEN + defaultFence(tokens, index, options, env, self) + CODE_CLOSE
+    return codeOpen(token) + defaultFence(tokens, index, options, env, self) + CODE_CLOSE
   }
 
   const defaultTableOpen = md.renderer.rules.table_open ?? renderToken
   const defaultTableClose = md.renderer.rules.table_close ?? renderToken
 
   md.renderer.rules.table_open = (tokens, index, options, env, self) => {
-    return TABLE_OPEN + defaultTableOpen(tokens, index, options, env, self)
+    return tableOpen(tokens[index]) + defaultTableOpen(tokens, index, options, env, self)
   }
 
   md.renderer.rules.table_close = (tokens, index, options, env, self) => {
@@ -36,7 +35,7 @@ export function contentBlocksPlugin(md: MarkdownIt): void {
   const defaultParagraphClose = md.renderer.rules.paragraph_close ?? renderToken
 
   md.renderer.rules.paragraph_open = (tokens, index, options, env, self) => {
-    const prefix = tokens[index].meta?.kpoImageOnlyParagraph ? IMAGE_OPEN : ''
+    const prefix = tokens[index].meta?.kpoImageOnlyParagraph ? imageOpen(tokens[index]) : ''
     return prefix + defaultParagraphOpen(tokens, index, options, env, self)
   }
 
@@ -44,6 +43,18 @@ export function contentBlocksPlugin(md: MarkdownIt): void {
     const suffix = tokens[index].meta?.kpoImageOnlyParagraph ? IMAGE_CLOSE : ''
     return defaultParagraphClose(tokens, index, options, env, self) + suffix
   }
+}
+
+function tableOpen(token: Token): string {
+  return `<div class="kpo-content-block kpo-content-block--table kpo-content-block--wide" data-kpo-content-kind="table"${askAiBlockAttribute(token)}>\n`
+}
+
+function codeOpen(token: Token): string {
+  return `<div class="kpo-content-block kpo-content-block--code kpo-content-block--wide"${askAiBlockAttribute(token)}>\n`
+}
+
+function imageOpen(token: Token): string {
+  return `<div class="kpo-content-block kpo-content-block--image kpo-content-block--wide"${askAiBlockAttribute(token)}>\n`
 }
 
 function markSpecialContentTokens(md: MarkdownIt): void {
@@ -72,18 +83,6 @@ function markSpecialContentTokens(md: MarkdownIt): void {
       }
     }
   })
-}
-
-function isImageOnlyParagraph(tokens: Token[], openIndex: number): boolean {
-  const inline = tokens[openIndex + 1]
-  if (inline?.type !== 'inline') return false
-
-  const meaningfulChildren = (inline.children ?? []).filter((child) => {
-    return child.type !== 'text' || child.content.trim() !== ''
-  })
-
-  if (meaningfulChildren.length !== 1) return false
-  return meaningfulChildren[0].type === 'image'
 }
 
 function findParagraphClose(tokens: Token[], openIndex: number): number {

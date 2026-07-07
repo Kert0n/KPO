@@ -1,3 +1,5 @@
+import { clamp } from '../../lib/math'
+
 export type MermaidViewportMode = 'desktop' | 'mobile'
 
 export type ResolveMermaidAutoScaleInput = {
@@ -127,10 +129,6 @@ export function shouldShowMermaidToolbar(input: ShouldShowMermaidToolbarInput): 
 
 function positive(value: number | null | undefined): number | null {
   return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : null
-}
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.min(max, Math.max(min, value))
 }
 
 function roundScale(value: number): number {

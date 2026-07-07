@@ -9,7 +9,7 @@ import {
   parseCsv,
   resolveDisplayLanguage
 } from '../lib/codeBlockModel'
-import { preserveBlockViewportPosition } from '../lib/interactiveBlockTransaction'
+import { preserveViewportAnchor } from '../lib/viewportAnchor'
 
 /**
  * Переключатель языка для примера кода.
@@ -35,13 +35,15 @@ const props = withDefaults(defineProps<{
   authorDefaultLang?: string
   allowPlayground?: boolean
   playgroundCode?: string
+  askBlockId?: string
 }>(), {
   title: '',
   labels: '',
   initialLang: '',
   authorDefaultLang: '',
   allowPlayground: false,
-  playgroundCode: ''
+  playgroundCode: '',
+  askBlockId: ''
 })
 
 const { activeLanguage, setActiveLanguage } = useCodeLanguage()
@@ -147,7 +149,7 @@ function tabLabel(index: number): string {
 }
 
 async function selectLanguage(lang: string): Promise<void> {
-  await preserveBlockViewportPosition(rootElement.value, () => {
+  await preserveViewportAnchor(rootElement.value, () => {
     authorDefaultReleased.value = true
 
     if (isSupportedCodeLanguage(lang)) {
@@ -161,7 +163,7 @@ async function selectLanguage(lang: string): Promise<void> {
 }
 
 async function togglePlayground(): Promise<void> {
-  await preserveBlockViewportPosition(rootElement.value, () => {
+  await preserveViewportAnchor(rootElement.value, () => {
     setPlaygroundMode(!playgroundMode.value)
   }, { frames: 3 })
 }
@@ -185,7 +187,7 @@ function onTabsKeydown(event: KeyboardEvent): void {
 </script>
 
 <template>
-  <section ref="root" class="kpo-switcher">
+  <section ref="root" class="kpo-switcher" :data-kpo-ask-block-id="askBlockId || undefined">
     <header class="kpo-switcher__header">
       <span v-if="title" class="kpo-switcher__title">{{ title }}</span>
 
@@ -236,6 +238,7 @@ function onTabsKeydown(event: KeyboardEvent): void {
       v-if="playgroundEverShown"
       v-show="playgroundActive"
       :code="kotlinCode"
+      :ask-block-id="askBlockId"
       @failed="playgroundFailed = true"
     />
   </section>
