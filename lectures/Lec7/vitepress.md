@@ -160,9 +160,9 @@ flowchart LR
     SupportCustomer -. "same id may be shared" .- LoyaltyCustomer
 ```
 
-Плохое решение - создать один общий класс `Customer` и использовать его везде. Через несколько месяцев в нем окажутся
-поля `cartId`, `ticketSla`, `discountPercent`, `taxRegion`, `marketingConsent`, а любое изменение будет затрагивать
-сразу несколько команд.
+Плохое решение — создать один общий класс `Customer` и использовать его везде. Отдел продаж добавит `LTV`, поддержка —
+`LastTicketDate`, бухгалтерия — `TaxId`, маркетинг — `MarketingConsent`. Через несколько месяцев класс вырастет до 47
+полей и 12 зависимостей, а любое изменение будет затрагивать сразу несколько команд.
 
 Хорошее решение - разрешить разным контекстам иметь свои модели. Они могут ссылаться на один и тот же `CustomerId`, но
 должны явно договориться, кто этим идентификатором владеет, кто может его назначать и кто только читает.
@@ -245,6 +245,10 @@ nurse.Prescribe(fluVaccine, DoseStandard())
 словах между командами. Это особенно важно в core domain: там цена неправильного понимания выше.
 
 ## Анемичная Модель
+
+Мы определили *где* границы (bounded context), *каким языком* говорим (ubiquitous language) и *что* является ядром бизнеса
+(core domain). Теперь — *как* внутри bounded context строить модель, которая сама защищает свои правила. Начнём с того,
+как выглядит модель, которая этого *не* делает.
 
 **Anemic domain model** - модель, в которой объект хранит данные, но не защищает свои правила. Обычно у нее публичные
 поля или сеттеры, а вся логика лежит во внешних сервисах.
@@ -342,6 +346,10 @@ flowchart TD
 :::
 
 ## Value Object
+
+Email — не просто `String`. Money — не просто `Double`. Percentage — не просто `Int`. Когда вы храните скидку как `Int`,
+ничто не мешает поставить `-50` или `300`. Когда email — строка, `"hello"` проходит компиляцию. Value Object делает
+невалидное значение невозможным.
 
 **Value object** - объект-значение. Он описывает значение в предметной области, не имеет собственной идентичности и
 сравнивается по содержимому.
@@ -779,6 +787,20 @@ func (customer Customer) CompletedOrders() int {
 логика обязана быть внутри одного класса. Это значит, что изменение состояния не должно происходить в обход объекта,
 который владеет этим состоянием.
 
+```mermaid
+flowchart LR
+    subgraph Anemic["Анемичная модель"]
+        AC[Controller] --> AS[Service] --> AE["entity.setField()"] --> AR[Repository]
+    end
+```
+
+```mermaid
+flowchart LR
+    subgraph Rich["Богатая модель"]
+        RC[Controller] --> RS[AppService] --> RE["entity.doAction()"] --> RR[Repository]
+    end
+```
+
 Переход от анемичной модели к богатой обычно выглядит так:
 
 | Было                         | Стало                                                |
@@ -994,6 +1016,28 @@ func (customer LoyaltyCustomer) IsEmployee() bool {
 Обратите внимание: в примере нет метода `setStatus` и поля `discountPercent`, которое можно изменить снаружи. Статус и
 скидка являются следствием количества завершенных заказов. Это и есть защита инварианта.
 
+::: only kotlin
+Kotlin `sealed interface` идеально подходит для моделирования состояний агрегата — *make illegal states
+unrepresentable*:
+
+```kotlin
+sealed interface OrderState {
+    data class Draft(val items: List<OrderItem>) : OrderState
+    data class Confirmed(val items: List<OrderItem>, val confirmedAt: Instant) : OrderState
+    data class Shipped(val trackingId: String) : OrderState
+    data object Cancelled : OrderState
+}
+```
+
+Компилятор заставит обработать все варианты в `when`, а невалидный переход (например, `Cancelled → Shipped`) просто не
+будет иметь ветки.
+:::
+
+::: only go
+В Go нет конструкторов — структурные литералы обходят валидацию. `NewEmail()` — единственная защита инварианта Value
+Object. Это требует дисциплины, но делает точку валидации явной и легко находимой через grep.
+:::
+
 ## Где Должна Жить Логика
 
 Не вся логика должна быть внутри entity. Важно выбрать правильный уровень.
@@ -1010,9 +1054,33 @@ func (customer LoyaltyCustomer) IsEmployee() bool {
 **Application service** координирует сценарий приложения: загрузить данные, проверить права, открыть транзакцию,
 вызвать доменную операцию, сохранить результат. Он не должен решать, какая скидка положена клиенту.
 
+```kotlin
+// ❌ Логика в AppService — решает за entity
+class PromoteService(private val repo: CustomerRepository) {
+    fun promote(id: CustomerId) {
+        val c = repo.findById(id)
+        if (c.completedOrders >= 10) c.status = "Gold"   // бизнес-правило снаружи
+        if (c.status == "Gold") c.discountPercent = 15    // ещё одно
+        repo.save(c)
+    }
+}
+
+// ✅ Логика в entity — AppService только координирует
+class PromoteService(private val repo: CustomerRepository) {
+    fun onOrderCompleted(id: CustomerId) {
+        val c = repo.findById(id)
+        c.registerCompletedOrder()   // entity сама решает статус и скидку
+        repo.save(c)
+    }
+}
+```
+
 **Domain service** выражает доменную операцию, которая не принадлежит естественно одному entity или value object.
 
 ## Domain Service
+
+Не вся бизнес-логика помещается в одну entity. Перевод денег между двумя счетами — чья ответственность? Ни одного из
+счетов. Для таких операций существует domain service.
 
 Классический пример - перевод денег. Есть счет отправителя, счет получателя и сумма. Если поместить метод перевода в
 счет отправителя, он начнет слишком много знать о получателе. Если поместить в счет получателя, проблема симметрична.
@@ -1270,6 +1338,67 @@ func (service MoneyTransferService) Transfer(from *Account, to *Account, amount 
 
 Domain service не должен становиться "богатым сервисом", который забирает у entity все правила. Его роль - собрать
 несколько доменных объектов в одну операцию, сохранив инварианты внутри объектов.
+
+### Агрегатный корень
+
+Aggregate root — единственная точка входа к группе связанных объектов. Внешний код не работает с дочерними entity
+напрямую — только через корень, который гарантирует согласованность:
+
+```kotlin
+class Order(val id: OrderId) {
+    private val _lines = mutableListOf<OrderLine>()
+    val lines: List<OrderLine> get() = _lines
+
+    fun addLine(product: ProductId, quantity: Int, price: Money) {
+        require(quantity > 0)
+        _lines += OrderLine(product, quantity, price)
+    }
+
+    fun removeLine(product: ProductId) {
+        _lines.removeAll { it.product == product }
+    }
+
+    fun total(): Money = _lines.fold(Money.ZERO) { acc, line ->
+        acc + line.price * line.quantity
+    }
+}
+
+data class OrderLine(val product: ProductId, val quantity: Int, val price: Money)
+```
+
+`OrderLine` не имеет собственного репозитория — она живёт и умирает вместе с `Order`.
+
+### Domain Events
+
+Domain event фиксирует факт, который произошёл в предметной области. Это мостик к [асинхронному
+взаимодействию](/lectures/11) и [отказоустойчивости](/lectures/12):
+
+```kotlin
+sealed interface DomainEvent
+
+data class CustomerPromoted(
+    val customerId: CustomerId,
+    val newStatus: CustomerStatus,
+    val at: Instant
+) : DomainEvent
+```
+
+Entity *поднимает* события, а application service *публикует* их:
+
+```kotlin
+class LoyaltyCustomer(val id: CustomerId, val email: Email) {
+    private val _events = mutableListOf<DomainEvent>()
+    val domainEvents: List<DomainEvent> get() = _events
+
+    fun registerCompletedOrder(now: Instant) {
+        completedOrders += 1
+        val newStatus = CustomerStatus.fromOrders(completedOrders)
+        if (newStatus != previousStatus) {
+            _events += CustomerPromoted(id, newStatus, now)
+        }
+    }
+}
+```
 
 ## Изоляция Доменной Модели
 

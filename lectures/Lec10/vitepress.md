@@ -183,12 +183,9 @@ sequenceDiagram
 - нужны очереди, повторы, ограничение нагрузки и независимое масштабирование обработчиков;
 - один факт должен быть обработан несколькими потребителями.
 
-Цена асинхронности:
-
-- сложнее проектировать состояния: `pending`, `processing`, `done`, `failed`;
-- сложнее отлаживать, потому что нет одной прямой цепочки вызова;
-- появляются повторная доставка, дедупликация, порядок сообщений и eventual consistency;
-- пользователю нужно показывать промежуточный статус, а не "все сразу готово".
+Цена асинхронности: сложнее проектировать состояния, отлаживать порядок сообщений и объяснять пользователю
+промежуточные статусы. Полная картина async-обмена: брокеры, consumer groups, DLQ и exactly-once семантика —
+в [Лекции 11](/lectures/11).
 
 ## Реактивное взаимодействие
 
@@ -321,6 +318,10 @@ API чаще всего используют JSON, но HTTP не огранич
 
 ## HTTP-статусы
 
+Вернёмся к сквозному сценарию. Карточка товара: `GET /products/42` → `200 OK`. Создание заказа: `POST /orders` → `201
+Created`. Несуществующий товар: `GET /products/999` → `404 Not Found`. Каждый код несёт семантику для клиента, кэша и
+middleware.
+
 Статус - короткий машинно-читаемый итог обработки запроса. Тело ответа может содержать подробности, но клиент сначала
 ориентируется на статус.
 
@@ -353,7 +354,29 @@ API чаще всего используют JSON, но HTTP не огранич
 
 ## Асинхронность поверх HTTP
 
-HTTP часто используют в синхронной модели: клиент отправил запрос и получил финальный ответ. Но тот же HTTP можно
+HTTP часто используют в синхронной модели: клиент отправил запрос и получил финальный ответ. Сравните два подхода:
+
+```mermaid
+sequenceDiagram
+    participant C as Клиент
+    participant S as Сервер
+    Note over C,S: Sync: клиент ждёт
+    C->>S: POST /orders
+    S-->>C: 201 Created (готово)
+```
+
+```mermaid
+sequenceDiagram
+    participant C as Клиент
+    participant S as Сервер
+    Note over C,S: Async: клиент не ждёт
+    C->>S: POST /reports
+    S-->>C: 202 Accepted (принято)
+    C->>S: GET /reports/jobs/j-7
+    S-->>C: 200 {status: done}
+```
+
+Но тот же HTTP можно
 использовать для асинхронной бизнес-семантики.
 
 Представим формирование отчета:
@@ -458,6 +481,65 @@ flowchart LR
 REST не запрещает действия вообще. Иногда действие действительно является доменной командой: например, `POST
 /orders/{id}/cancel`. Но если обычный CRUD можно выразить ресурсами и стандартными методами, лучше начать с них.
 
+Минимальный CRUD для `/orders` — роутер + обработчики:
+
+::: multi-code "REST CRUD: /orders" {default=kotlin}
+
+```kotlin
+// Ktor
+fun Application.orderRoutes(repo: OrderRepository) {
+    routing {
+        get("/orders") { call.respond(repo.findAll()) }
+        get("/orders/{id}") {
+            val order = repo.findById(call.parameters["id"]!!)
+            if (order != null) call.respond(order) else call.respond(HttpStatusCode.NotFound)
+        }
+        post("/orders") {
+            val cmd = call.receive<CreateOrderRequest>()
+            val order = repo.create(cmd)
+            call.respond(HttpStatusCode.Created, order)
+        }
+        delete("/orders/{id}") {
+            repo.delete(call.parameters["id"]!!)
+            call.respond(HttpStatusCode.NoContent)
+        }
+    }
+}
+```
+
+```csharp
+// ASP.NET Minimal API
+app.MapGet("/orders", (OrderRepository repo) => repo.FindAll());
+app.MapGet("/orders/{id}", (string id, OrderRepository repo) =>
+    repo.FindById(id) is { } order ? Results.Ok(order) : Results.NotFound());
+app.MapPost("/orders", (CreateOrderRequest cmd, OrderRepository repo) =>
+    Results.Created($"/orders/{cmd.Id}", repo.Create(cmd)));
+app.MapDelete("/orders/{id}", (string id, OrderRepository repo) =>
+    { repo.Delete(id); return Results.NoContent(); });
+```
+
+```go
+// net/http
+mux := http.NewServeMux()
+mux.HandleFunc("GET /orders", func(w http.ResponseWriter, r *http.Request) {
+    json.NewEncoder(w).Encode(repo.FindAll())
+})
+mux.HandleFunc("GET /orders/{id}", func(w http.ResponseWriter, r *http.Request) {
+    order, ok := repo.FindByID(r.PathValue("id"))
+    if !ok { http.NotFound(w, r); return }
+    json.NewEncoder(w).Encode(order)
+})
+mux.HandleFunc("POST /orders", func(w http.ResponseWriter, r *http.Request) {
+    var cmd CreateOrderRequest
+    json.NewDecoder(r.Body).Decode(&cmd)
+    order := repo.Create(cmd)
+    w.WriteHeader(http.StatusCreated)
+    json.NewEncoder(w).Encode(order)
+})
+```
+
+:::
+
 ## Stateless
 
 `Stateless` означает, что сервер не должен требовать скрытого контекста из предыдущего HTTP-запроса, чтобы понять
@@ -530,6 +612,49 @@ Content-Type: application/json
 ::: tip Практическое правило
 Если клиент будет делать retry, сначала решите, что повтор запроса означает для состояния системы. Без этого retry может
 создать дубликаты заказов, платежей или сообщений.
+:::
+
+Серверная сторона idempotency key: проверить → обработать или вернуть cached:
+
+::: multi-code "Idempotency key: handler на сервере" {default=kotlin}
+
+```kotlin
+fun handlePayment(key: String, request: PaymentRequest): PaymentResult {
+    val existing = idempotencyStore.find(key)
+    if (existing != null) return existing
+
+    val result = paymentService.charge(request)
+    idempotencyStore.save(key, result)
+    return result
+}
+```
+
+```csharp
+public PaymentResult HandlePayment(string key, PaymentRequest request)
+{
+    if (_store.TryGet(key, out var existing))
+        return existing;
+
+    var result = _paymentService.Charge(request);
+    _store.Save(key, result);
+    return result;
+}
+```
+
+```go
+func (h *PaymentHandler) HandlePayment(key string, req PaymentRequest) (PaymentResult, error) {
+    if existing, ok := h.store.Find(key); ok {
+        return existing, nil
+    }
+    result, err := h.service.Charge(req)
+    if err != nil {
+        return PaymentResult{}, err
+    }
+    h.store.Save(key, result)
+    return result, nil
+}
+```
+
 :::
 
 ## Cacheability
@@ -738,8 +863,13 @@ func main() {
 :::
 
 ::: only go
-В Go стандартный пакет `net/http` достаточно мощный для большинства HTTP-клиентов и серверов; для production-кода
-обязательно настраивают таймауты.
+Go — единственный из четырёх языков, где полноценный HTTP-сервер пишется без фреймворка. `net/http` покрывает
+маршрутизацию, middleware, TLS и graceful shutdown. Для production-кода обязательно настраивают таймауты.
+:::
+
+::: only kotlin
+Ktor `suspend fun` делает async HTTP-вызовы синтаксически неотличимыми от sync — нет callback hell и `CompletableFuture`
+chain. Внутри `suspend` функция приостанавливается без блокировки потока.
 :::
 
 ## Endpoint на разных языках
@@ -939,6 +1069,9 @@ SOAP часто остается в банковских, государстве
 :::
 
 ## GraphQL
+
+Мобильному приложению нужны 3 поля из Order, а REST отдаёт 47. Dashboard собирает данные из 3 ресурсов — 3
+HTTP-запроса. GraphQL решает оба случая одним запросом: клиент сам описывает, какие поля ему нужны.
 
 GraphQL - язык запросов и runtime-модель для API. Обычно клиент отправляет запрос на одну endpoint-точку, например
 `/graphql`, а в теле описывает, какие поля ему нужны.
