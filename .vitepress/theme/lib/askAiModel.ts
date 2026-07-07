@@ -67,10 +67,6 @@ export function isAskAiProviderId(value: string): value is AskAiProviderId {
   return ASK_AI_PROVIDERS.some((provider) => provider.id === value)
 }
 
-export function promptLimitForProvider(provider: AskAiProviderId): number {
-  return DEFAULT_PROMPT_LIMIT
-}
-
 export function buildAskAiPrompt(input: AskAiPromptInput): string {
   const selectedText = normalizeText(input.selectedText)
   const blocks = input.pageContext.blocks
@@ -197,12 +193,12 @@ function blockIndexes(blocks: AskAiBlock[], ids: string[]): number[] {
     .filter((index) => index !== -1)
 }
 
-export function blockToPromptText(block: AskAiBlock): string {
+function blockToPromptText(block: AskAiBlock): string {
   const label = blockLabel(block)
   return label ? `${label}\n${block.markdown.trim()}` : block.markdown.trim()
 }
 
-export function isBridgeBlock(block: AskAiBlock): boolean {
+function isBridgeBlock(block: AskAiBlock): boolean {
   const plainText = normalizeText(block.plainText || block.markdown)
   if (block.kind === 'heading') return true
   if (plainText.endsWith(':')) return true
@@ -213,7 +209,7 @@ export function isBridgeBlock(block: AskAiBlock): boolean {
   return false
 }
 
-export function isSubstantiveBlock(block: AskAiBlock): boolean {
+function isSubstantiveBlock(block: AskAiBlock): boolean {
   if (['code', 'multi-code', 'playground', 'mermaid', 'table'].includes(block.kind)) return true
 
   const plainText = normalizeText(block.plainText || block.markdown)

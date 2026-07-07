@@ -3,6 +3,7 @@ import type Token from 'markdown-it/lib/token.mjs'
 import container from 'markdown-it-container'
 import { normalizeLanguage } from '../theme/lib/codeBlockModel'
 import { askAiBlockAttribute, askAiBlockId } from './askAiAnchors'
+import { escapeAttribute } from './htmlUtils'
 
 /**
  * Контейнер ::: multi-code — один пример на нескольких языках.
@@ -246,10 +247,3 @@ function markInitialFenceActive(fences: MultiCodeFence[], initialLang: string): 
   }
 }
 
-function escapeAttribute(value: string): string {
-  return value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-}

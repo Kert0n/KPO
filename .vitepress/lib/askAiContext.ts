@@ -4,7 +4,9 @@ import MarkdownIt from 'markdown-it'
 import type Token from 'markdown-it/lib/token.mjs'
 import container from 'markdown-it-container'
 import matter from 'gray-matter'
+import { isImageOnlyParagraph } from '../markdown/tokenUtils'
 import { createAskAiBlockId, type AskAiBlockKind } from './askAiIds'
+import { extractNumber } from './content'
 import type { AskAiBlock, AskAiPageContext } from '../theme/lib/askAiModel'
 
 export type AskAiContextEntry = {
@@ -208,11 +210,6 @@ function scanNumberedPages(entries: AskAiContextEntry[], root: string, directory
   }
 }
 
-function extractNumber(name: string): number {
-  const match = name.match(/(\d+)/)
-  return match ? Number.parseInt(match[1], 10) : Number.MAX_SAFE_INTEGER
-}
-
 function pageTitle(data: Record<string, unknown>, content: string): string {
   if (typeof data.title === 'string' && data.title.trim() !== '') return data.title.trim()
   return content.match(/^#\s+(.+?)\s*$/m)?.[1]?.trim() ?? 'Материал курса'
@@ -239,17 +236,6 @@ function findMatchingClose(tokens: Token[], openIndex: number): number {
     if (token.type === 'container_multi-code_close' && token.level === open.level) return index
   }
   return -1
-}
-
-function isImageOnlyParagraph(tokens: Token[], openIndex: number): boolean {
-  const inline = tokens[openIndex + 1]
-  if (inline?.type !== 'inline') return false
-
-  const meaningfulChildren = (inline.children ?? []).filter((child) => {
-    return child.type !== 'text' || child.content.trim() !== ''
-  })
-
-  return meaningfulChildren.length === 1 && meaningfulChildren[0].type === 'image'
 }
 
 function plainText(value: string): string {

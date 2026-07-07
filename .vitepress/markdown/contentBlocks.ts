@@ -1,6 +1,7 @@
 import type MarkdownIt from 'markdown-it'
 import type Token from 'markdown-it/lib/token.mjs'
 import { askAiBlockAttribute } from './askAiAnchors'
+import { isImageOnlyParagraph } from './tokenUtils'
 
 const TABLE_CLOSE = '</div>\n'
 const CODE_CLOSE = '</div>\n'
@@ -82,18 +83,6 @@ function markSpecialContentTokens(md: MarkdownIt): void {
       }
     }
   })
-}
-
-function isImageOnlyParagraph(tokens: Token[], openIndex: number): boolean {
-  const inline = tokens[openIndex + 1]
-  if (inline?.type !== 'inline') return false
-
-  const meaningfulChildren = (inline.children ?? []).filter((child) => {
-    return child.type !== 'text' || child.content.trim() !== ''
-  })
-
-  if (meaningfulChildren.length !== 1) return false
-  return meaningfulChildren[0].type === 'image'
 }
 
 function findParagraphClose(tokens: Token[], openIndex: number): number {

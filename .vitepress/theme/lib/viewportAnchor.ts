@@ -1,3 +1,5 @@
+import { clamp } from '../../lib/math'
+
 export type ViewportAnchor = {
   root: HTMLElement
   relativeViewportTop: number
@@ -79,6 +81,3 @@ function maxScrollY(): number {
   return Math.max(0, documentHeight - window.innerHeight)
 }
 
-function clamp(value: number, min: number, max: number): number {
-  return Math.min(max, Math.max(min, value))
-}

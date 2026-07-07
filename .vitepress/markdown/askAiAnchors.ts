@@ -1,6 +1,8 @@
 import type MarkdownIt from 'markdown-it'
 import type Token from 'markdown-it/lib/token.mjs'
 import { createAskAiBlockId, type AskAiBlockKind } from '../lib/askAiIds'
+import { escapeAttribute } from './htmlUtils'
+import { isImageOnlyParagraph } from './tokenUtils'
 
 export function askAiAnchorsPlugin(md: MarkdownIt): void {
   md.core.ruler.push('kpo_ask_ai_anchors', (state) => {
@@ -63,21 +65,3 @@ function assignBlockId(token: Token, kind: AskAiBlockKind, lines: string[]): voi
   }
 }
 
-function isImageOnlyParagraph(tokens: Token[], openIndex: number): boolean {
-  const inline = tokens[openIndex + 1]
-  if (inline?.type !== 'inline') return false
-
-  const meaningfulChildren = (inline.children ?? []).filter((child) => {
-    return child.type !== 'text' || child.content.trim() !== ''
-  })
-
-  return meaningfulChildren.length === 1 && meaningfulChildren[0].type === 'image'
-}
-
-function escapeAttribute(value: string): string {
-  return value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-}

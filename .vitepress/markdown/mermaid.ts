@@ -1,4 +1,5 @@
 import type MarkdownIt from 'markdown-it'
+import { stableHash } from '../lib/hash'
 import { askAiBlockAttribute } from './askAiAnchors'
 
 export type MermaidLintDiagnostic = {
@@ -101,12 +102,4 @@ function markdownEnvPath(env: unknown): string | undefined {
   }
 
   return candidate.relativePath ?? candidate.path ?? candidate.file
-}
-
-function stableHash(value: string): string {
-  let hash = 5381
-  for (let i = 0; i < value.length; i += 1) {
-    hash = (hash * 33) ^ value.charCodeAt(i)
-  }
-  return (hash >>> 0).toString(36)
 }
