@@ -39,12 +39,9 @@ export type AskAiProviderAction = {
   prompt: string
   copyPrompt: boolean
   openUrl: string | null
-  usesDeeplink: boolean
-  toastKind: 'opened' | 'copied' | 'copied-and-opened' | 'manual-copy' | 'unavailable'
-  copiedFallbackReason?: 'url-too-long'
+  toastKind: 'copied' | 'copied-and-opened' | 'manual-copy' | 'unavailable'
 }
 
-const CHATGPT_SAFE_URL_LENGTH = 2000
 const DEFAULT_PROMPT_LIMIT = 12000
 const CONTEXT_BEFORE_TARGET_CHARS = 1800
 const CONTEXT_AFTER_TARGET_CHARS = 1800
@@ -113,24 +110,12 @@ export function resolveAskAiProviderAction(
 ): AskAiProviderAction {
   if (provider === 'chatgpt') {
     const prompt = buildAskAiPrompt({ ...input, maxChars: DEFAULT_PROMPT_LIMIT })
-    const url = chatGptUrl(prompt)
-    if (url.length <= CHATGPT_SAFE_URL_LENGTH) {
-      return {
-        prompt,
-        copyPrompt: false,
-        openUrl: url,
-        usesDeeplink: true,
-        toastKind: 'opened'
-      }
-    }
-
     return {
       prompt,
       copyPrompt: true,
       openUrl: 'https://chatgpt.com/',
-      usesDeeplink: false,
-      toastKind: 'copied-and-opened',
-      copiedFallbackReason: 'url-too-long'
+
+      toastKind: 'copied-and-opened'
     }
   }
 
@@ -140,7 +125,7 @@ export function resolveAskAiProviderAction(
       prompt,
       copyPrompt: true,
       openUrl: null,
-      usesDeeplink: false,
+
       toastKind: 'copied'
     }
   }
@@ -400,6 +385,3 @@ function normalizeText(value: string): string {
   return value.replace(/\r\n?/g, '\n').trim()
 }
 
-function chatGptUrl(prompt: string): string {
-  return `https://chatgpt.com/?q=${encodeURIComponent(prompt)}`
-}

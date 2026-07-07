@@ -223,7 +223,7 @@ function clearPreparedAction(): void {
 }
 
 function actionToast(
-  toastKind: 'opened' | 'copied' | 'copied-and-opened' | 'manual-copy' | 'unavailable',
+  toastKind: 'copied' | 'copied-and-opened' | 'manual-copy' | 'unavailable',
   copied: boolean,
   contextUnavailable: boolean
 ): string {
@@ -233,7 +233,6 @@ function actionToast(
   if (toastKind === 'copied-and-opened' && !copied) return 'Copy prompt manually'
 
   const suffix = contextUnavailable ? ' without page context' : ''
-  if (toastKind === 'opened') return `Opened ChatGPT${suffix}`
   if (toastKind === 'copied') return `Prompt copied${suffix}`
 
   if (askAiProvider.value === 'claude') return `Prompt copied, opened Claude${suffix}`

@@ -38,39 +38,16 @@ describe('askAiModel', () => {
     expect(prompt).toContain('[... фрагмент сокращен ...]')
   })
 
-  it('uses ChatGPT deeplink only for short prompts', () => {
-    const shortAction = resolveAskAiProviderAction('chatgpt', {
-      pageContext: {
-        courseTitle: '',
-        courseDescription: '',
-        pageTitle: '',
-        pageDescription: '',
-        sourcePath: 'short.md',
-        blocks: [block('current', 'paragraph', 'a')]
-      },
-      selectedText: 'a',
+  it('copies prompt and opens base ChatGPT without query parameter', () => {
+    const action = resolveAskAiProviderAction('chatgpt', {
+      pageContext: context,
+      selectedText: 'short',
       blockIds: ['current']
     })
 
-    expect(shortAction.copyPrompt).toBe(false)
-    expect(shortAction.openUrl).toContain('https://chatgpt.com/?q=')
-    expect(shortAction.usesDeeplink).toBe(true)
-    expect(shortAction.toastKind).toBe('opened')
-  })
-
-  it('copies and opens base ChatGPT for encoded URLs over the safe limit', () => {
-    const longAction = resolveAskAiProviderAction('chatgpt', {
-      pageContext: grpcContext,
-      selectedText: 'message OrderResponse {\n  string id = 1;\n  string status = 2;\n}',
-      blockIds: ['grpc-proto']
-    })
-
-    expect(longAction.copyPrompt).toBe(true)
-    expect(longAction.openUrl).toBe('https://chatgpt.com/')
-    expect(longAction.usesDeeplink).toBe(false)
-    expect(longAction.toastKind).toBe('copied-and-opened')
-    expect(longAction.openUrl).not.toContain('?q=')
-    expect(longAction.prompt).toContain('message OrderResponse')
+    expect(action.copyPrompt).toBe(true)
+    expect(action.openUrl).toBe('https://chatgpt.com/')
+    expect(action.toastKind).toBe('copied-and-opened')
   })
 
   it('always copies before opening Claude and DeepSeek', () => {
@@ -87,12 +64,12 @@ describe('askAiModel', () => {
 
     expect(claudeAction.copyPrompt).toBe(true)
     expect(claudeAction.openUrl).toBe('https://claude.ai/new')
-    expect(claudeAction.usesDeeplink).toBe(false)
+
     expect(claudeAction.toastKind).toBe('copied-and-opened')
 
     expect(deepSeekAction.copyPrompt).toBe(true)
     expect(deepSeekAction.openUrl).toBe('https://chat.deepseek.com/')
-    expect(deepSeekAction.usesDeeplink).toBe(false)
+
     expect(deepSeekAction.toastKind).toBe('copied-and-opened')
   })
 

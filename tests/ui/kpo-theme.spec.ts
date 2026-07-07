@@ -1091,7 +1091,7 @@ test('ask ai keeps clipboard fallback when page context is unavailable', async (
   expect(copiedPrompt).toContain(`[Выделенный фрагмент]\n${selectedText}`)
 })
 
-test('ask ai copies and opens base ChatGPT for long encoded prompts', async ({ page }) => {
+test('ask ai copies prompt and opens base ChatGPT without query parameter', async ({ page }) => {
   await clearStorage(page)
   await stubAskAiSideEffects(page)
 
