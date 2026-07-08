@@ -15,7 +15,9 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "pretest:ui": "node .vitepress/scripts/assert-node-version.mjs",
-    "test:ui": "playwright test"
+    "test:ui": "playwright test",
+    "pdf": "npm run build && node scripts/export-pdf.mjs",
+    "pdf:published": "KPO_PDF_BASE_URL=https://kert0n.github.io/KPO/ node scripts/export-pdf.mjs --remote"
   },
   "devDependencies": {
     "@playwright/test": "^1.61.1",
@@ -26,6 +28,7 @@
     "markdown-it": "^14.1.0",
     "markdown-it-container": "4.0.0",
     "markdown-it-mathjax3": "^4.3.2",
+    "pdf-lib": "^1.17.1",
     "shiki": "2.5.0",
     "typescript": "5.9.3",
     "vitepress": "1.6.4",

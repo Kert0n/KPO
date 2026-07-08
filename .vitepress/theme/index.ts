@@ -20,6 +20,7 @@ import './styles/content-lanes.css'
 import './styles/code.css'
 import './styles/playground.css'
 import './styles/ask-ai.css'
+import './styles/print.css'
 
 export default {
   extends: DefaultTheme,
