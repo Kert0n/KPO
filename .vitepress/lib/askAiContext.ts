@@ -27,15 +27,16 @@ type CacheEntry = {
 
 const cache = new Map<string, CacheEntry>()
 const markdown = MarkdownIt({ html: true }).use(container, 'multi-code')
+const contentDirectory = 'content'
 
 export function listAskAiContextEntries(root = process.cwd()): AskAiContextEntry[] {
   const entries: AskAiContextEntry[] = []
 
-  addIfExists(entries, root, 'index', 'index.md')
-  addIfExists(entries, root, 'intro', 'intro.md')
-  addIfExists(entries, root, 'conclusion', 'conclusion.md')
+  addIfExists(entries, root, 'index', 'content/home/vitepress.md')
+  addIfExists(entries, root, 'intro', 'content/intro/vitepress.md')
+  addIfExists(entries, root, 'conclusion', 'content/conclusion/vitepress.md')
   scanNumberedPages(entries, root, 'lectures')
-  addIfExists(entries, root, 'extras/index', 'extras/index.md')
+  addIfExists(entries, root, 'extras/index', 'content/extras/index/vitepress.md')
   scanNumberedPages(entries, root, 'extras')
 
   const seen = new Set<string>()
@@ -182,23 +183,14 @@ function addIfExists(entries: AskAiContextEntry[], root: string, routeKey: strin
 }
 
 function scanNumberedPages(entries: AskAiContextEntry[], root: string, directory: 'lectures' | 'extras'): void {
-  const directoryPath = resolve(root, directory)
+  const directoryPath = resolve(root, contentDirectory, directory)
   if (!existsSync(directoryPath)) return
 
   for (const entry of readdirSync(directoryPath, { withFileTypes: true })) {
-    if (entry.name.startsWith('.') || entry.name.startsWith('_')) continue
-
-    if (entry.isFile()) {
-      if (!entry.name.endsWith('.md') || entry.name === 'index.md') continue
-      entries.push({
-        routeKey: `${directory}/${entry.name.replace(/\.md$/, '')}`,
-        sourcePath: `${directory}/${entry.name}`
-      })
-      continue
-    }
+    if (entry.name === 'index' || entry.name.startsWith('.') || entry.name.startsWith('_')) continue
 
     if (entry.isDirectory()) {
-      const sourcePath = `${directory}/${entry.name}/vitepress.md`
+      const sourcePath = `${contentDirectory}/${directory}/${entry.name}/vitepress.md`
       if (!existsSync(resolve(root, sourcePath))) continue
       const order = extractNumber(entry.name)
       const slug = Number.isFinite(order) ? String(order).padStart(2, '0') : entry.name

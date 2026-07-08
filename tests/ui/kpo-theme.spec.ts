@@ -8,7 +8,7 @@ const DESKTOP_PROSE_TOLERANCE_PX = 12
 const MERMAID_FOREIGN_OBJECT_TOLERANCE_PX = 2
 const MERMAID_VIEWBOX_TOLERANCE_PX = 8
 const MIN_READABLE_MERMAID_HEIGHT_PX = CONTENT_LAYOUT_TOKENS.mermaidMinHeight
-const UI_FIXTURE_ROUTE = 'test-fixtures/ui-contract'
+const UI_FIXTURE_ROUTE = 'service-pages/ui-contract'
 const PUBLIC_CONTENT_ROUTES = [
   'intro',
   'lectures/01',
@@ -48,6 +48,13 @@ async function setStorage(page: Page, entries: Record<string, string>): Promise<
 
 async function expectActiveTab(switcher: Locator, language: string): Promise<void> {
   await expect(switcher.locator('.kpo-switcher__tab--active')).toHaveText(language)
+}
+
+async function searchFor(page: Page, query: string): Promise<void> {
+  await page.locator('.DocSearch-Button').first().click()
+  const input = page.locator('.VPLocalSearchBox .search-input')
+  await input.fill(query)
+  await expect(page.locator('.VPLocalSearchBox .result').first()).toBeVisible()
 }
 
 async function waitForMermaid(page: Page): Promise<void> {
@@ -856,6 +863,27 @@ test('intro documents ask ai workflow', async ({ page }) => {
   await expect(page.locator('.vp-doc')).toContainText('не отправляет текст на сервер')
   await expect(page.locator('.vp-doc')).toContainText('правой кнопкой')
   await expect(page.locator('.vp-doc')).toContainText('на мобильном')
+})
+
+test('local search shows matching excerpts by default', async ({ page }) => {
+  await clearStorage(page)
+  await page.goto('intro')
+  await searchFor(page, 'discount')
+
+  await expect(
+    page.locator('.VPLocalSearchBox .excerpt mark[data-markjs="true"]').filter({ hasText: 'discount' }).first()
+  ).toBeVisible()
+})
+
+test('local search navigation highlights matches on the target page', async ({ page }) => {
+  await clearStorage(page)
+  await page.goto('intro')
+  await searchFor(page, 'customerTier')
+  await page.locator('.VPLocalSearchBox .result').first().click()
+
+  await expect(page).toHaveURL(/\/extras\/01/)
+  await expect(page.locator('.vp-doc mark.kpo-search-hit').filter({ hasText: 'customerTier' }).first()).toBeVisible()
+  await expect(page.locator('.vp-doc .kpo-switcher mark.kpo-search-hit').filter({ hasText: 'customerTier' }).first()).toBeVisible()
 })
 
 test('ask ai context menu appears for selected document text', async ({ page }) => {
