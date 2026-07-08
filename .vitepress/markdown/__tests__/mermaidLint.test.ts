@@ -49,6 +49,15 @@ describe('mermaid lint', () => {
     expect(lintMermaidCode('flowchart TD\n  DB[(Database)] --> Cache[(orders + lines JSON)]')).toEqual([])
   })
 
+  it('rejects classDiagram inheritance arrows inside flowchart', () => {
+    expect(lintMermaidCode('flowchart LR\n  A <|.. B')).toEqual([
+      expect.objectContaining({
+        line: 2,
+        message: expect.stringContaining('classDiagram')
+      })
+    ])
+  })
+
   it('all lecture and extra mermaid fences pass lint', () => {
     const files = [...markdownFiles('lectures'), ...markdownFiles('extras')]
     const failures: string[] = []

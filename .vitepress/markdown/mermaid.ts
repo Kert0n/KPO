@@ -62,8 +62,18 @@ export function assertValidMermaidCode(code: string, source: MermaidLintSource =
 export function lintMermaidCode(code: string): MermaidLintDiagnostic[] {
   const diagnostics: MermaidLintDiagnostic[] = []
   const labelPattern = /\b[A-Za-z][\w-]*\[([^\]\n]+)\]/g
+  const firstDirective = code.split('\n').find((line) => line.trim() !== '')?.trim() ?? ''
+  const isFlowchart = /^(flowchart|graph)\b/.test(firstDirective)
 
   for (const [lineIndex, line] of code.split('\n').entries()) {
+    if (isFlowchart && /<\||\|>/.test(line)) {
+      diagnostics.push({
+        line: lineIndex + 1,
+        snippet: line.trim(),
+        message: 'classDiagram arrows are not valid in flowchart; use classDiagram or flowchart arrows'
+      })
+    }
+
     for (const match of line.matchAll(labelPattern)) {
       const label = match[1].trim()
       if (isQuotedLabel(label) || isMermaidShapeLabel(label)) continue
