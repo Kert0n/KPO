@@ -27,7 +27,6 @@ const PUBLIC_CONTENT_ROUTES = [
   'lectures/14',
   'extras/',
   'extras/01',
-  'extras/02',
   'conclusion'
 ] as const
 

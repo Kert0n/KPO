@@ -21,6 +21,8 @@ export default defineConfig({
   // остальные .md — материалы редактора (черновики, заметки)
   srcExclude: [
     'README.md',
+    'lectures/_*/**',
+    'extras/_*/**',
     'lectures/*/!(vitepress).md',
     'extras/*/!(vitepress).md'
   ],

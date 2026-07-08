@@ -1,62 +1,91 @@
-# КПО — конспект лекций
+# КПО — конспект курса
 
-Интерактивный конспект по конструированию программного обеспечения на [VitePress](https://vitepress.dev). Сайт
-поддерживает многоязычные примеры кода, Kotlin Playground, Mermaid-диаграммы, адаптивные таблицы и регрессионно
-проверенный mobile layout.
+Интерактивный сайт курса «Конструирование программного обеспечения» на VitePress. В репозитории лежат 14 лекций-компаньонов, вводная страница, заключение, дополнительная песочница для практики и технические материалы темы.
+
+Сайт поддерживает примеры на Kotlin, C#, Java и Go, Kotlin Playground, Mermaid-диаграммы, MathJax, адаптивные таблицы, Ask AI prompt-copy workflow и регрессионные UI-тесты.
 
 ## Требования
 
-- Node 24 (`>=24 <25`);
+- Node >=24;
 - npm;
 - Chromium browsers для Playwright UI tests.
 
-Скрипты `prebuild`, `pretest` и `pretest:ui` проверяют major-версию Node, чтобы локальные проверки не проходили случайно
-на Node 20/26.
+Файл `.node-version` содержит `24`. Скрипты `prebuild`, `pretest` и `pretest:ui` проверяют major-версию Node перед локальными проверками.
 
 ## Команды
 
 ```sh
-npm ci            # чистая установка зависимостей
-npm run dev       # дев-сервер
-npm run build     # сборка в .vitepress/dist
-npm run preview   # просмотр собранного сайта
-npm run test      # unit-тесты markdown/theme моделей
-npm run test:ui   # browser-регрессии Playwright
-```
-
-Полный локальный прогон перед изменениями в layout/theme:
-
-```sh
+npm ci
+npm run dev
 npm run test
 npm run build
 npm run test:ui
+npm run pdf
 ```
 
-## Структура контента
+Дополнительные команды:
+
+```sh
+npm run preview
+npm run pdf:published
+```
+
+`npm run pdf` собирает сайт, поднимает локальный `vitepress preview` и экспортирует курс в `output/pdf/kpo-course.pdf`. `npm run pdf:published` использует опубликованный сайт `https://kert0n.github.io/KPO/`.
+
+## Структура курса
 
 ```text
-index.md               — главная (hero)
-intro.md               — onboarding по возможностям сайта
-lectures/LecN/         — папка лекции N
-  ├─ vitepress.md      — публикуемая страница (ЕДИНСТВЕННОЕ, что попадает на сайт)
-  ├─ assets/           — картинки страницы (слайды и т.п.)
-  └─ …                 — черновики, транскрипты, видео: только для редактора,
-                         в сборку и в git не попадают (см. .gitignore и srcExclude)
-extras/NN.md           — дополнение плоским файлом
-extras/NN/vitepress.md — дополнение папкой, если нужны assets/черновики
-extras/index.md        — страница «О дополнениях»
-conclusion.md          — заключение
+index.md                    — главная страница
+intro.md                    — как читать курс и пользоваться возможностями сайта
+lectures/LecN/vitepress.md  — публикуемая страница лекции N
+lectures/LecN/assets/       — изображения лекции
+lectures/_template/         — скрытая заготовка новой лекции
+extras/index.md             — landing page дополнительных материалов
+extras/01.md                — публичная песочница для практики
+extras/_template/           — скрытая заготовка дополнительной темы
+conclusion.md               — финальная карта повторения и практика
+test-fixtures/ui-contract.md — синтетическая страница для UI-регрессий
 ```
 
-Боковая панель, навигация и чистые URL строятся автоматически (`.vitepress/lib/content.ts`):
+Папки, начинающиеся с `_`, не попадают в sidebar и дополнительно исключены из сборки через `srcExclude`. `test-fixtures/ui-contract.md` не является учебным контентом: это контрактная страница для проверки темы. Синтетические кейсы из нее не нужно переносить в лекции ради покрытия UI.
 
-- **добавить лекцию** — создать папку `lectures/Lec15/` с `vitepress.md` (или плоский файл `lectures/15.md`), ничего
-  настраивать не нужно; страница получит URL `/lectures/15`;
-- **заголовок пункта** берётся из frontmatter `title`, иначе из первого `# H1`, иначе «Лекция NN»;
-- **переупорядочить** — номер берётся из имени папки/файла или из `order` во frontmatter;
-- картинки внутри `vitepress.md` подключаются относительными путями: `![…](assets/slide-045.png)`.
+## Как читать
 
-## Переключалка языков: `::: multi-code`
+Начните с `intro.md`, затем проходите лекции по порядку. Каждая лекция самостоятельна: можно открыть нужную тему напрямую и вернуться к вводной странице только за описанием интерфейса. Для экспериментов используйте `/extras/01`: туда удобно переносить фрагменты кода из лекций, менять правила и запускать Kotlin-версии в Playground.
+
+## Как добавить лекцию
+
+```sh
+cp -R lectures/_template lectures/Lec15
+```
+
+Затем отредактируйте `lectures/Lec15/vitepress.md`:
+
+- `title` во frontmatter;
+- `order`;
+- H1;
+- ссылки, диаграммы и примеры.
+
+Папочная страница получит чистый URL `/lectures/15`. Sidebar, nav и rewrites строятся автоматически в `.vitepress/lib/content.ts`.
+
+## Как добавить extra
+
+```sh
+cp -R extras/_template extras/NN
+```
+
+Затем отредактируйте `extras/NN/vitepress.md`:
+
+- `title` во frontmatter;
+- `order`;
+- H1;
+- практические задания и ссылки.
+
+Папочная страница получит URL по номеру каталога. Плоский файл `extras/NN.md` тоже поддерживается, если для темы не нужны assets и черновики.
+
+## Авторские возможности Markdown
+
+### Многоязычные примеры
 
 ````md
 ::: multi-code "Заголовок примера" {default=kotlin playground=off}
@@ -72,82 +101,29 @@ Console.WriteLine("Привет");
 :::
 ````
 
-- Внутри контейнера — только fence-блоки (` ```kotlin `, ` ```csharp `, ` ```java `, ` ```go `; алиасы `kt`, `cs`
-  понимаются).
-- Языки можно указывать не все: если глобально выбранного языка в блоке нет, показывается первый язык блока.
-- `{default=go}` — авторский язык по умолчанию для этого блока. Он сильнее сохранённого глобального языка, пока
-  пользователь не кликнул именно в этот блок. Применяйте, если то что вы хотите проиллюстрировать можно наилучшим
-  образом показать только на конкретном языке.
-- `{playground=off}` — жёстко отключить Kotlin Playground для этого блока: глобальный режим playground его не включит.
-  Применяйте когда код не предназначен для запуска.
-- Выбранный читателем язык общий для всего сайта и хранится в localStorage (`kpo:code-language`), как и режим
-  playground (`kpo:playground-mode`).
+Поддерживаются `kotlin`, `csharp`, `java`, `go` и алиасы `kt`, `cs`. Выбранный язык хранится в `localStorage` как `kpo:code-language`. Опция `{playground=off}` отключает Kotlin Playground для конкретного блока.
 
-Поведение default-ов:
-
-- до первого клика в конкретном блоке `{default=...}` защищён и перебивает сохранённый глобальный язык;
-- после клика в этом блоке он присоединяется к глобальному выбору и дальше переключается вместе с остальными
-  совместимыми блоками;
-- другие блоки с author default остаются защищёнными, пока пользователь не кликнет именно в них;
-- блоки без author default всегда следуют глобальному языку, если такой язык есть в блоке;
-- если глобального языка в блоке нет, используется author default, initial language или первый язык блока.
-
-## Отдельный Kotlin-код для Playground
-
-Код для чтения должен быть коротким, а интерактивная версия требует `main`, тестовых данных или вывода, старайтесь
-добавлять отдельный fence для `kotlin playground`, чтобы пользователь которому не нужен запуск получали менее
-нагруженную страницу:
+Для запускаемой версии Kotlin можно добавить отдельный fence:
 
 ````md
-::: multi-code "Заголовок примера"
-
-```kotlin
-data class User(val id: Int, val name: String)
-```
-
 ```kotlin playground
-data class User(val id: Int, val name: String)
-
 fun main() {
-    println(User(1, "Ада"))
+    println("Запускаемый пример")
 }
 ```
-
-```go
-type User struct {
-    ID   int
-    Name string
-}
-```
-
-:::
 ````
 
-`kotlin playground` не становится отдельной вкладкой и не считается дублем Kotlin. Он используется только как исходник
-интерактивного редактора. Если такого fence нет, Playground берёт обычный `kotlin`-код. `{playground=off}` отключает оба
-варианта.
-
-## Текст для конкретного языка
-
-Блок, видимый только при выбранном языке (внутри — любой markdown):
+### Текст для конкретного языка
 
 ```md
 ::: only kotlin
-> Пояснение, актуальное только для Kotlin. Используйте для больших пояснений особенностей конкретного языка.
+Пояснение, видимое только при выбранном Kotlin.
 :::
 ```
 
-Вставка внутри предложения — компонент `<LangOnly>`:
+Для коротких вставок внутри предложения используйте `<LangOnly lang="go">...</LangOnly>`.
 
-```md
-Программа завершается вызовом <LangOnly lang="go">`os.Exit(0)`</LangOnly>.
-```
-
-Используйте, для краткого уточнения или комментирования конкретного кода в статье (например указывая строки кода).
-
-Показ управляется атрибутом `html[data-kpo-lang]` чистым CSS — секции переключаются мгновенно вместе с примерами кода.
-
-## Диаграммы Mermaid
+### Mermaid
 
 ````md
 ```mermaid
@@ -156,96 +132,65 @@ flowchart LR
 ```
 ````
 
-Mermaid рендерится на клиенте: библиотека грузится лениво только на страницах с диаграммами. Палитра следует light/dark
-теме сайта через theme tokens.
+Mermaid рендерится на клиенте. Build-time lint ловит частые ошибки Mermaid 11, включая использование classDiagram-стрелок внутри `flowchart`/`graph`.
 
-Диаграммы участвуют в общем content layout contract:
+## PDF export
 
-- Mermaid-блок получает wide lane и локальный scroll, если диаграмма шире доступного места;
-- auto-scale старается вписать диаграмму, но не увеличивает маленькие диаграммы выше 100%;
-- wide diagrams начинают локальный overflow из центра, а не с левого края;
-- кнопки масштаба появляются при hover/focus или когда у диаграммы есть локальный overflow;
-- при скрытом левом sidebar включается focused-wide mode: правый outline не занимает место, а Mermaid/table/code
-  получают расширенную центрированную полосу.
+Экспорт реализован собственным Playwright-скриптом `scripts/export-pdf.mjs`. Он:
 
-## Markdown-таблицы
+- экспортирует явный список публичных route в стабильном порядке;
+- не включает главную страницу, retired extras routes, `test-fixtures`, скрытые template folders и черновики;
+- ждет Mermaid и MathJax;
+- падает, если на странице появился `.kpo-mermaid__error`;
+- сохраняет отдельные страницы в `output/pdf/pages/`;
+- объединяет итоговый файл через `pdf-lib`.
 
-Markdown-таблицы получают adaptive layout:
+```sh
+npm run pdf
+npm run pdf:published
+```
 
-- `fit` — таблица помещается без вмешательства;
-- `wrap` — таблица шире контейнера, но колонки ещё достаточно широкие, поэтому текст переносится;
-- `scroll` — таблица слишком плотная, поэтому scroll появляется внутри блока.
+Для визуальной проверки PDF удобно поставить Poppler:
 
-Сам `<table>` остаётся нативной таблицей. Горизонтальный scroll страницы считается багом.
+```sh
+brew install poppler
+pdfinfo output/pdf/kpo-course.pdf
+mkdir -p output/pdf/preview
+pdftoppm -png -f 1 -l 5 output/pdf/kpo-course.pdf output/pdf/preview/page
+```
 
-## Особые блоки и overflow
-
-Тема явно разделяет контент на две полосы:
-
-- **prose lane** — обычные абзацы, заголовки, списки, цитаты, `::: tip`, `::: warning`, `::: details` и другие custom
-  containers. Они остаются в читаемой колонке и переносят длинные ссылки/inline-code.
-- **wide lane** — Mermaid, `multi-code`, одиночные fence-блоки, markdown-таблицы, Kotlin Playground и image-only
-  paragraphs. Они центрируются в доступной области и владеют своим локальным scroll, если контент шире экрана.
-
-Инвариант: страница не должна получать горизонтальный scroll. Широкий контент скроллится только внутри своего блока;
-глобальный `overflow-x: hidden` не используется как маскировка layout-багов.
-
-## Темы и палитра
-
-Единственный источник цветов кода — `.vitepress/lib/palette.ts` (светлая — вдохновлена IntelliJ Light, тёмная —
-вдохновлена Darcula/New UI). Из него собираются:
-
-- две кастомные Shiki-темы (`.vitepress/lib/shikiThemes.ts`) для статической подсветки;
-- CSS-переменные `--kpo-code-*` (`.vitepress/lib/paletteCss.ts`) для CodeMirror в Kotlin Playground.
-
-Поэтому статический код и playground всегда окрашены одинаково, а смена темы не пере-инициализирует редактор. Переменные
-интерфейса — в `.vitepress/theme/styles/vars.css`.
+Сгенерированные PDF игнорируются через `.gitignore`.
 
 ## Тесты
 
-Unit-тесты покрывают чистые модели и markdown pipeline:
+Unit-тесты покрывают markdown pipeline и чистые модели темы:
 
-- markdown-плагины;
-- code block model и persistent state;
-- Mermaid scale/scroll/theme models;
-- adaptive table model;
-- content block model.
+```sh
+npm run test
+```
 
-Browser-регрессии Playwright покрывают пользовательское поведение:
+Browser-регрессии Playwright проверяют реальные страницы:
 
-- language/default semantics;
-- playground hard gate;
-- Mermaid rendering, zoom, dark theme и text fit;
-- sidebar URL stability;
-- footer date format;
-- mobile page overflow sweep;
-- adaptive tables wrap-before-scroll;
-- wide lane centering.
+```sh
+npm run build
+npm run test:ui
+```
 
-## Публикация на GitHub Pages — пошагово
+Перед публикацией используйте полный прогон:
 
-1. **Репозиторий.** Код должен лежать в GitHub-репозитории с именем `KPO`
-   (имя обязано совпадать с `base: '/KPO/'` в `.vitepress/config.mts`;
-   если репозиторий называется иначе — поменяйте `base`).
-2. **Ветка.** Workflow `.github/workflows/deploy.yml` запускается при пуше
-   в ветку `master` (основная ветка этого репозитория). Если ваша основная
-   ветка называется иначе, поправьте `branches: [master]` в workflow.
-3. **Включить Pages.** На GitHub: *Settings → Pages → Build and deployment →
-   Source: **GitHub Actions***. Больше ничего настраивать не нужно.
-4. **Запушить.** Любой пуш в основную ветку собирает сайт (`npm ci` +
-   `vitepress build`) и публикует его. Прогресс виден во вкладке *Actions*.
-5. **Адрес.** Сайт появится на `https://<логин>.github.io/KPO/`
-   (для этого репозитория — https://kert0n.github.io/KPO/).
+```sh
+npm exec --yes --package=node@24 -- npm run test
+npm exec --yes --package=node@24 -- npm run build
+npm exec --yes --package=node@24 -- npm run test:ui
+npm run pdf
+```
 
-Замечания:
+## Публикация на GitHub Pages
 
-- публичный репозиторий публикуется на Pages бесплатно; для приватного нужен GitHub Pro;
-- первый деплой после включения Pages может занять пару минут;
-- проверить сборку локально перед пушем: `npm run build && npm run preview`.
+Workflow `.github/workflows/deploy.yml` собирает сайт при пуше в `master` и публикует `.vitepress/dist` через GitHub Pages. Репозиторий должен называться `KPO`, потому что в `.vitepress/config.mts` задан `base: '/KPO/'`.
+
+Адрес опубликованного сайта: https://kert0n.github.io/KPO/
 
 ## Лицензия
 
 Проект распространяется по GNU General Public License v3.0 or later (`GPL-3.0-or-later`). См. [LICENSE](./LICENSE).
-
-Лицензия применяется к исходному коду темы, markdown-плагинам, конфигурации и учебным материалам репозитория, если для
-отдельного файла явно не указано иное. Сторонние зависимости, шрифты и библиотеки сохраняют собственные лицензии.

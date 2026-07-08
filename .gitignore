@@ -19,8 +19,13 @@ lectures/*/*
 !lectures/*/vitepress.md
 !lectures/*/assets/
 !lectures/*/assets/**
+!lectures/_template/
+!lectures/_template/**
 extras/*/*
 !extras/*/vitepress.md
 !extras/*/assets/
 !extras/*/assets/**
+!extras/_template/
+!extras/_template/**
 /.lecture-tree/
+output/pdf/
