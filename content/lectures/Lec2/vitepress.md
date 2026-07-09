@@ -1290,6 +1290,20 @@ flowchart TD
 - Lifecycle влияет на поведение программы: transient, singleton и scoped дают разные гарантии.
 - DI делает тестирование естественным, потому что реальные реализации можно заменить fake или mock.
 
+## Дополнительное чтение
+
+Материалы закрывают основные варианты передачи зависимостей, Service Locator и жизненный цикл объектов в контейнере.
+
+### DI и Service Locator
+
+- [Внедрение зависимостей](https://topjava.ru/blog/back-to-basics-dependency-injection) — базовое объяснение dependency injection.
+- [Service Locator](https://sergeyteplyakov.blogspot.com/2013/03/di-service-locator.html) — разбор подхода и его последствий для дизайна.
+- [Отличие Dependency Injection от Service Locator](https://habr.com/ru/articles/465395/) — сравнение двух способов получения зависимостей.
+
+### Жизненный цикл зависимостей
+
+- [Жизненный цикл зависимостей](https://metanit.com/sharp/dotnet/1.3.php) — singleton, scoped и transient на примере .NET.
+
 ## Самопроверка
 
 1. Почему `private val engine: Engine = GasEngine()` все еще нарушает DIP?

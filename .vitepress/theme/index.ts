@@ -4,6 +4,7 @@ import { h } from 'vue'
 import AskAiContextMenu from './components/AskAiContextMenu.vue'
 import AskAiProviderSelect from './components/AskAiProviderSelect.vue'
 import CodeSwitcher from './components/CodeSwitcher.vue'
+import AdditionalReadingsIndex from './components/AdditionalReadingsIndex.vue'
 import KpoNavBarExtra from './components/KpoNavBarExtra.vue'
 import LangOnly from './components/LangOnly.vue'
 import MermaidDiagram from './components/MermaidDiagram.vue'
@@ -17,6 +18,7 @@ import './styles/vars.css'
 import './styles/layout.css'
 import './styles/vitepress-adapter.css'
 import './styles/content-lanes.css'
+import './styles/additional-readings.css'
 import './styles/code.css'
 import './styles/playground.css'
 import './styles/ask-ai.css'
@@ -37,6 +39,7 @@ export default {
     })
   },
   enhanceApp({ app, router }) {
+    app.component('AdditionalReadingsIndex', AdditionalReadingsIndex)
     app.component('AskAiContextMenu', AskAiContextMenu)
     app.component('CodeSwitcher', CodeSwitcher)
     app.component('LangOnly', LangOnly)

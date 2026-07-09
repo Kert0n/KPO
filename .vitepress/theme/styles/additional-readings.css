@@ -1,0 +1,57 @@
+.kpo-additional-readings {
+  display: grid;
+  gap: 2rem;
+  margin-top: 2rem;
+}
+
+.kpo-additional-readings__lecture {
+  border-top: 1px solid var(--vp-c-divider);
+  padding-top: 1.5rem;
+}
+
+.kpo-additional-readings__header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.vp-doc .kpo-additional-readings__header h2 {
+  margin: 0;
+  border-top: 0;
+  padding-top: 0;
+}
+
+.kpo-additional-readings__lecture-link {
+  flex: 0 0 auto;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.kpo-additional-readings__group {
+  margin-top: 1.25rem;
+}
+
+.vp-doc .kpo-additional-readings__group h3 {
+  margin-top: 0;
+}
+
+.vp-doc .kpo-additional-readings__group ul {
+  margin: 0;
+}
+
+.kpo-additional-readings__note {
+  color: var(--vp-c-text-2);
+}
+
+@media (max-width: 639px) {
+  .kpo-additional-readings__header {
+    display: block;
+  }
+
+  .kpo-additional-readings__lecture-link {
+    display: inline-block;
+    margin-top: 0.35rem;
+  }
+}
