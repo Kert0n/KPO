@@ -3,6 +3,8 @@ node_modules/
 .vitepress/cache/
 .vitepress/dist/
 test-results/
+analysis-results/
+analysis/
 \#/
 
 # Системное, IDE и логи

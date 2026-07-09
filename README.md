@@ -17,7 +17,9 @@
 ```sh
 npm ci
 npm run dev
+npm run typecheck
 npm run test
+npm run audit
 npm run build
 npm run test:ui
 npm run pdf
@@ -27,6 +29,8 @@ npm run pdf
 
 ```sh
 npm run preview
+npm run dev:host
+npm run preview:host
 npm run pdf:published
 ```
 
@@ -170,6 +174,12 @@ Unit-тесты покрывают markdown pipeline и чистые модел�
 npm run test
 ```
 
+TypeScript, security audit, unit-тесты и сборка объединены в полный локальный gate:
+
+```sh
+npm run verify
+```
+
 Browser-регрессии Playwright проверяют реальные страницы:
 
 ```sh
@@ -181,7 +191,7 @@ npm run test:ui
 
 ```sh
 npm exec --yes --package=node@24 -- npm run test
-npm exec --yes --package=node@24 -- npm run build
+npm exec --yes --package=node@24 -- npm run verify
 npm exec --yes --package=node@24 -- npm run test:ui
 npm run pdf
 ```

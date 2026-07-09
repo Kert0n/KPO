@@ -219,7 +219,7 @@
   border-radius: 6px;
   background: var(--vp-c-bg-soft);
   color: var(--vp-c-text-1);
-  font: 13px/1.5 var(--vp-font-family-mono);
+  font: 13px/1.5 var(--vp-font-family-mono), monospace;
   resize: vertical;
 }
 

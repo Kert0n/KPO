@@ -134,7 +134,6 @@ export function resolveAskAiProviderAction(
     prompt,
     copyPrompt: true,
     openUrl: provider === 'claude' ? 'https://claude.ai/new' : 'https://chat.deepseek.com/',
-    usesDeeplink: false,
     toastKind: 'copied-and-opened'
   }
 }
@@ -384,4 +383,3 @@ function trimMiddle(value: string, maxChars: number): string {
 function normalizeText(value: string): string {
   return value.replace(/\r\n?/g, '\n').trim()
 }
-

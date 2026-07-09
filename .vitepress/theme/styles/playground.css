@@ -40,7 +40,7 @@
   height: auto;
   background: var(--vp-code-block-bg);
   color: var(--kpo-code-fg);
-  font-family: var(--vp-font-family-mono);
+  font-family: var(--vp-font-family-mono), monospace;
   font-size: var(--vp-code-font-size);
   line-height: var(--vp-code-line-height);
 }
@@ -62,7 +62,7 @@
 
 .kpo-playground .CodeMirror-linenumber {
   color: var(--kpo-code-line-number);
-  font-family: var(--vp-font-family-mono);
+  font-family: var(--vp-font-family-mono), monospace;
   font-size: var(--vp-code-font-size);
 }
 
@@ -153,7 +153,7 @@
   padding: 4px 12px;
   border-top: 1px solid var(--vp-c-divider);
   color: var(--vp-c-text-3);
-  font-family: var(--vp-font-family-base);
+  font-family: var(--vp-font-family-base), sans-serif;
   font-size: 0.6875rem;
 }
 
@@ -165,7 +165,7 @@
   border-top: 1px solid var(--vp-c-divider);
   background: var(--vp-c-bg-alt);
   color: var(--vp-c-text-1);
-  font-family: var(--vp-font-family-mono);
+  font-family: var(--vp-font-family-mono), monospace;
   font-size: var(--vp-code-font-size);
   line-height: var(--vp-code-line-height);
 }

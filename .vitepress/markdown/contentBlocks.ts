@@ -1,4 +1,6 @@
 import type MarkdownIt from 'markdown-it'
+import type { Options } from 'markdown-it'
+import type Renderer from 'markdown-it/lib/renderer.mjs'
 import type Token from 'markdown-it/lib/token.mjs'
 import { askAiBlockAttribute } from './askAiAnchors'
 import { isImageOnlyParagraph } from './tokenUtils'
@@ -96,9 +98,9 @@ function findParagraphClose(tokens: Token[], openIndex: number): number {
 function renderToken(
   tokens: Token[],
   index: number,
-  options: MarkdownIt.Options,
+  options: Options,
   _env: unknown,
-  self: MarkdownIt.Renderer
+  self: Renderer
 ): string {
   return self.renderToken(tokens, index, options)
 }
