@@ -5,17 +5,16 @@ import matter from 'gray-matter'
 
 /**
  * Автоматическое построение сайдбара, навигации и rewrites
- * из файловой системы.
+ * из content/ — единственного VitePress srcDir.
  *
  * Элемент раздела — одно из двух:
- *  - плоский файл `NN.md` (например, extras/01.md);
  *  - папка с публикуемой страницей `vitepress.md` (например,
  *    lectures/Lec1/vitepress.md) — остальное содержимое папки
  *    (черновики, транскрипты, видео) принадлежит редактору
  *    и в сборку не попадает (см. srcExclude в config.mts).
  *
  * Папочные страницы через rewrites получают чистые URL вида
- * /lectures/01 — те же, что у плоских файлов.
+ * /lectures/01, /extras/01, /intro.
  *
  * Порядок: frontmatter `order` → число в имени (Lec7 → 7, 03.md → 3).
  * Заголовок: frontmatter `title` → первый H1 → «Лекция NN»/«Дополнение NN».
@@ -31,6 +30,15 @@ type Page = {
 }
 
 const root = process.cwd()
+const contentRoot = resolve(root, 'content')
+
+const staticRewrites: Record<string, string> = {
+  'home/vitepress.md': 'index.md',
+  'intro/vitepress.md': 'intro.md',
+  'conclusion/vitepress.md': 'conclusion.md',
+  'extras/index/vitepress.md': 'extras/index.md',
+  'service-pages/ui-contract/vitepress.md': 'service-pages/ui-contract.md'
+}
 
 const sections = [
   { directory: 'lectures', fallback: 'Лекция' },
@@ -84,7 +92,7 @@ export function getNav(): DefaultTheme.NavItem[] {
 
 /** Карта rewrites для папочных страниц: lectures/Lec1/vitepress.md → lectures/01.md */
 export function getRewrites(): Record<string, string> {
-  const rewrites: Record<string, string> = {}
+  const rewrites: Record<string, string> = { ...staticRewrites }
 
   for (const section of sections) {
     for (const page of scanPages(section.directory)) {
@@ -100,13 +108,13 @@ export function getFirstLectureLink(): string {
 }
 
 function scanPages(directory: (typeof sections)[number]['directory']): Page[] {
-  const directoryPath = resolve(root, directory)
+  const directoryPath = resolve(contentRoot, directory)
   if (!existsSync(directoryPath)) return []
 
   const fallback = sections.find((s) => s.directory === directory)!.fallback
 
   const pages = readdirSync(directoryPath, { withFileTypes: true })
-    .filter((entry) => !entry.name.startsWith('_') && !entry.name.startsWith('.'))
+    .filter((entry) => entry.name !== 'index' && !entry.name.startsWith('_') && !entry.name.startsWith('.'))
     .map((entry) => toPage(directory, entry, fallback))
     .filter((page): page is Page => page !== null)
     .sort((a, b) => a.order - b.order || a.link.localeCompare(b.link, 'ru'))
@@ -121,19 +129,8 @@ function toPage(
   entry: { name: string; isFile(): boolean; isDirectory(): boolean },
   fallback: string
 ): Page | null {
-  if (entry.isFile()) {
-    if (!entry.name.endsWith('.md') || entry.name === 'index.md') return null
-
-    const order = extractNumber(entry.name)
-    return {
-      text: extractTitle(join(root, directory, entry.name), fallback, order),
-      link: `/${directory}/${entry.name.replace(/\.md$/, '')}`,
-      order
-    }
-  }
-
   if (entry.isDirectory()) {
-    const source = join(root, directory, entry.name, 'vitepress.md')
+    const source = join(contentRoot, directory, entry.name, 'vitepress.md')
     if (!existsSync(source)) return null
 
     const order = extractNumber(entry.name)

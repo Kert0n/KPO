@@ -4,8 +4,8 @@ import { buildAskAiPageContext } from '../askAiContext'
 describe('askAiContext', () => {
   it('extracts stable markdown blocks for code, mermaid, table and multi-code', () => {
     const context = buildAskAiPageContext({
-      routeKey: 'test-fixtures/ui-contract',
-      sourcePath: 'test-fixtures/ui-contract.md'
+      routeKey: 'service-pages/ui-contract',
+      sourcePath: 'content/service-pages/ui-contract/vitepress.md'
     }, {
       courseTitle: 'Course',
       courseDescription: 'Description'

@@ -10,6 +10,7 @@ export default defineConfig({
   title: 'Конструирование ПО',
   description: 'Конспект лекций по архитектуре приложений и инженерным практикам',
   base: '/KPO/',
+  srcDir: 'content',
   cleanUrls: true,
   lastUpdated: true,
 
@@ -20,11 +21,12 @@ export default defineConfig({
   // В папках лекций/дополнений публикуется только vitepress.md;
   // остальные .md — материалы редактора (черновики, заметки)
   srcExclude: [
-    'README.md',
     'lectures/_*/**',
     'extras/_*/**',
+    'service-pages/_*/**',
     'lectures/*/!(vitepress).md',
-    'extras/*/!(vitepress).md'
+    'extras/*/!(vitepress).md',
+    'service-pages/*/!(vitepress).md'
   ],
 
   head: [
@@ -47,6 +49,13 @@ export default defineConfig({
   },
 
   vite: {
+    build: {
+      // Code examples intentionally stay searchable. The local search index and
+      // lazy Mermaid/Kotlin Playground chunks are larger than Vite's default
+      // 500 KiB raw threshold, but the limit stays below 1 MiB so real
+      // regressions remain visible.
+      chunkSizeWarningLimit: 900
+    },
     plugins: [
       askAiContextPlugin({
         base: '/KPO/',
@@ -71,6 +80,7 @@ export default defineConfig({
     search: {
       provider: 'local',
       options: {
+        detailedView: true,
         translations: {
           button: {
             buttonText: 'Поиск',

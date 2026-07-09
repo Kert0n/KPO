@@ -59,7 +59,7 @@ describe('mermaid lint', () => {
   })
 
   it('all lecture and extra mermaid fences pass lint', () => {
-    const files = [...markdownFiles('lectures'), ...markdownFiles('extras')]
+    const files = [...markdownFiles('content/lectures'), ...markdownFiles('content/extras')]
     const failures: string[] = []
 
     for (const file of files) {

@@ -8,7 +8,7 @@
   },
   "scripts": {
     "dev": "vitepress dev --host 0.0.0.0",
-    "prebuild": "node .vitepress/scripts/assert-node-version.mjs",
+    "prebuild": "node .vitepress/scripts/assert-node-version.mjs && node .vitepress/scripts/assert-content-contract.mjs",
     "build": "vitepress build",
     "preview": "vitepress preview --host 0.0.0.0",
     "pretest": "node .vitepress/scripts/assert-node-version.mjs",

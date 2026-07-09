@@ -15,17 +15,23 @@ npm-debug.log*
 # Материалы редактора в папках лекций и дополнений:
 # публикуются (и коммитятся) только vitepress.md и его ресурсы (assets/).
 # Черновики, заметки, транскрипты, видео и PDF живут только локально.
-lectures/*/*
-!lectures/*/vitepress.md
-!lectures/*/assets/
-!lectures/*/assets/**
-!lectures/_template/
-!lectures/_template/**
-extras/*/*
-!extras/*/vitepress.md
-!extras/*/assets/
-!extras/*/assets/**
-!extras/_template/
-!extras/_template/**
+content/lectures/*/*
+!content/lectures/*/vitepress.md
+!content/lectures/*/assets/
+!content/lectures/*/assets/**
+!content/lectures/_template/
+!content/lectures/_template/**
+content/extras/*/*
+!content/extras/*/vitepress.md
+!content/extras/*/assets/
+!content/extras/*/assets/**
+!content/extras/_template/
+!content/extras/_template/**
+!content/extras/index/
+!content/extras/index/vitepress.md
+content/service-pages/*/*
+!content/service-pages/*/vitepress.md
+!content/service-pages/_internal/
+!content/service-pages/_internal/**
 /.lecture-tree/
 output/pdf/
