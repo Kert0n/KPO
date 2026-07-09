@@ -9,7 +9,6 @@ import LangOnly from './components/LangOnly.vue'
 import MermaidDiagram from './components/MermaidDiagram.vue'
 import SidebarToggle from './components/SidebarToggle.vue'
 import { installAdaptiveTables } from './lib/adaptiveTables'
-import { installSearchResultHighlight } from './lib/searchResultHighlight'
 
 import '@fontsource-variable/inter'
 import '@fontsource-variable/jetbrains-mono'
@@ -22,7 +21,6 @@ import './styles/code.css'
 import './styles/playground.css'
 import './styles/ask-ai.css'
 import './styles/print.css'
-import './styles/search.css'
 
 export default {
   extends: DefaultTheme,
@@ -44,6 +42,5 @@ export default {
     app.component('LangOnly', LangOnly)
     app.component('MermaidDiagram', MermaidDiagram)
     installAdaptiveTables(router)
-    installSearchResultHighlight(router)
   }
 } satisfies Theme

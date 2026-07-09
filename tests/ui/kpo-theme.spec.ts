@@ -57,11 +57,39 @@ async function searchFor(page: Page, query: string): Promise<void> {
   await expect(page.locator('.VPLocalSearchBox .result').first()).toBeVisible()
 }
 
-async function waitForMermaid(page: Page): Promise<void> {
-  await page.waitForFunction(() => {
+async function waitForMermaid(
+  page: Page,
+  options: { requireDiagrams?: boolean } = {}
+): Promise<void> {
+  await page.locator('.vp-doc').first().waitFor({ state: 'attached' })
+
+  if (!options.requireDiagrams) {
+    await page.evaluate(() => {
+      return new Promise<void>((resolve) => {
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+      })
+    })
+
+    if (await page.locator('.kpo-mermaid').count() === 0) return
+  }
+
+  await page.waitForFunction((requireDiagrams) => {
     const diagrams = [...document.querySelectorAll('.kpo-mermaid')]
+    if (diagrams.length === 0) return !requireDiagrams
+
     return diagrams.every((diagram) => {
-      return diagram.querySelector('svg') || diagram.querySelector('.kpo-mermaid__error')
+      const svg = diagram.querySelector('svg')
+      if (diagram.querySelector('.kpo-mermaid__error')) return true
+      if (!svg) return false
+
+      const rect = svg.getBoundingClientRect()
+      return rect.width > 0 && rect.height > 0
+    })
+  }, options.requireDiagrams ?? false)
+
+  await page.evaluate(() => {
+    return new Promise<void>((resolve) => {
+      requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
     })
   })
 }
@@ -868,22 +896,27 @@ test('intro documents ask ai workflow', async ({ page }) => {
 test('local search shows matching excerpts by default', async ({ page }) => {
   await clearStorage(page)
   await page.goto('intro')
-  await searchFor(page, 'discount')
+  await searchFor(page, 'customerTier')
+
+  const result = page.locator('.VPLocalSearchBox .result').first()
+  await expect(result).toHaveAttribute('href', /\/extras\/01#runnable-kotlin-playground/)
 
   await expect(
-    page.locator('.VPLocalSearchBox .excerpt mark[data-markjs="true"]').filter({ hasText: 'discount' }).first()
+    page.locator('.VPLocalSearchBox .excerpt mark[data-markjs="true"]').filter({ hasText: /customerTier|CustomerTier/ }).first()
   ).toBeVisible()
 })
 
-test('local search navigation highlights matches on the target page', async ({ page }) => {
+test('local search result navigates to the matched section', async ({ page }) => {
   await clearStorage(page)
   await page.goto('intro')
   await searchFor(page, 'customerTier')
-  await page.locator('.VPLocalSearchBox .result').first().click()
+  const result = page.locator('.VPLocalSearchBox .result').first()
 
-  await expect(page).toHaveURL(/\/extras\/01/)
-  await expect(page.locator('.vp-doc mark.kpo-search-hit').filter({ hasText: 'customerTier' }).first()).toBeVisible()
-  await expect(page.locator('.vp-doc .kpo-switcher mark.kpo-search-hit').filter({ hasText: 'customerTier' }).first()).toBeVisible()
+  await expect(result).toHaveAttribute('href', /\/extras\/01#runnable-kotlin-playground/)
+  await result.click()
+
+  await expect(page).toHaveURL(/\/extras\/01#runnable-kotlin-playground/)
+  await expect(page.getByRole('heading', { name: 'Runnable Kotlin Playground' })).toBeVisible()
 })
 
 test('ask ai context menu appears for selected document text', async ({ page }) => {
@@ -1211,7 +1244,7 @@ test('ask ai mobile bubble appears after text selection', async ({ page }) => {
 test('code switchers without author defaults follow the latest global language', async ({ page }) => {
   await clearStorage(page)
   await page.goto(UI_FIXTURE_ROUTE)
-  await waitForMermaid(page)
+  await waitForMermaid(page, { requireDiagrams: true })
   await expectNoGlobalOverflowMask(page)
   await expectNoPageOverflowFromVpDoc(page)
 
@@ -1258,7 +1291,7 @@ test('fixture renders mermaid and keeps playground disabled for marked blocks', 
   })
   await page.goto(UI_FIXTURE_ROUTE)
 
-  await waitForMermaid(page)
+  await waitForMermaid(page, { requireDiagrams: true })
 
   await expect.poll(async () => page.locator('.kpo-mermaid').count()).toBeGreaterThan(0)
   await expect(page.locator('.kpo-mermaid__error')).toHaveCount(0)
@@ -1273,7 +1306,7 @@ test('fixture text code blocks keep overflow local on mobile', async ({ page }) 
   await page.setViewportSize(LAYOUT_VIEWPORTS.mobilePhone)
   await clearStorage(page)
   await page.goto(UI_FIXTURE_ROUTE)
-  await waitForMermaid(page)
+  await waitForMermaid(page, { requireDiagrams: true })
 
   const textBlock = page.locator('.language-text').filter({
     hasText: 'Пример функционального тестирования'
@@ -1338,7 +1371,7 @@ test('last updated footer uses european date with AM PM time', async ({ page }) 
 test('hidden sidebar expands wide content lane but keeps prose narrow', async ({ page }) => {
   await page.setViewportSize(LAYOUT_VIEWPORTS.desktop)
   await page.goto(UI_FIXTURE_ROUTE)
-  await waitForMermaid(page)
+  await waitForMermaid(page, { requireDiagrams: true })
 
   const open = await measureWideLane(page)
   const beforeUrl = page.url()
@@ -1362,7 +1395,7 @@ test('moderately wide mermaid diagrams fit the expanded lane when sidebar is hid
   const fitted = []
 
   await page.goto(UI_FIXTURE_ROUTE)
-  await waitForMermaid(page)
+  await waitForMermaid(page, { requireDiagrams: true })
   const openMetrics = await getMermaidMetrics(page)
 
   await hideSidebar(page)
@@ -1373,7 +1406,10 @@ test('moderately wide mermaid diagrams fit the expanded lane when sidebar is hid
     return openMetrics[item.index]?.hasLocalXScroll && !item.hasLocalXScroll
   }))
 
-  expect(fitted.length).toBeGreaterThan(0)
+  expect(
+    fitted.length,
+    JSON.stringify({ openMetrics, hiddenMetrics }, null, 2)
+  ).toBeGreaterThan(0)
 
   for (const item of fitted) {
     expect(item.hasLocalXScroll).toBe(false)
@@ -1388,7 +1424,7 @@ test('small mermaid diagrams are not auto-upscaled on mobile', async ({ page }) 
   await page.setViewportSize(LAYOUT_VIEWPORTS.mobilePhone)
   await page.goto(UI_FIXTURE_ROUTE)
   await expect.poll(async () => page.locator('.kpo-mermaid').count()).toBeGreaterThan(0)
-  await waitForMermaid(page)
+  await waitForMermaid(page, { requireDiagrams: true })
 
   const metrics = await getMermaidMetrics(page)
   const small = metrics.filter((item) => item.viewBoxWidth <= item.containerClientWidth)
@@ -1405,7 +1441,7 @@ test('small mermaid diagrams are not auto-upscaled on mobile', async ({ page }) 
 test('very wide mermaid diagrams stay readable and scroll locally on desktop', async ({ page }) => {
   await page.setViewportSize(LAYOUT_VIEWPORTS.desktop)
   await page.goto(UI_FIXTURE_ROUTE)
-  await waitForMermaid(page)
+  await waitForMermaid(page, { requireDiagrams: true })
   await hideSidebar(page)
   await expectNoPageOverflowFromVpDoc(page)
 
@@ -1453,7 +1489,7 @@ test('hidden sidebar enters focused-wide mode and removes the outline from layou
 test('mermaid zoom controls adjust scale without page overflow', async ({ page }) => {
   await page.setViewportSize(LAYOUT_VIEWPORTS.desktop)
   await page.goto(UI_FIXTURE_ROUTE)
-  await waitForMermaid(page)
+  await waitForMermaid(page, { requireDiagrams: true })
 
   const diagram = page.locator('.kpo-mermaid').first()
   const svg = diagram.locator('svg')
@@ -1481,7 +1517,7 @@ test('mermaid zoom controls adjust scale without page overflow', async ({ page }
 test('fixture theme switch does not create page overflow or rely on global overflow masking', async ({ page }) => {
   await page.setViewportSize(LAYOUT_VIEWPORTS.desktop)
   await page.goto(UI_FIXTURE_ROUTE)
-  await waitForMermaid(page)
+  await waitForMermaid(page, { requireDiagrams: true })
 
   await expectNoGlobalOverflowMask(page)
   await expectNoPageOverflowFromVpDoc(page)
@@ -1522,7 +1558,7 @@ test('language click preserves viewport position inside the interacted code bloc
   await page.setViewportSize(LAYOUT_VIEWPORTS.desktop)
   await clearStorage(page)
   await page.goto(UI_FIXTURE_ROUTE)
-  await waitForMermaid(page)
+  await waitForMermaid(page, { requireDiagrams: true })
 
   const switcher = page.locator('.kpo-switcher').nth(1)
   await switcher.scrollIntoViewIfNeeded()
@@ -1541,7 +1577,7 @@ test('keyboard language switch preserves viewport position inside the interacted
   await page.setViewportSize(LAYOUT_VIEWPORTS.desktop)
   await clearStorage(page)
   await page.goto(UI_FIXTURE_ROUTE)
-  await waitForMermaid(page)
+  await waitForMermaid(page, { requireDiagrams: true })
 
   const switcher = page.locator('.kpo-switcher').nth(1)
   await switcher.scrollIntoViewIfNeeded()
@@ -1561,7 +1597,7 @@ test('playground toggle preserves viewport position inside the interacted code b
   await page.setViewportSize(LAYOUT_VIEWPORTS.desktop)
   await clearStorage(page)
   await page.goto(UI_FIXTURE_ROUTE)
-  await waitForMermaid(page)
+  await waitForMermaid(page, { requireDiagrams: true })
 
   const switcher = page.locator('.kpo-switcher').nth(4)
   await switcher.scrollIntoViewIfNeeded()
@@ -1583,7 +1619,7 @@ test('overflowing mermaid diagrams start centered in their local viewport', asyn
   ]) {
     await page.setViewportSize(viewport)
     await page.goto(UI_FIXTURE_ROUTE)
-    await waitForMermaid(page)
+    await waitForMermaid(page, { requireDiagrams: true })
 
     await expect.poll(async () => {
       return page.locator('.kpo-mermaid__viewport').evaluateAll((nodes) => {
@@ -1611,7 +1647,7 @@ test('overflowing mermaid diagrams start centered in their local viewport', asyn
 test('manual mermaid scroll is preserved across zoom and reset recenters', async ({ page }) => {
   await page.setViewportSize(LAYOUT_VIEWPORTS.mobilePhone)
   await page.goto(UI_FIXTURE_ROUTE)
-  await waitForMermaid(page)
+  await waitForMermaid(page, { requireDiagrams: true })
 
   const diagram = page.locator('.kpo-mermaid').filter({
     has: page.locator('.kpo-mermaid__viewport')
@@ -1654,7 +1690,7 @@ test('manual mermaid scroll is preserved across zoom and reset recenters', async
 test('mermaid zoom controls visibility follows overflow, hover and focus', async ({ page }) => {
   await page.setViewportSize(LAYOUT_VIEWPORTS.desktop)
   await page.goto(UI_FIXTURE_ROUTE)
-  await waitForMermaid(page)
+  await waitForMermaid(page, { requireDiagrams: true })
   await hideSidebar(page)
 
   const fittingIndex = await page.locator('.kpo-mermaid').evaluateAll((nodes) => {
@@ -1678,7 +1714,7 @@ test('mermaid zoom controls visibility follows overflow, hover and focus', async
 
   await page.setViewportSize(LAYOUT_VIEWPORTS.mobilePhone)
   await page.goto(UI_FIXTURE_ROUTE)
-  await waitForMermaid(page)
+  await waitForMermaid(page, { requireDiagrams: true })
 
   const overflowing = page.locator('.kpo-mermaid--has-overflow').first()
   await expect(overflowing.locator('.kpo-mermaid__toolbar')).toHaveCSS('opacity', '1')
@@ -1688,7 +1724,7 @@ test('mermaid zoom controls visibility follows overflow, hover and focus', async
 test('fixture mermaid dark theme keeps label colors readable and token-based', async ({ page }) => {
   await page.setViewportSize(LAYOUT_VIEWPORTS.desktop)
   await page.goto(UI_FIXTURE_ROUTE)
-  await waitForMermaid(page)
+  await waitForMermaid(page, { requireDiagrams: true })
 
   const isDark = await page.locator('html').evaluate((node) => node.classList.contains('dark'))
   if (!isDark) {
@@ -1738,7 +1774,7 @@ test('public mermaid dark theme labels are readable when present', async ({ page
 test('fixture mermaid text and foreignObject labels are not clipped', async ({ page }) => {
   await page.setViewportSize(LAYOUT_VIEWPORTS.desktop)
   await page.goto(UI_FIXTURE_ROUTE)
-  await waitForMermaid(page)
+  await waitForMermaid(page, { requireDiagrams: true })
 
   await expect.poll(async () => page.locator('.kpo-mermaid svg .nodeLabel, .kpo-mermaid svg .edgeLabel span').count())
     .toBeGreaterThan(0)
@@ -1767,7 +1803,7 @@ test('wide tables are centered in the hidden-sidebar wide lane', async ({ page }
   await page.setViewportSize(LAYOUT_VIEWPORTS.desktop)
 
   await page.goto(UI_FIXTURE_ROUTE)
-  await waitForMermaid(page)
+  await waitForMermaid(page, { requireDiagrams: true })
   await waitForAdaptiveTables(page)
   await hideSidebar(page)
   await waitForAdaptiveTables(page)
@@ -1809,7 +1845,7 @@ test('wide elements use the expanded lane when sidebar is hidden', async ({ page
 
   for (const item of cases) {
     await page.goto(item.route)
-    await waitForMermaid(page)
+    await waitForMermaid(page, { requireDiagrams: true })
     await waitForAdaptiveTables(page)
 
     if (item.playground) {
@@ -1877,7 +1913,7 @@ test('markdown tables wrap before falling back to local scroll on mobile', async
   await page.setViewportSize(LAYOUT_VIEWPORTS.mobilePhone)
 
   await page.goto(UI_FIXTURE_ROUTE)
-  await waitForMermaid(page)
+  await waitForMermaid(page, { requireDiagrams: true })
   await waitForAdaptiveTables(page)
 
   const states = await getAdaptiveTableStates(page)
@@ -1905,7 +1941,7 @@ test('markdown tables wrap before falling back to local scroll on mobile', async
 test('dense markdown tables keep overflow local after wrap is not readable', async ({ page }) => {
   await page.setViewportSize(LAYOUT_VIEWPORTS.mobilePhone)
   await page.goto(UI_FIXTURE_ROUTE)
-  await waitForMermaid(page)
+  await waitForMermaid(page, { requireDiagrams: true })
   await waitForAdaptiveTables(page)
 
   const states = await getAdaptiveTableStates(page)
@@ -1927,7 +1963,7 @@ test('dense markdown tables keep overflow local after wrap is not readable', asy
 test('markdown tables preserve native table display in every adaptive mode', async ({ page }) => {
   await page.setViewportSize(LAYOUT_VIEWPORTS.mobilePhone)
   await page.goto(UI_FIXTURE_ROUTE)
-  await waitForMermaid(page)
+  await waitForMermaid(page, { requireDiagrams: true })
   await waitForAdaptiveTables(page)
 
   const states = await getAdaptiveTableStates(page)
@@ -1947,7 +1983,7 @@ test('wide mermaid diagrams keep readable size and scroll locally on mobile', as
 
   for (const route of [UI_FIXTURE_ROUTE]) {
     await page.goto(route)
-    await waitForMermaid(page)
+    await waitForMermaid(page, { requireDiagrams: true })
 
     const metrics = await getMermaidMetrics(page)
     const wide = metrics.filter((item) => item.viewBoxWidth > item.containerClientWidth)
@@ -2038,7 +2074,7 @@ test('special content elements are viewport-contained on mobile', async ({ page 
       await page.reload()
     }
 
-    await waitForMermaid(page)
+    await waitForMermaid(page, { requireDiagrams: true })
 
     if (item.playground) {
       await page.locator('.kpo-switcher').first().getByRole('tab', { name: 'Kotlin' }).click()
