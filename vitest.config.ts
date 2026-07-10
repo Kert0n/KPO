@@ -2,7 +2,7 @@ import { defineConfig } from 'vitest/config'
 
 export default defineConfig({
   test: {
-    include: ['.vitepress/**/*.test.ts'],
+    include: ['.vitepress/**/*.test.ts', 'tests/characterization/**/*.test.ts'],
     exclude: [
       'node_modules/**',
       '.vitepress/cache/**',
