@@ -1,6 +1,9 @@
 import { expect, test, type Locator, type Page } from '@playwright/test'
 import { CONTENT_LAYOUT_TOKENS, LAYOUT_VIEWPORTS } from '../../.vitepress/theme/lib/contentLayoutTokens'
 import { getContentCatalog, getUiSweepPages } from '../../.vitepress/shared/content/contentCatalog'
+import { registerConsoleGuard } from './helpers/consoleGuard'
+
+registerConsoleGuard(test)
 
 const CENTER_TOLERANCE_PX = 2
 const SCALE_TOLERANCE = 0.05
@@ -935,9 +938,9 @@ test('local search result navigates to the matched section', async ({ page }) =>
 
 test('ask ai context menu appears for selected document text', async ({ page }) => {
   await clearStorage(page)
-  await page.goto(UI_FIXTURE_ROUTE)
+  await page.goto('lectures/10')
 
-  await selectTextAndOpenAskAiMenu(page, 'This page is intentionally hidden from navigation.')
+  await selectTextAndOpenAskAiMenu(page, 'RESTful API')
 
   await expect(page.locator('.kpo-ai-menu')).toBeVisible()
   await expect(page.locator('.kpo-ai-menu')).toContainText('Ask ChatGPT about this')
@@ -1099,6 +1102,17 @@ test('ask ai manual prompt appears only after clipboard methods fail', async ({ 
 
   await expect(page.locator('.kpo-ai-toast')).toHaveText('Copy prompt manually')
   await expect(page.locator('.kpo-ai-manual')).toBeVisible()
+  const prompt = page.getByRole('textbox', { name: 'AI prompt' })
+  const close = page.getByRole('button', { name: 'Close' })
+  await expect(prompt).toBeFocused()
+  await page.keyboard.press('Tab')
+  await expect(close).toBeFocused()
+  await page.keyboard.press('Tab')
+  await expect(prompt).toBeFocused()
+  await page.keyboard.press('Shift+Tab')
+  await expect(close).toBeFocused()
+  await page.keyboard.press('Escape')
+  await expect(page.locator('.kpo-ai-manual')).toHaveCount(0)
 
   const attempts = await page.evaluate(() => {
     return (window as unknown as { __kpoCopyAttempts: string[] }).__kpoCopyAttempts
@@ -1144,9 +1158,9 @@ test('ask ai keeps clipboard fallback when page context is unavailable', async (
 
   await page.route('**/__ask-ai-context/**', async (route) => {
     await route.fulfill({
-      status: 404,
-      contentType: 'text/plain',
-      body: 'missing context'
+      status: 200,
+      contentType: 'application/json',
+      body: '{invalid context'
     })
   })
 
@@ -1241,7 +1255,7 @@ test('ask ai copies and opens Claude without showing manual prompt', async ({ pa
 test('ask ai mobile bubble appears after text selection', async ({ page }) => {
   await clearStorage(page)
   await page.setViewportSize({ width: 390, height: 844 })
-  await page.goto(UI_FIXTURE_ROUTE)
+  await page.goto('intro')
 
   await page
     .locator('.vp-doc p')

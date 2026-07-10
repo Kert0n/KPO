@@ -439,9 +439,21 @@ function cssNumber(style: CSSStyleDeclaration, property: string, fallback: numbe
         +
       </button>
     </div>
-    <div v-if="svg" ref="viewport" class="kpo-mermaid__viewport" @scroll.passive="onViewportScroll">
+    <div
+      v-if="svg"
+      ref="viewport"
+      class="kpo-mermaid__viewport"
+      role="region"
+      aria-label="Диаграмма Mermaid"
+      tabindex="0"
+      @scroll.passive="onViewportScroll"
+    >
       <div class="kpo-mermaid__canvas" :style="canvasStyle" v-html="svg" />
     </div>
+    <details v-if="svg" class="kpo-mermaid__source">
+      <summary>Исходник Mermaid</summary>
+      <pre class="kpo-mermaid__fallback">{{ decodedCode }}</pre>
+    </details>
     <div v-else-if="failed" class="kpo-mermaid__error">
       <p class="kpo-mermaid__error-title">Диаграмма не отрисовалась</p>
       <p class="kpo-mermaid__error-message">{{ errorMessage }}</p>

@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url'
 import { chromium } from 'playwright'
 import { PDFDocument } from 'pdf-lib'
 import { getContentCatalog, getPdfPages } from '../.vitepress/shared/content/contentCatalog'
-import { SITE } from '../.vitepress/shared/site'
+import { SITE, STORAGE_KEYS } from '../.vitepress/shared/site'
 
 const root = resolve(fileURLToPath(new URL('..', import.meta.url)))
 const remote = process.argv.includes('--remote')
@@ -40,13 +40,13 @@ try {
     deviceScaleFactor: 1
   })
 
-  await context.addInitScript(() => {
+  await context.addInitScript((storageKeys) => {
     window.localStorage.clear()
     window.sessionStorage.clear()
-    window.localStorage.setItem('kpo:code-language', 'kotlin')
-    window.localStorage.removeItem('kpo:playground-mode')
+    window.localStorage.setItem(storageKeys.codeLanguage, 'kotlin')
+    window.localStorage.removeItem(storageKeys.playgroundMode)
     document.documentElement.dataset.kpoLang = 'kotlin'
-  })
+  }, STORAGE_KEYS)
 
   const page = await context.newPage()
   const pageFiles = []
@@ -57,11 +57,11 @@ try {
 
     process.stdout.write(`Exporting ${route || '/'} -> ${pageFile}\n`)
     await page.goto(url, { waitUntil: 'networkidle' })
-    await page.evaluate(() => {
-      window.localStorage.setItem('kpo:code-language', 'kotlin')
-      window.localStorage.removeItem('kpo:playground-mode')
+    await page.evaluate((storageKeys) => {
+      window.localStorage.setItem(storageKeys.codeLanguage, 'kotlin')
+      window.localStorage.removeItem(storageKeys.playgroundMode)
       document.documentElement.dataset.kpoLang = 'kotlin'
-    })
+    }, STORAGE_KEYS)
 
     await page.locator('.vp-doc').first().waitFor({ state: 'attached', timeout: 30_000 })
     await waitForMermaid(page, route)

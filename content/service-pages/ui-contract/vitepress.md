@@ -1,6 +1,7 @@
 ---
 title: UI Contract Fixtures
 search: false
+askAi: false
 outline: false
 lastUpdated: false
 ---

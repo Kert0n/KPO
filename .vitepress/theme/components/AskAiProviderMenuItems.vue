@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useAskAiProvider } from '../composables/useAskAiProvider'
-import { isAskAiProviderId, type AskAiProviderId } from '../lib/askAiModel'
+import { isAskAiProviderId, type AskAiProviderId } from '../../shared/core/askAiModel'
 
 const { askAiProvider, setAskAiProvider } = useAskAiProvider()
 
@@ -22,14 +22,14 @@ function selectProvider(value: string): void {
 </script>
 
 <template>
-  <div class="KpoAskAiProviderMenu">
+  <div class="KpoAskAiProviderMenu" role="radiogroup" aria-label="Провайдер Ask AI">
     <p class="KpoAskAiProviderMenu__title">СПРОСИТЬ ИИ</p>
     <template v-for="provider in providerMenuItems" :key="provider.id">
       <div v-if="provider.separated" class="KpoAskAiProviderMenu__divider" />
       <button
         type="button"
         class="KpoAskAiProviderMenu__item"
-        role="menuitemradio"
+        role="radio"
         :aria-checked="askAiProvider === provider.id"
         @click="selectProvider(provider.id)"
       >

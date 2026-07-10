@@ -10,34 +10,68 @@ type AdaptiveTableController = {
   table: HTMLTableElement
   observer: ResizeObserver
   frame: number | null
+  settleFrame: number | null
 }
 
 type AdaptiveTableInstallState = {
   controllers: Map<HTMLElement, AdaptiveTableController>
   scanFrame: number | null
+  disposed: boolean
 }
 
-let installState: AdaptiveTableInstallState | null = null
+export type AdaptiveTablesController = {
+  scan(): void
+  disposeDisconnected(): void
+  dispose(): void
+}
 
-export function installAdaptiveTables(router?: Router): void {
-  if (typeof window === 'undefined' || typeof document === 'undefined') return
+let installedController: AdaptiveTablesController | null = null
 
-  const state = installState ?? {
+export function installAdaptiveTables(router?: Router): AdaptiveTablesController | null {
+  if (typeof window === 'undefined' || typeof document === 'undefined') return null
+
+  installedController?.dispose()
+
+  const state: AdaptiveTableInstallState = {
     controllers: new Map<HTMLElement, AdaptiveTableController>(),
-    scanFrame: null
+    scanFrame: null,
+    disposed: false
   }
-  installState = state
-
-  const scan = () => scheduleScan(state)
-  scan()
 
   const previousAfterRouteChanged = router?.onAfterRouteChanged
-  if (router) {
-    router.onAfterRouteChanged = async (to) => {
-      await previousAfterRouteChanged?.(to)
-      scan()
+  const afterRouteChanged = async (to: string) => {
+    await previousAfterRouteChanged?.(to)
+    controller.scan()
+  }
+
+  const controller: AdaptiveTablesController = {
+    scan() {
+      if (!state.disposed) scheduleScan(state)
+    },
+    disposeDisconnected() {
+      if (!state.disposed) disposeDisconnectedTables(state)
+    },
+    dispose() {
+      if (state.disposed) return
+      state.disposed = true
+      if (state.scanFrame !== null) window.cancelAnimationFrame(state.scanFrame)
+      state.scanFrame = null
+      for (const tableController of state.controllers.values()) disposeTableController(tableController)
+      state.controllers.clear()
+      if (router?.onAfterRouteChanged === afterRouteChanged) {
+        router.onAfterRouteChanged = previousAfterRouteChanged
+      }
+      if (installedController === controller) installedController = null
     }
   }
+
+  if (router) {
+    router.onAfterRouteChanged = afterRouteChanged
+  }
+
+  installedController = controller
+  controller.scan()
+  return controller
 }
 
 function scheduleScan(state: AdaptiveTableInstallState): void {
@@ -46,6 +80,7 @@ function scheduleScan(state: AdaptiveTableInstallState): void {
   }
 
   state.scanFrame = window.requestAnimationFrame(() => {
+    if (state.disposed) return
     state.scanFrame = null
     scanTables(state)
   })
@@ -68,7 +103,8 @@ function scanTables(state: AdaptiveTableInstallState): void {
       block,
       table,
       observer: new ResizeObserver(() => scheduleTableLayout(controller)),
-      frame: null
+      frame: null,
+      settleFrame: null
     }
 
     state.controllers.set(block, controller)
@@ -80,8 +116,7 @@ function scanTables(state: AdaptiveTableInstallState): void {
 function disposeDisconnectedTables(state: AdaptiveTableInstallState): void {
   for (const [block, controller] of state.controllers) {
     if (document.contains(block)) continue
-    if (controller.frame !== null) window.cancelAnimationFrame(controller.frame)
-    controller.observer.disconnect()
+    disposeTableController(controller)
     state.controllers.delete(block)
   }
 }
@@ -116,13 +151,24 @@ function applyAdaptiveTableLayout(controller: AdaptiveTableController): void {
 
   if (mode !== 'wrap') return
 
-  window.requestAnimationFrame(() => {
+  if (controller.settleFrame !== null) window.cancelAnimationFrame(controller.settleFrame)
+  controller.settleFrame = window.requestAnimationFrame(() => {
+    controller.settleFrame = null
+    if (!controller.block.isConnected) return
     const hasWrappedOverflow =
       block.scrollWidth > block.clientWidth + CONTENT_LAYOUT_TOKENS.tableOverflowEpsilon
     if (hasWrappedOverflow) {
       setTableMode(block, 'scroll')
     }
   })
+}
+
+function disposeTableController(controller: AdaptiveTableController): void {
+  if (controller.frame !== null) window.cancelAnimationFrame(controller.frame)
+  if (controller.settleFrame !== null) window.cancelAnimationFrame(controller.settleFrame)
+  controller.frame = null
+  controller.settleFrame = null
+  controller.observer.disconnect()
 }
 
 function setTableMode(block: HTMLElement, mode: AdaptiveTableMode | null): void {

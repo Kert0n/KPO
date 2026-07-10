@@ -47,13 +47,13 @@
   --vp-c-gutter: #ebecf0;
 
   --vp-c-text-1: #1f2328;
-  --vp-c-text-2: #6c707e;
-  --vp-c-text-3: #8c8e96;
+  --vp-c-text-2: #5f636f;
+  --vp-c-text-3: #686c75;
 
   /* Акцент — синий IntelliJ New UI */
-  --vp-c-brand-1: #3574f0;
+  --vp-c-brand-1: #294fae;
   --vp-c-brand-2: #315fd1;
-  --vp-c-brand-3: #3574f0;
+  --vp-c-brand-3: #294fae;
   --vp-c-brand-soft: rgba(53, 116, 240, 0.14);
 
   --vp-nav-bg-color: var(--vp-c-bg-alt);

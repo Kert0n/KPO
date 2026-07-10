@@ -72,6 +72,9 @@ onMounted(async () => {
       playgroundInstance(targetElement)?.destroy?.()
       return
     }
+    for (const textarea of host.value?.querySelectorAll<HTMLTextAreaElement>('.CodeMirror textarea') ?? []) {
+      textarea.setAttribute('aria-label', 'Редактор Kotlin Playground')
+    }
     ready.value = true
   } catch (error) {
     console.warn('[kotlin-playground] инициализация не удалась:', error)

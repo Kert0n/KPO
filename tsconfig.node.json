@@ -9,7 +9,6 @@
     ".vitepress/lib/**/*.ts",
     ".vitepress/markdown/**/*.ts",
     ".vitepress/shared/**/*.ts",
-    ".vitepress/theme/lib/askAiModel.ts",
     "scripts/**/*.mts",
     "vitest.config.ts"
   ],

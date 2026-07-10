@@ -7,7 +7,7 @@ import matter from 'gray-matter'
 import { isImageOnlyParagraph } from '../markdown/tokenUtils'
 import { createAskAiBlockId, type AskAiBlockKind } from './askAiIds'
 import { getContentCatalog } from '../shared/content/contentCatalog'
-import type { AskAiBlock, AskAiPageContext } from '../theme/lib/askAiModel'
+import type { AskAiBlock, AskAiPageContext } from '../shared/core/askAiModel'
 
 export type AskAiContextEntry = {
   routeKey: string

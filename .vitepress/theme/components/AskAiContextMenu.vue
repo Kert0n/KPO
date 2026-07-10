@@ -11,7 +11,7 @@ import {
   type AskAiBlock,
   type AskAiProviderAction,
   type AskAiPageContext
-} from '../lib/askAiModel'
+} from '../../shared/core/askAiModel'
 import { copyPromptToClipboard } from '../lib/clipboardPrompt'
 import { readPlaygroundCode, readPlaygroundSelection } from '../lib/playgroundRegistry'
 
@@ -43,6 +43,7 @@ const prepareError = ref<unknown>(null)
 const preparing = ref(false)
 const toast = ref('')
 const manualPrompt = ref('')
+const manualPanel = ref<HTMLElement | null>(null)
 const contextCache = new Map<string, AskAiPageContext>()
 
 let toastTimer: number | null = null
@@ -50,6 +51,7 @@ let mobileSelectionTimer: number | null = null
 let pageContextPrefetchTimer: number | null = null
 let pageContextAbortController: AbortController | null = null
 let prepareVersion = 0
+let focusReturnElement: HTMLElement | null = null
 
 const menuLabel = computed(() => {
   return (
@@ -102,6 +104,22 @@ watch(askAiProvider, () => {
   void prepareAskAiAction(snapshot.value)
 })
 
+watch(manualPrompt, async (value, previous) => {
+  if (value && !previous) {
+    await nextTick()
+    const textarea = manualPanel.value?.querySelector<HTMLTextAreaElement>('textarea')
+    textarea?.focus()
+    textarea?.select()
+    return
+  }
+
+  if (!value && previous) {
+    await nextTick()
+    if (focusReturnElement?.isConnected) focusReturnElement.focus()
+    focusReturnElement = null
+  }
+})
+
 function onContextMenu(event: MouseEvent): void {
   if (event.shiftKey) return
 
@@ -109,6 +127,7 @@ function onContextMenu(event: MouseEvent): void {
   if (!nextSnapshot) return
 
   event.preventDefault()
+  rememberFocusReturnElement()
   snapshot.value = nextSnapshot
   menu.mode = 'desktop'
   void prepareAskAiAction(nextSnapshot)
@@ -127,6 +146,7 @@ function onSelectionChange(): void {
     if (!rect) return
 
     snapshot.value = nextSnapshot
+    rememberFocusReturnElement()
     menu.mode = 'mobile'
     void prepareAskAiAction(nextSnapshot)
     showMenu(rect.left + rect.width / 2, rect.top - 12)
@@ -145,9 +165,14 @@ function onDocumentClick(event: MouseEvent): void {
 }
 
 function onKeydown(event: KeyboardEvent): void {
+  if (manualPrompt.value && event.key === 'Tab') {
+    trapManualDialogFocus(event)
+    return
+  }
+
   if (event.key === 'Escape') {
     hideMenu()
-    manualPrompt.value = ''
+    closeManualPrompt()
   }
 }
 
@@ -270,6 +295,7 @@ async function loadPageContext(): Promise<AskAiPageContext> {
 
 function queuePageContextPrefetch(): void {
   clearPageContextPrefetch()
+  if (page.value.frontmatter.kpoAskAi === false || page.value.frontmatter.askAi === false) return
   pageContextPrefetchTimer = window.setTimeout(() => {
     pageContextPrefetchTimer = null
     loadPageContext().catch(() => undefined)
@@ -375,9 +401,31 @@ async function copyPrompt(prompt: string): Promise<boolean> {
   if (result.ok) return true
 
   manualPrompt.value = prompt
-  await nextTick()
-  document.querySelector<HTMLTextAreaElement>('.kpo-ai-manual textarea')?.select()
   return false
+}
+
+function closeManualPrompt(): void {
+  manualPrompt.value = ''
+}
+
+function trapManualDialogFocus(event: KeyboardEvent): void {
+  const focusable = [...(manualPanel.value?.querySelectorAll<HTMLElement>('textarea, button') ?? [])].filter(
+    (element) => !element.hasAttribute('disabled')
+  )
+  if (focusable.length === 0) return
+
+  const current = document.activeElement
+  const currentIndex = focusable.indexOf(current as HTMLElement)
+  const nextIndex = event.shiftKey
+    ? currentIndex <= 0
+      ? focusable.length - 1
+      : currentIndex - 1
+    : currentIndex < 0 || currentIndex === focusable.length - 1
+      ? 0
+      : currentIndex + 1
+
+  event.preventDefault()
+  focusable[nextIndex].focus()
 }
 
 function fallbackContext(selectedText: string): AskAiPageContext {
@@ -406,10 +454,18 @@ function showMenu(x: number, y: number): void {
   menu.x = clamp(x, 8 + width / 2, window.innerWidth - 8 - width / 2)
   menu.y = clamp(y, 8, window.innerHeight - 8 - height)
   menu.visible = true
+  void nextTick(() => document.querySelector<HTMLButtonElement>('.kpo-ai-menu__item')?.focus())
 }
 
 function hideMenu(): void {
   menu.visible = false
+}
+
+function rememberFocusReturnElement(): void {
+  const active = document.activeElement
+  if (active instanceof HTMLElement && !active.closest('.kpo-ai-menu, .kpo-ai-manual')) {
+    focusReturnElement = active
+  }
 }
 
 function isMobileLike(): boolean {
@@ -501,10 +557,10 @@ function clearMobileSelectionTimer(): void {
       aria-modal="true"
       aria-label="Copy AI prompt"
     >
-      <div class="kpo-ai-manual__panel">
+      <div ref="manualPanel" class="kpo-ai-manual__panel">
         <p class="kpo-ai-manual__title">Copy AI prompt</p>
-        <textarea :value="manualPrompt" readonly />
-        <button type="button" @click="manualPrompt = ''">Close</button>
+        <textarea :value="manualPrompt" aria-label="AI prompt" readonly />
+        <button type="button" @click="closeManualPrompt">Close</button>
       </div>
     </div>
   </Teleport>

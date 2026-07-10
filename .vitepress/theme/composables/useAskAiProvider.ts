@@ -1,5 +1,5 @@
 import type { Ref } from 'vue'
-import { isAskAiProviderId, type AskAiProviderId } from '../lib/askAiModel'
+import { isAskAiProviderId, type AskAiProviderId } from '../../shared/core/askAiModel'
 import { createPersistentState } from './persistentState'
 import { STORAGE_KEYS } from '../../shared/site'
 

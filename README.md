@@ -209,7 +209,7 @@ npm run pdf
 
 ## Публикация на GitHub Pages
 
-Workflow `.github/workflows/deploy.yml` собирает сайт при пуше в `master` и публикует `.vitepress/dist` через GitHub Pages. Репозиторий должен называться `KPO`, потому что в `.vitepress/config.mts` задан `base: '/KPO/'`.
+Workflow `.github/workflows/ci.yml` проверяет PR, а при пуше в `master` публикует прошедшую все quality-gates сборку через GitHub Pages. Идентичность сайта, включая `base: '/KPO/'`, централизована в `.vitepress/shared/site.ts`.
 
 Адрес опубликованного сайта: https://kert0n.github.io/KPO/
 

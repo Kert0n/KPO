@@ -136,10 +136,15 @@ function frontmatterOrder(frontmatter: Frontmatter, fallback: number, file: stri
 }
 
 function frontmatterInclusion(frontmatter: Frontmatter): Partial<ContentPage['inclusion']> {
-  if (frontmatter.pdf !== undefined && typeof frontmatter.pdf !== 'boolean') {
-    throw new Error('Invalid frontmatter pdf: expected a boolean.')
+  const result: Partial<ContentPage['inclusion']> = {}
+  for (const key of ['nav', 'sidebar', 'search', 'askAi', 'pdf', 'uiSweep', 'sitemap'] as const) {
+    const value = frontmatter[key]
+    if (value !== undefined && typeof value !== 'boolean') {
+      throw new Error(`Invalid frontmatter ${key}: expected a boolean.`)
+    }
+    if (typeof value === 'boolean') result[key] = value
   }
-  return frontmatter.pdf === undefined ? {} : { pdf: frontmatter.pdf }
+  return result
 }
 
 function pageTitle(frontmatter: Frontmatter, content: string, fallback: string): string {

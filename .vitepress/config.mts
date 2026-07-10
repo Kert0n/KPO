@@ -62,6 +62,7 @@ export default defineConfig({
     const canonical = new URL(page.route.replace(/^\//, ''), `${SITE.origin}${SITE.base}`).toString()
     const description = page.description || SITE.description
     pageData.description = description
+    pageData.frontmatter.kpoAskAi = page.inclusion.askAi
     pageData.frontmatter.head ??= []
     pageData.frontmatter.head.push(
       ['link', { rel: 'canonical', href: canonical }],
@@ -85,7 +86,8 @@ export default defineConfig({
 
   themeConfig: {
     siteTitle: 'КПО',
-    logo: { light: `${SITE.base}logo-light.svg`, dark: `${SITE.base}logo-dark.svg` },
+    // VitePress сам добавляет base к root-relative asset paths.
+    logo: { light: '/logo-light.svg', dark: '/logo-dark.svg' },
 
     nav: getNav(),
     sidebar: getSidebar(),

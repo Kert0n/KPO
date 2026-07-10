@@ -31,13 +31,13 @@ export const lightCode: CodePalette = {
   keyword: '#0033b3',
   string: '#067d17',
   number: '#1750eb',
-  comment: '#8c8c8c',
+  comment: '#666a70',
   function: '#00627a',
   annotation: '#9e880d',
   field: '#871094',
   type: '#000000',
   constant: '#871094',
-  lineNumber: '#adadad',
+  lineNumber: '#686c75',
   selection: '#a6d2ff',
   cursor: '#000000'
 }
@@ -48,13 +48,13 @@ export const darkCode: CodePalette = {
   keyword: '#cf8e6d',
   string: '#6aab73',
   number: '#2aacb8',
-  comment: '#7a7e85',
+  comment: '#a7aab2',
   function: '#56a8f5',
   annotation: '#b3ae60',
   field: '#c77dbb',
   type: '#bcbec4',
   constant: '#c77dbb',
-  lineNumber: '#4b5059',
+  lineNumber: '#8f939c',
   selection: '#214283',
   cursor: '#ced0d6'
 }
