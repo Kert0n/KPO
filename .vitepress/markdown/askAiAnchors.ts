@@ -1,44 +1,14 @@
 import type MarkdownIt from 'markdown-it'
 import type Token from 'markdown-it/lib/token.mjs'
-import { createAskAiBlockId, type AskAiBlockKind } from '../lib/askAiIds'
+import { createAskAiBlockId } from '../lib/askAiIds'
+import { classifyMarkdownTokens, type MarkdownStructureKind } from '../shared/core/markdownStructure'
 import { escapeAttribute } from './htmlUtils'
-import { isImageOnlyParagraph } from './tokenUtils'
 
 export function askAiAnchorsPlugin(md: MarkdownIt): void {
   md.core.ruler.push('kpo_ask_ai_anchors', (state) => {
     const lines = state.src.replace(/\r\n?/g, '\n').split('\n')
-    let multiCodeDepth = 0
-
-    for (let index = 0; index < state.tokens.length; index += 1) {
-      const token = state.tokens[index]
-
-      if (token.type === 'container_multi-code_open') {
-        multiCodeDepth += 1
-        assignBlockId(token, 'multi-code', lines)
-        continue
-      }
-
-      if (token.type === 'container_multi-code_close') {
-        multiCodeDepth = Math.max(0, multiCodeDepth - 1)
-        continue
-      }
-
-      if (multiCodeDepth > 0 && token.type === 'fence') continue
-
-      if (token.type === 'fence') {
-        const language = token.info.trim().split(/\s+/)[0] ?? ''
-        assignBlockId(token, language === 'mermaid' ? 'mermaid' : 'code', lines)
-      } else if (token.type === 'heading_open') {
-        assignBlockId(token, 'heading', lines)
-      } else if (token.type === 'paragraph_open') {
-        assignBlockId(token, isImageOnlyParagraph(state.tokens, index) ? 'image' : 'paragraph', lines)
-      } else if (token.type === 'bullet_list_open' || token.type === 'ordered_list_open') {
-        assignBlockId(token, 'list', lines)
-      } else if (token.type === 'blockquote_open') {
-        assignBlockId(token, 'blockquote', lines)
-      } else if (token.type === 'table_open') {
-        assignBlockId(token, 'table', lines)
-      }
+    for (const block of classifyMarkdownTokens(state.tokens)) {
+      assignBlockId(state.tokens[block.tokenIndex], block.kind, lines)
     }
   })
 }
@@ -52,7 +22,7 @@ export function askAiBlockAttribute(token: Token): string {
   return id ? ` data-kpo-ask-block-id="${escapeAttribute(id)}"` : ''
 }
 
-function assignBlockId(token: Token, kind: AskAiBlockKind, lines: string[]): void {
+function assignBlockId(token: Token, kind: MarkdownStructureKind, lines: string[]): void {
   if (!token.map) return
   const [start, end] = token.map
   const markdown = lines.slice(start, end).join('\n').trim()

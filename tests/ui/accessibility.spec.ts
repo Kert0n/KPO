@@ -1,16 +1,19 @@
 import AxeBuilder from '@axe-core/playwright'
-import { expect, test, type Page } from '@playwright/test'
+import type { Page } from '@playwright/test'
 import { getContentCatalog } from '../../.vitepress/shared/content/contentCatalog'
+import { requireCatalogPage, routePath } from './helpers/catalog'
 import { registerConsoleGuard } from './helpers/consoleGuard'
+import { expect, test } from './helpers/fixtures'
 
 registerConsoleGuard(test)
+test.use({ mermaidMode: 'on' })
 
 const catalog = getContentCatalog()
 const contentRoutes = [
-  catalog.pages.find((page) => page.kind === 'intro'),
-  catalog.pages.find((page) => page.kind === 'service'),
-  catalog.pages.find((page) => page.kind === 'lecture')
-].flatMap((page) => (page ? [page.route.replace(/^\//, '')] : []))
+  requireCatalogPage(catalog, (page) => page.kind === 'intro', 'intro'),
+  requireCatalogPage(catalog, (page) => page.kind === 'service', 'service UI fixture'),
+  requireCatalogPage(catalog, (page) => page.kind === 'lecture', 'first lecture')
+].map(routePath)
 
 for (const route of contentRoutes) {
   test(`accessibility: ${route}`, async ({ page }) => {

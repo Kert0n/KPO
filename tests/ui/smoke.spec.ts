@@ -1,15 +1,16 @@
-import { expect, test } from '@playwright/test'
 import { getContentCatalog } from '../../.vitepress/shared/content/contentCatalog'
+import { requireCatalogPage, routePath } from './helpers/catalog'
 import { registerConsoleGuard } from './helpers/consoleGuard'
+import { expect, test } from './helpers/fixtures'
 
 registerConsoleGuard(test)
 
 const catalog = getContentCatalog()
 const routes = [
-  catalog.pages.find((page) => page.kind === 'intro'),
-  catalog.pages.find((page) => page.kind === 'lecture'),
-  catalog.pages.find((page) => page.route === '/extras/02')
-].flatMap((page) => (page ? [page.route.replace(/^\//, '')] : []))
+  requireCatalogPage(catalog, (page) => page.kind === 'intro', 'intro'),
+  requireCatalogPage(catalog, (page) => page.kind === 'lecture', 'first lecture'),
+  requireCatalogPage(catalog, (page) => page.route === '/extras/02', '/extras/02')
+].map(routePath)
 
 for (const route of routes) {
   test(`cross-browser smoke: ${route}`, async ({ page }) => {

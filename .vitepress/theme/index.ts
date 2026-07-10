@@ -14,15 +14,18 @@ import { installAdaptiveTables } from './lib/adaptiveTables'
 import '@fontsource-variable/inter'
 import '@fontsource-variable/jetbrains-mono'
 
-import './styles/vars.css'
-import './styles/layout.css'
-import './styles/vitepress-adapter.css'
-import './styles/content-lanes.css'
-import './styles/additional-readings.css'
-import './styles/code.css'
-import './styles/playground.css'
-import './styles/ask-ai.css'
-import './styles/print.css'
+// Import order is an architectural contract: tokens -> VitePress adapters ->
+// content -> components -> print overrides.
+import './styles/tokens.css'
+import './styles/adapters/vitepress-layout.css'
+import './styles/adapters/vitepress-navigation.css'
+import './styles/adapters/vitepress-search.css'
+import './styles/adapters/vitepress-code.css'
+import './styles/adapters/vitepress-theme.css'
+import './styles/content/additional-readings.css'
+import './styles/components/playground.css'
+import './styles/components/ask-ai.css'
+import './styles/adapters/vitepress-print.css'
 
 export default {
   extends: DefaultTheme,

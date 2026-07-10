@@ -1,7 +1,6 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref, useTemplateRef } from 'vue'
-import { registerPlayground, unregisterPlayground, updatePlaygroundCode } from '../lib/playgroundRegistry'
-import { SITE } from '../../shared/site'
+import { useTemplateRef } from 'vue'
+import { usePlaygroundController } from '../composables/code/usePlaygroundController'
 
 /**
  * Обёртка над официальным kotlin-playground (npm-пакет).
@@ -33,65 +32,13 @@ const props = withDefaults(
 const emit = defineEmits<{ failed: [] }>()
 
 const host = useTemplateRef('host')
-const ready = ref(false)
-
-let targetElement: HTMLElement | undefined
-let disposed = false
-
-onMounted(async () => {
-  if (!host.value) return
-  disposed = false
-
-  targetElement = document.createElement('code')
-  targetElement.textContent = props.code
-  targetElement.setAttribute('lines', 'true')
-  targetElement.setAttribute('indent', '4')
-  targetElement.setAttribute('match-brackets', 'true')
-  targetElement.setAttribute('data-autocomplete', 'true')
-  targetElement.setAttribute('data-target-platform', props.platform)
-  targetElement.setAttribute('data-version', SITE.kotlinVersion)
-  host.value.appendChild(targetElement)
-
-  try {
-    const { default: createPlayground } = await import('kotlin-playground')
-    if (disposed || !targetElement?.isConnected) return
-    await createPlayground(targetElement, {
-      onChange(code) {
-        if (disposed) return
-        updatePlaygroundCode(props.askBlockId, code)
-      },
-      getInstance(instance) {
-        if (disposed) {
-          instance.KotlinPlayground?.destroy?.()
-          return
-        }
-        registerPlayground(props.askBlockId, props.code, instance)
-      }
-    })
-    if (disposed || !targetElement?.isConnected) {
-      playgroundInstance(targetElement)?.destroy?.()
-      return
-    }
-    for (const textarea of host.value?.querySelectorAll<HTMLTextAreaElement>('.CodeMirror textarea') ?? []) {
-      textarea.setAttribute('aria-label', 'Редактор Kotlin Playground')
-    }
-    ready.value = true
-  } catch (error) {
-    console.warn('[kotlin-playground] инициализация не удалась:', error)
-    emit('failed')
-  }
+const { ready } = usePlaygroundController({
+  host,
+  code: () => props.code,
+  platform: () => props.platform,
+  askBlockId: () => props.askBlockId,
+  onFailed: () => emit('failed')
 })
-
-onBeforeUnmount(() => {
-  disposed = true
-  playgroundInstance(targetElement)?.destroy?.()
-  unregisterPlayground(props.askBlockId)
-  targetElement = undefined
-})
-
-function playgroundInstance(element: HTMLElement | undefined): { destroy?: () => void } | undefined {
-  return (element as { KotlinPlayground?: { destroy?: () => void } } | undefined)?.KotlinPlayground
-}
 </script>
 
 <template>

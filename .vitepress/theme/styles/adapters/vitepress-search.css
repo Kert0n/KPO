@@ -1,0 +1,5 @@
+/*
+ * Search-specific default-theme selectors currently live beside the navbar
+ * rules in vitepress-navigation.css because they share one responsive layout
+ * contract. This is the stable extraction point for a DocSearch markup update.
+ */

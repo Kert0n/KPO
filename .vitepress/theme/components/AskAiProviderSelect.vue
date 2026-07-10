@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import VPFlyout from 'vitepress/dist/client/theme-default/components/VPFlyout.vue'
 import AskAiProviderMenuItems from './AskAiProviderMenuItems.vue'
+import KpoFlyout from './navigation/KpoFlyout.vue'
 
 withDefaults(
   defineProps<{
@@ -17,7 +17,7 @@ withDefaults(
     <AskAiProviderMenuItems />
   </div>
 
-  <VPFlyout v-else class="KpoAskAiProvider" icon="vpi-sparkles" label="Спросить ИИ">
+  <KpoFlyout v-else class="KpoAskAiProvider" icon="vpi-sparkles" label="Спросить ИИ">
     <AskAiProviderMenuItems />
-  </VPFlyout>
+  </KpoFlyout>
 </template>

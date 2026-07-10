@@ -8,6 +8,7 @@
 
 - Node >=24;
 - npm;
+- JDK 21 для runnable Kotlin validation;
 - Chromium browsers для Playwright UI tests.
 
 Файл `.node-version` содержит `24`. Скрипты `prebuild`, `pretest` и `pretest:ui` проверяют major-версию Node перед локальными проверками.
@@ -22,6 +23,7 @@ npm run test
 npm run audit
 npm run build
 npm run test:ui
+npm run test:ui:prebuilt
 npm run pdf
 ```
 
@@ -195,7 +197,18 @@ Browser-регрессии Playwright проверяют реальные стр
 
 ```sh
 npm run build
-npm run test:ui
+npm run test:ui:prebuilt # быстрый повтор против готового dist
+npm run test:ui          # одна production-сборка и полный Chromium suite
+npm run test:visual      # visual matrix против готового dist
+```
+
+Playwright использует четыре worker’а по умолчанию; число можно изменить через `KPO_UI_WORKERS`. Подробности о visual baselines, cross-browser smoke и timing report находятся в `docs/testing.md`.
+
+Для локальной Kotlin validation нужен JDK 21:
+
+```sh
+npm run validate:playground
+# Windows compile script автоматически выберет tooling\kotlin-snippets\gradlew.bat
 ```
 
 Перед публикацией используйте полный прогон:

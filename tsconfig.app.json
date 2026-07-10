@@ -2,8 +2,7 @@
   "extends": "./tsconfig.base.json",
   "compilerOptions": {
     "composite": true,
-    "noEmit": true,
-    "noImplicitAny": false
+    "noEmit": true
   },
   "include": [
     ".vitepress/theme/**/*.ts",

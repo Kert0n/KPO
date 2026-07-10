@@ -1,23 +1,18 @@
 <script setup lang="ts">
 import { useData } from 'vitepress'
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, ref } from 'vue'
 import { stableHash } from '../../shared/core/hash'
-import { clamp } from '../../shared/core/math'
-import { CONTENT_LAYOUT_TOKENS } from '../lib/contentLayoutTokens'
 import {
   readSvgViewBox,
-  resolveCenteredScrollLeft,
   resolveMermaidAutoScale,
-  resolveMermaidManualScale,
-  resolveMermaidOverflow,
   resolveMermaidRenderedHeight,
   resolveMermaidRenderedWidth,
-  resolveScrollLeftForCenterRatio,
-  shouldShowMermaidToolbar,
-  type MermaidViewportMode
+  shouldShowMermaidToolbar
 } from '../lib/mermaidLayoutModel'
-import { createMermaidConfig } from '../lib/mermaidThemeModel'
-import { waitAnimationFrames } from '../lib/viewportAnchor'
+import { useMermaidRenderer } from '../composables/mermaid/useMermaidRenderer'
+import { useMermaidTheme } from '../composables/mermaid/useMermaidTheme'
+import { useMermaidViewport } from '../composables/mermaid/useMermaidViewport'
+import { useMermaidZoom } from '../composables/mermaid/useMermaidZoom'
 
 /**
  * Диаграммы Mermaid. Рендер только на клиенте (динамический import),
@@ -36,60 +31,46 @@ const { isDark } = useData()
 const decodedCode = computed(() => decodeURIComponent(props.code))
 const root = ref<HTMLElement | null>(null)
 const viewport = ref<HTMLElement | null>(null)
-const svg = ref('')
-const failed = ref(false)
-const errorMessage = ref('')
-const availableWidth = ref<number | null>(null)
-const manualScale = ref<number | null>(null)
-const viewBoxWidth = ref<number | null>(null)
-const viewBoxHeight = ref<number | null>(null)
-const viewportMode = ref<MermaidViewportMode>('desktop')
-const hasOverflowX = ref(false)
-const hasOverflowY = ref(false)
-const userScrolledViewport = ref(false)
 const hovered = ref(false)
 const focusWithin = ref(false)
 const textRisk = ref(false)
-type MermaidScaleConfig = {
-  desktopMinScale: number
-  mobileMinScale: number
-  wideDiagramMinWidth: number
-  minHeight: number
-}
-
-const scaleConfig = ref<MermaidScaleConfig>({
-  desktopMinScale: CONTENT_LAYOUT_TOKENS.mermaidDesktopMinScale,
-  mobileMinScale: CONTENT_LAYOUT_TOKENS.mermaidMobileMinScale,
-  wideDiagramMinWidth: CONTENT_LAYOUT_TOKENS.mermaidWideDiagramMinWidth,
-  minHeight: CONTENT_LAYOUT_TOKENS.mermaidMinHeight
-})
-
-let renderCounter = 0
-let renderGeneration = 0
-let resizeObserver: ResizeObserver | null = null
-let isProgrammaticScroll = false
-let programmaticScrollLeft: number | null = null
+const {
+  availableWidth,
+  viewBoxWidth,
+  viewBoxHeight,
+  viewportMode,
+  hasOverflowX,
+  hasOverflowY,
+  scaleConfig,
+  syncViewportLayout,
+  currentViewportCenterRatio,
+  resetUserScroll,
+  onViewportScroll
+} = useMermaidViewport(root, viewport)
 const instanceId = props.diagramId ?? `kpo-mermaid-${stableHash(decodedCode.value)}`
-
-onMounted(() => {
-  updateMeasurements()
-  resizeObserver = new ResizeObserver(() => {
-    updateMeasurements()
-    void syncViewportLayout()
-  })
-  if (root.value) resizeObserver.observe(root.value)
-  window.addEventListener('resize', onWindowResize)
-  void render()
-})
-
-onBeforeUnmount(() => {
-  renderGeneration += 1
-  resizeObserver?.disconnect()
-  window.removeEventListener('resize', onWindowResize)
-})
-
-watch(isDark, () => {
-  void render()
+const { currentConfig } = useMermaidTheme()
+const { svg, failed, errorMessage, renderState, renderRevision } = useMermaidRenderer({
+  code: () => decodedCode.value,
+  instanceId,
+  isDark,
+  config: currentConfig,
+  disabled: () => document.documentElement.dataset.kpoTestMermaid === 'off',
+  async onRendered(rendered) {
+    resetUserScroll()
+    textRisk.value = false
+    const size = readSvgViewBox(rendered)
+    viewBoxWidth.value = size.width
+    viewBoxHeight.value = size.height
+    await syncViewportLayout()
+    updateTextRisk()
+  },
+  onFailed() {
+    viewBoxWidth.value = null
+    viewBoxHeight.value = null
+    hasOverflowX.value = false
+    hasOverflowY.value = false
+    textRisk.value = false
+  }
 })
 
 const autoScale = computed(() => {
@@ -104,9 +85,13 @@ const autoScale = computed(() => {
   })
 })
 
-const effectiveScale = computed(() => manualScale.value ?? autoScale.value)
-
-const scaleLabel = computed(() => `${Math.round(effectiveScale.value * 100)}%`)
+const { manualScale, effectiveScale, scaleLabel, zoomOut, zoomIn, resetScale } = useMermaidZoom({
+  autoScale,
+  viewportMode,
+  currentCenterRatio: currentViewportCenterRatio,
+  resetUserScroll,
+  syncViewportLayout
+})
 
 const controlsVisible = computed(() => {
   return shouldShowMermaidToolbar({
@@ -134,236 +119,10 @@ const canvasStyle = computed(() => {
   return style
 })
 
-async function render(): Promise<void> {
-  const generation = ++renderGeneration
-  failed.value = false
-  errorMessage.value = ''
-  svg.value = ''
-  textRisk.value = false
-  userScrolledViewport.value = false
-
-  try {
-    const { default: mermaid } = await import('mermaid')
-    if (generation !== renderGeneration) return
-
-    mermaid.initialize(createMermaidConfig(mermaidThemeTokens()))
-
-    renderCounter += 1
-    const { svg: rendered } = await mermaid.render(`${instanceId}-${renderCounter}`, decodedCode.value)
-    if (generation !== renderGeneration) return
-    const size = readSvgViewBox(rendered)
-    viewBoxWidth.value = size.width
-    viewBoxHeight.value = size.height
-    svg.value = rendered
-    await syncViewportLayout()
-    updateTextRisk()
-  } catch (error) {
-    if (generation !== renderGeneration) return
-    console.warn('[mermaid] не удалось отрисовать диаграмму:', error)
-    errorMessage.value = error instanceof Error ? error.message : String(error)
-    svg.value = ''
-    viewBoxWidth.value = null
-    viewBoxHeight.value = null
-    hasOverflowX.value = false
-    hasOverflowY.value = false
-    textRisk.value = false
-    failed.value = true
-  }
-}
-
-async function zoomOut(): Promise<void> {
-  await updateManualScale(-0.1)
-}
-
-async function zoomIn(): Promise<void> {
-  await updateManualScale(0.1)
-}
-
-async function resetScale(): Promise<void> {
-  manualScale.value = null
-  userScrolledViewport.value = false
-  await syncViewportLayout({ forceCenter: true })
-}
-
-function updateMeasurements(): void {
-  if (!root.value) return
-
-  viewportMode.value = window.matchMedia('(max-width: 639px)').matches ? 'mobile' : 'desktop'
-
-  const style = getComputedStyle(root.value)
-  const inlinePadding = cssPixels(style.paddingLeft) + cssPixels(style.paddingRight)
-  availableWidth.value = Math.max(0, root.value.clientWidth - inlinePadding)
-
-  scaleConfig.value = {
-    desktopMinScale: cssNumber(
-      style,
-      '--kpo-mermaid-desktop-min-scale',
-      CONTENT_LAYOUT_TOKENS.mermaidDesktopMinScale
-    ),
-    mobileMinScale: cssNumber(
-      style,
-      '--kpo-mermaid-mobile-min-scale',
-      CONTENT_LAYOUT_TOKENS.mermaidMobileMinScale
-    ),
-    wideDiagramMinWidth: cssNumber(
-      style,
-      '--kpo-mermaid-wide-diagram-min-width',
-      CONTENT_LAYOUT_TOKENS.mermaidWideDiagramMinWidth
-    ),
-    minHeight: cssNumber(style, '--kpo-mermaid-min-height', CONTENT_LAYOUT_TOKENS.mermaidMinHeight)
-  }
-}
-
-async function updateManualScale(delta: number): Promise<void> {
-  const centerRatio = currentViewportCenterRatio()
-  manualScale.value = resolveMermaidManualScale({
-    currentScale: effectiveScale.value,
-    delta,
-    mode: viewportMode.value
-  })
-  await syncViewportLayout({ centerRatio })
-}
-
-async function syncViewportLayout(
-  options: {
-    forceCenter?: boolean
-    centerRatio?: number | null
-  } = {}
-): Promise<void> {
-  await nextTick()
-  await waitAnimationFrames(2)
-  updateMeasurements()
-  updateOverflowState()
-
-  if (options.centerRatio !== undefined && options.centerRatio !== null) {
-    restoreViewportCenterRatio(options.centerRatio)
-    return
-  }
-
-  centerViewportIfNeeded(Boolean(options.forceCenter))
-}
-
-function updateOverflowState(): void {
-  const element = viewport.value
-  if (!element) {
-    hasOverflowX.value = false
-    hasOverflowY.value = false
-    return
-  }
-
-  const state = resolveMermaidOverflow({
-    clientWidth: element.clientWidth,
-    scrollWidth: element.scrollWidth,
-    clientHeight: element.clientHeight,
-    scrollHeight: element.scrollHeight
-  })
-
-  hasOverflowX.value = state.hasOverflowX
-  hasOverflowY.value = state.hasOverflowY
-}
-
-function centerViewportIfNeeded(force: boolean): void {
-  const element = viewport.value
-  if (!element || (!force && userScrolledViewport.value)) return
-
-  if (!hasOverflowX.value) {
-    setViewportScrollLeft(0)
-    return
-  }
-
-  setViewportScrollLeft(
-    resolveCenteredScrollLeft({
-      clientWidth: element.clientWidth,
-      scrollWidth: element.scrollWidth
-    })
-  )
-}
-
-function restoreViewportCenterRatio(centerRatio: number): void {
-  const element = viewport.value
-  if (!element) return
-
-  setViewportScrollLeft(
-    resolveScrollLeftForCenterRatio({
-      centerRatio,
-      clientWidth: element.clientWidth,
-      scrollWidth: element.scrollWidth
-    })
-  )
-}
-
-function currentViewportCenterRatio(): number | null {
-  const element = viewport.value
-  if (!element || element.scrollWidth <= 0) return null
-
-  return clamp((element.scrollLeft + element.clientWidth / 2) / element.scrollWidth, 0, 1)
-}
-
-function setViewportScrollLeft(scrollLeft: number): void {
-  const element = viewport.value
-  if (!element) return
-
-  isProgrammaticScroll = true
-  element.scrollLeft = scrollLeft
-  programmaticScrollLeft = element.scrollLeft
-  window.requestAnimationFrame(() => {
-    isProgrammaticScroll = false
-    programmaticScrollLeft = null
-  })
-}
-
-function onViewportScroll(): void {
-  const element = viewport.value
-  if (
-    isProgrammaticScroll &&
-    element &&
-    programmaticScrollLeft !== null &&
-    Math.abs(element.scrollLeft - programmaticScrollLeft) <= 2
-  ) {
-    return
-  }
-
-  isProgrammaticScroll = false
-  programmaticScrollLeft = null
-  userScrolledViewport.value = true
-}
-
 function onFocusOut(): void {
   void nextTick(() => {
     focusWithin.value = Boolean(root.value?.contains(document.activeElement))
   })
-}
-
-function onWindowResize(): void {
-  updateMeasurements()
-  void syncViewportLayout()
-}
-
-function mermaidThemeTokens() {
-  const style = getComputedStyle(document.documentElement)
-
-  return {
-    fontFamily: mermaidFontFamily(),
-    background: cssVariable(style, '--vp-c-bg'),
-    softBackground: cssVariable(style, '--vp-c-bg-soft'),
-    text: cssVariable(style, '--vp-c-text-1'),
-    mutedText: cssVariable(style, '--vp-c-text-2'),
-    border: cssVariable(style, '--vp-c-border')
-  }
-}
-
-function mermaidFontFamily(): string {
-  if (typeof window === 'undefined') return 'Inter Variable, Inter, sans-serif'
-
-  return cssVariable(
-    getComputedStyle(document.documentElement),
-    '--vp-font-family-base',
-    'Inter Variable, Inter, sans-serif'
-  )
-}
-
-function cssVariable(style: CSSStyleDeclaration, property: string, fallback = ''): string {
-  return style.getPropertyValue(property).trim() || fallback
 }
 
 function updateTextRisk(): void {
@@ -383,22 +142,14 @@ function updateTextRisk(): void {
     return childRect.width > containerRect.width + 2 || childRect.height > containerRect.height + 2
   })
 }
-
-function cssPixels(value: string): number {
-  const parsed = Number.parseFloat(value)
-  return Number.isFinite(parsed) ? parsed : 0
-}
-
-function cssNumber(style: CSSStyleDeclaration, property: string, fallback: number): number {
-  const parsed = Number.parseFloat(style.getPropertyValue(property))
-  return Number.isFinite(parsed) ? parsed : fallback
-}
 </script>
 
 <template>
   <div
     ref="root"
     class="kpo-mermaid"
+    :data-kpo-render-state="renderState"
+    :data-kpo-render-revision="renderRevision"
     :class="{
       'kpo-mermaid--controls-visible': controlsVisible,
       'kpo-mermaid--has-overflow': hasOverflowX || hasOverflowY,

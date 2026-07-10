@@ -61,7 +61,7 @@ jobs:
         with:
           path: .vitepress/dist
 
-  browser:
+  browser-chromium:
     needs: [quality]
     runs-on: ubuntu-latest
     steps:
@@ -70,10 +70,85 @@ jobs:
         with:
           node-version: 24
           cache: npm
+      - name: Restore Playwright Chromium
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-chromium-${{ hashFiles('package-lock.json') }}
       - run: npm ci
-      - run: npx playwright install --with-deps chromium firefox webkit
+      - run: npx playwright install --with-deps chromium
       - run: npm run build
-      - run: KPO_CROSS_BROWSER=1 npm run test:ui
+      - run: KPO_UI_WORKERS=4 npm run test:ui:prebuilt
+      - name: Upload Chromium failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: chromium-test-results
+          path: test-results
+
+  browser-smoke:
+    needs: [quality]
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [firefox, webkit]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: 24
+          cache: npm
+      - name: Restore Playwright ${{ matrix.browser }}
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ matrix.browser }}-${{ hashFiles('package-lock.json') }}
+      - run: npm ci
+      - run: npx playwright install --with-deps ${{ matrix.browser }}
+      - run: npm run build
+      - run: npm run test:ui:smoke -- --project=${{ matrix.browser }}-smoke
+      - name: Upload ${{ matrix.browser }} failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: ${{ matrix.browser }}-test-results
+          path: test-results
+
+  browser-visual:
+    needs: [quality]
+    runs-on: ubuntu-latest
+    container: mcr.microsoft.com/playwright:v1.61.1-noble
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: npm run test:visual
+      - name: Upload visual failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: visual-test-results
+          path: test-results
+
+  browser:
+    if: always()
+    needs: [browser-chromium, browser-smoke, browser-visual]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require all browser suites
+        env:
+          CHROMIUM_RESULT: ${{ needs.browser-chromium.result }}
+          SMOKE_RESULT: ${{ needs.browser-smoke.result }}
+          VISUAL_RESULT: ${{ needs.browser-visual.result }}
+        run: |
+          test "$CHROMIUM_RESULT" = "success"
+          test "$SMOKE_RESULT" = "success"
+          test "$VISUAL_RESULT" = "success"
 
   deploy:
     if: github.event_name == 'push' && github.ref == 'refs/heads/master'

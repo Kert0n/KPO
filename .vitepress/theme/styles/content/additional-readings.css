@@ -17,7 +17,7 @@
   margin-bottom: 1rem;
 }
 
-.vp-doc .kpo-additional-readings__header h2 {
+.kpo-additional-readings__header h2 {
   margin: 0;
   border-top: 0;
   padding-top: 0;
@@ -33,11 +33,11 @@
   margin-top: 1.25rem;
 }
 
-.vp-doc .kpo-additional-readings__group h3 {
+.kpo-additional-readings__group h3 {
   margin-top: 0;
 }
 
-.vp-doc .kpo-additional-readings__group ul {
+.kpo-additional-readings__group ul {
   margin: 0;
 }
 

@@ -8,6 +8,17 @@ const publicRoutes = catalog.pages.filter((page) => page.inclusion.sitemap)
 const routeSet = new Set(catalog.pages.map((page) => normalizeRoute(page.route)))
 const failures: string[] = []
 
+for (const wrapper of [
+  'gradlew',
+  'gradlew.bat',
+  'gradle/wrapper/gradle-wrapper.jar',
+  'gradle/wrapper/gradle-wrapper.properties'
+]) {
+  if (!existsSync(resolve(root, 'tooling/kotlin-snippets', wrapper))) {
+    failures.push(`missing Gradle Wrapper file: tooling/kotlin-snippets/${wrapper}`)
+  }
+}
+
 if (publicRoutes.length === 0) failures.push('Content catalog must contain at least one public route.')
 
 for (const page of catalog.pages) {

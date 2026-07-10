@@ -3,12 +3,10 @@ import { computed, onMounted, ref, useTemplateRef, watch } from 'vue'
 import KotlinPlayground from './KotlinPlayground.vue'
 import { useCodeLanguage } from '../composables/useCodeLanguage'
 import { usePlaygroundMode } from '../composables/usePlaygroundMode'
-import {
-  canUsePlayground,
-  isSupportedCodeLanguage,
-  parseCsv,
-  resolveDisplayLanguage
-} from '../lib/codeBlockModel'
+import { useActiveCodeLanguage } from '../composables/code/useActiveCodeLanguage'
+import { useCodeTabs } from '../composables/code/useCodeTabs'
+import { useShikiBlocks } from '../composables/code/useShikiBlocks'
+import { canUsePlayground, parseCsv } from '../lib/codeBlockModel'
 import { preserveViewportAnchor } from '../lib/viewportAnchor'
 
 /**
@@ -54,9 +52,6 @@ const { playgroundMode, setPlaygroundMode } = usePlaygroundMode()
 
 const rootElement = useTemplateRef('root')
 const blocksElement = useTemplateRef('blocks')
-const mounted = ref(false)
-const authorDefaultReleased = ref(false)
-const localUnsupportedLanguage = ref<string | null>(null)
 const playgroundFailed = ref(false)
 const playgroundEverShown = ref(false)
 const kotlinCode = ref('')
@@ -71,16 +66,20 @@ const hasKotlin = computed(() => langList.value.includes('kotlin'))
  * После первого клика конкретный блок присоединяется к глобальному
  * выбору, чтобы последующие клики в других блоках переключали и его.
  */
-const displayLang = computed(() => {
-  return resolveDisplayLanguage({
-    languages: langList.value,
-    initialLanguage: props.initialLang,
-    authorDefaultLanguage: props.authorDefaultLang,
-    globalLanguage: mounted.value ? activeLanguage.value : null,
-    authorDefaultProtected: Boolean(props.authorDefaultLang) && !authorDefaultReleased.value,
-    localUnsupportedLanguage: localUnsupportedLanguage.value
-  })
+const {
+  hydrated: mounted,
+  displayLanguage: displayLang,
+  selectLanguage
+} = useActiveCodeLanguage({
+  root: rootElement,
+  languages: langList,
+  initialLanguage: () => props.initialLang,
+  authorDefaultLanguage: () => props.authorDefaultLang,
+  globalLanguage: activeLanguage,
+  setGlobalLanguage: setActiveLanguage
 })
+const { extractKotlinCode } = useShikiBlocks(blocksElement, displayLang)
+const { onTabsKeydown } = useCodeTabs(langList, displayLang, selectLanguage)
 
 /** Playground возможен: блок им размечен, показан Kotlin, загрузка не падала */
 const playgroundUsable = computed(() => {
@@ -113,8 +112,6 @@ onMounted(() => {
   mounted.value = true
 })
 
-watch([displayLang, mounted], syncActiveBlock)
-
 watch(
   playgroundActive,
   (active) => {
@@ -122,27 +119,6 @@ watch(
   },
   { immediate: true }
 )
-
-/** Переключает класс active на fence-блоке выбранного языка */
-function syncActiveBlock(): void {
-  const blocks = blocksElement.value?.querySelectorAll(':scope > [class*="language-"]') ?? []
-  for (const block of blocks) {
-    block.classList.toggle('active', blockLanguage(block) === displayLang.value)
-  }
-}
-
-function blockLanguage(block: Element): string {
-  for (const name of block.classList) {
-    if (name.startsWith('language-')) return name.slice('language-'.length)
-  }
-  return ''
-}
-
-/** Исходник для playground: textContent Shiki-разметки — это ровно код */
-function extractKotlinCode(): string {
-  const code = blocksElement.value?.querySelector(':scope > .language-kotlin pre code')
-  return code?.textContent?.replace(/\n$/, '') ?? ''
-}
 
 function decodePlaygroundCode(): string {
   if (!props.playgroundCode) return ''
@@ -158,20 +134,6 @@ function tabLabel(index: number): string {
   return labelList.value[index] ?? langList.value[index]
 }
 
-async function selectLanguage(lang: string): Promise<void> {
-  await preserveViewportAnchor(rootElement.value, () => {
-    authorDefaultReleased.value = true
-
-    if (isSupportedCodeLanguage(lang)) {
-      localUnsupportedLanguage.value = null
-      setActiveLanguage(lang)
-      return
-    }
-
-    localUnsupportedLanguage.value = lang
-  })
-}
-
 async function togglePlayground(): Promise<void> {
   await preserveViewportAnchor(
     rootElement.value,
@@ -180,23 +142,6 @@ async function togglePlayground(): Promise<void> {
     },
     { frames: 3 }
   )
-}
-
-function onTabsKeydown(event: KeyboardEvent): void {
-  const langs = langList.value
-  const current = Math.max(0, langs.indexOf(displayLang.value))
-  const moves: Record<string, number> = {
-    ArrowLeft: current - 1,
-    ArrowRight: current + 1,
-    Home: 0,
-    End: langs.length - 1
-  }
-
-  const next = moves[event.key]
-  if (next === undefined) return
-
-  event.preventDefault()
-  void selectLanguage(langs[(next + langs.length) % langs.length])
 }
 </script>
 

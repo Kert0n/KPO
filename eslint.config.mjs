@@ -54,14 +54,30 @@ export default tseslint.config(
     rules: { '@typescript-eslint/no-unused-vars': 'off' }
   },
   {
-    files: ['.vitepress/theme/**/*.{ts,vue}'],
+    files: ['.vitepress/theme/components/**/*.{ts,vue}'],
     rules: {
       'no-restricted-imports': [
         'error',
         {
           patterns: [
             {
-              group: ['../../lib/**', '../../../lib/**'],
+              group: ['../../lib/**'],
+              message: 'Theme must depend on shared modules, not build-time lib modules.'
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    files: ['.vitepress/theme/composables/**/*.{ts,vue}'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['../../../lib/**'],
               message: 'Theme must depend on shared modules, not build-time lib modules.'
             }
           ]

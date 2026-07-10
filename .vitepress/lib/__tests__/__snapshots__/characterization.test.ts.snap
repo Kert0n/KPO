@@ -1,0 +1,954 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`published contract characterization > keeps Ask AI entries, block IDs and fixture prompt stable 1`] = `
+[
+  {
+    "routeKey": "conclusion",
+    "sourcePath": "content/conclusion/vitepress.md",
+  },
+  {
+    "routeKey": "extras/01",
+    "sourcePath": "content/extras/01/vitepress.md",
+  },
+  {
+    "routeKey": "extras/02",
+    "sourcePath": "content/extras/02/vitepress.md",
+  },
+  {
+    "routeKey": "extras/index",
+    "sourcePath": "content/extras/index/vitepress.md",
+  },
+  {
+    "routeKey": "index",
+    "sourcePath": "content/home/vitepress.md",
+  },
+  {
+    "routeKey": "intro",
+    "sourcePath": "content/intro/vitepress.md",
+  },
+  {
+    "routeKey": "lectures/01",
+    "sourcePath": "content/lectures/Lec1/vitepress.md",
+  },
+  {
+    "routeKey": "lectures/02",
+    "sourcePath": "content/lectures/Lec2/vitepress.md",
+  },
+  {
+    "routeKey": "lectures/03",
+    "sourcePath": "content/lectures/Lec3/vitepress.md",
+  },
+  {
+    "routeKey": "lectures/04",
+    "sourcePath": "content/lectures/Lec4/vitepress.md",
+  },
+  {
+    "routeKey": "lectures/05",
+    "sourcePath": "content/lectures/Lec5/vitepress.md",
+  },
+  {
+    "routeKey": "lectures/06",
+    "sourcePath": "content/lectures/Lec6/vitepress.md",
+  },
+  {
+    "routeKey": "lectures/07",
+    "sourcePath": "content/lectures/Lec7/vitepress.md",
+  },
+  {
+    "routeKey": "lectures/08",
+    "sourcePath": "content/lectures/Lec8/vitepress.md",
+  },
+  {
+    "routeKey": "lectures/09",
+    "sourcePath": "content/lectures/Lec9/vitepress.md",
+  },
+  {
+    "routeKey": "lectures/10",
+    "sourcePath": "content/lectures/Lec10/vitepress.md",
+  },
+  {
+    "routeKey": "lectures/11",
+    "sourcePath": "content/lectures/Lec11/vitepress.md",
+  },
+  {
+    "routeKey": "lectures/12",
+    "sourcePath": "content/lectures/Lec12/vitepress.md",
+  },
+  {
+    "routeKey": "lectures/13",
+    "sourcePath": "content/lectures/Lec13/vitepress.md",
+  },
+  {
+    "routeKey": "lectures/14",
+    "sourcePath": "content/lectures/Lec14/vitepress.md",
+  },
+]
+`;
+
+exports[`published contract characterization > keeps Ask AI entries, block IDs and fixture prompt stable 2`] = `
+[
+  {
+    "id": "kpo-ai-2-heading-1kpbl7e",
+    "kind": "heading",
+    "language": undefined,
+    "lineEnd": 2,
+    "lineStart": 2,
+  },
+  {
+    "id": "kpo-ai-4-paragraph-1o4j04g",
+    "kind": "paragraph",
+    "language": undefined,
+    "lineEnd": 5,
+    "lineStart": 4,
+  },
+  {
+    "id": "kpo-ai-7-heading-1hn8l27",
+    "kind": "heading",
+    "language": undefined,
+    "lineEnd": 7,
+    "lineStart": 7,
+  },
+  {
+    "id": "kpo-ai-9-multi-code-gulv95",
+    "kind": "multi-code",
+    "language": undefined,
+    "lineEnd": 26,
+    "lineStart": 9,
+  },
+  {
+    "id": "kpo-ai-29-multi-code-iu82s1",
+    "kind": "multi-code",
+    "language": undefined,
+    "lineEnd": 46,
+    "lineStart": 29,
+  },
+  {
+    "id": "kpo-ai-49-multi-code-1ev2dw3",
+    "kind": "multi-code",
+    "language": undefined,
+    "lineEnd": 66,
+    "lineStart": 49,
+  },
+  {
+    "id": "kpo-ai-69-heading-142gu2j",
+    "kind": "heading",
+    "language": undefined,
+    "lineEnd": 69,
+    "lineStart": 69,
+  },
+  {
+    "id": "kpo-ai-71-multi-code-1ilfomi",
+    "kind": "multi-code",
+    "language": undefined,
+    "lineEnd": 88,
+    "lineStart": 71,
+  },
+  {
+    "id": "kpo-ai-91-heading-sdhjfo",
+    "kind": "heading",
+    "language": undefined,
+    "lineEnd": 91,
+    "lineStart": 91,
+  },
+  {
+    "id": "kpo-ai-93-multi-code-cmvd02",
+    "kind": "multi-code",
+    "language": undefined,
+    "lineEnd": 122,
+    "lineStart": 93,
+  },
+  {
+    "id": "kpo-ai-125-multi-code-1peu7ph",
+    "kind": "multi-code",
+    "language": undefined,
+    "lineEnd": 151,
+    "lineStart": 125,
+  },
+  {
+    "id": "kpo-ai-154-heading-1lwwh7w",
+    "kind": "heading",
+    "language": undefined,
+    "lineEnd": 154,
+    "lineStart": 154,
+  },
+  {
+    "id": "kpo-ai-156-mermaid-v5l2r6",
+    "kind": "mermaid",
+    "language": "mermaid",
+    "lineEnd": 170,
+    "lineStart": 156,
+  },
+  {
+    "id": "kpo-ai-172-mermaid-1svsqsx",
+    "kind": "mermaid",
+    "language": "mermaid",
+    "lineEnd": 177,
+    "lineStart": 172,
+  },
+  {
+    "id": "kpo-ai-179-mermaid-1xl6o1v",
+    "kind": "mermaid",
+    "language": "mermaid",
+    "lineEnd": 182,
+    "lineStart": 179,
+  },
+  {
+    "id": "kpo-ai-184-mermaid-1ux1pjq",
+    "kind": "mermaid",
+    "language": "mermaid",
+    "lineEnd": 188,
+    "lineStart": 184,
+  },
+  {
+    "id": "kpo-ai-190-heading-1gwubk3",
+    "kind": "heading",
+    "language": undefined,
+    "lineEnd": 190,
+    "lineStart": 190,
+  },
+  {
+    "id": "kpo-ai-192-image-u4zkda",
+    "kind": "image",
+    "language": undefined,
+    "lineEnd": 192,
+    "lineStart": 192,
+  },
+  {
+    "id": "kpo-ai-194-heading-1j4tuh5",
+    "kind": "heading",
+    "language": undefined,
+    "lineEnd": 194,
+    "lineStart": 194,
+  },
+  {
+    "id": "kpo-ai-196-table-1ufxhh4",
+    "kind": "table",
+    "language": undefined,
+    "lineEnd": 199,
+    "lineStart": 196,
+  },
+  {
+    "id": "kpo-ai-201-table-1suoi9y",
+    "kind": "table",
+    "language": undefined,
+    "lineEnd": 204,
+    "lineStart": 201,
+  },
+  {
+    "id": "kpo-ai-206-table-151mszd",
+    "kind": "table",
+    "language": undefined,
+    "lineEnd": 208,
+    "lineStart": 206,
+  },
+  {
+    "id": "kpo-ai-210-heading-lf6ar1",
+    "kind": "heading",
+    "language": undefined,
+    "lineEnd": 210,
+    "lineStart": 210,
+  },
+  {
+    "id": "kpo-ai-212-code-1flsfk9",
+    "kind": "code",
+    "language": "text",
+    "lineEnd": 214,
+    "lineStart": 212,
+  },
+  {
+    "id": "kpo-ai-216-code-11dq5fm",
+    "kind": "code",
+    "language": "text",
+    "lineEnd": 218,
+    "lineStart": 216,
+  },
+  {
+    "id": "kpo-ai-220-heading-1o0rwj0",
+    "kind": "heading",
+    "language": undefined,
+    "lineEnd": 220,
+    "lineStart": 220,
+  },
+  {
+    "id": "kpo-ai-222-paragraph-1ktpw2w",
+    "kind": "paragraph",
+    "language": undefined,
+    "lineEnd": 224,
+    "lineStart": 222,
+  },
+  {
+    "id": "kpo-ai-226-paragraph-nkfpx4",
+    "kind": "paragraph",
+    "language": undefined,
+    "lineEnd": 228,
+    "lineStart": 226,
+  },
+  {
+    "id": "kpo-ai-230-paragraph-1dcmifk",
+    "kind": "paragraph",
+    "language": undefined,
+    "lineEnd": 232,
+    "lineStart": 230,
+  },
+  {
+    "id": "kpo-ai-234-blockquote-s7rip6",
+    "kind": "blockquote",
+    "language": undefined,
+    "lineEnd": 234,
+    "lineStart": 234,
+  },
+  {
+    "id": "kpo-ai-236-paragraph-jlihai",
+    "kind": "paragraph",
+    "language": undefined,
+    "lineEnd": 237,
+    "lineStart": 236,
+  },
+  {
+    "id": "kpo-ai-239-heading-joh4yi",
+    "kind": "heading",
+    "language": undefined,
+    "lineEnd": 239,
+    "lineStart": 239,
+  },
+  {
+    "id": "kpo-ai-241-heading-1uap4h8",
+    "kind": "heading",
+    "language": undefined,
+    "lineEnd": 241,
+    "lineStart": 241,
+  },
+]
+`;
+
+exports[`published contract characterization > keeps Ask AI entries, block IDs and fixture prompt stable 3`] = `
+"Ты помогаешь студенту понять материал курса по конструированию ПО.
+
+Курс: Конструирование ПО
+Описание курса: Конспект лекций по архитектуре приложений и инженерным практикам
+Страница: UI Contract Fixtures
+Описание страницы: This page is intentionally hidden from navigation. It contains stable markup fixtures for layout, markdown extensions, language switchers, Mermaid, tables, images and Kotlin Playground behavior.
+
+Задача: объясни выделенный фрагмент с учетом контекста. Дай практичное объяснение: смысл, связь с темой, типичные ошибки, best practices, короткий пример если он полезен.
+
+[Контекст до]
+This page is intentionally hidden from navigation. It contains stable markup fixtures for layout, markdown extensions,
+language switchers, Mermaid, tables, images and Kotlin Playground behavior.
+
+## Code Switchers Without Author Defaults
+
+[Текущий блок]
+:::: multi-code "Fixture switcher one"
+
+\`\`\`kotlin
+val value = "one"
+\`\`\`
+
+\`\`\`csharp
+var value = "one";
+\`\`\`
+
+\`\`\`java
+var value = "one";
+\`\`\`
+
+\`\`\`go
+value := "one"
+\`\`\`
+
+[Контекст после]
+:::: multi-code "Fixture switcher two"
+
+\`\`\`kotlin
+val value = "two"
+\`\`\`
+
+\`\`\`csharp
+var value = "two";
+\`\`\`
+
+\`\`\`java
+var value = "two";
+\`\`\`
+
+\`\`\`go
+value := "two"
+\`\`\`
+
+:::: multi-code "Fixture switcher three"
+
+\`\`\`kotlin
+val value = "three"
+\`\`\`
+
+\`\`\`csharp
+var value = "three";
+\`\`\`
+
+\`\`\`java
+var value = "three";
+\`\`\`
+
+\`\`\`go
+value := "three"
+\`\`\`
+
+[Выделенный фрагмент]
+Fixture Kotlin"
+`;
+
+exports[`published contract characterization > keeps catalog routes and channel inclusion stable 1`] = `
+[
+  {
+    "inclusion": {
+      "askAi": true,
+      "nav": true,
+      "pdf": true,
+      "search": true,
+      "sidebar": true,
+      "sitemap": true,
+      "uiSweep": true,
+    },
+    "kind": "conclusion",
+    "order": 0,
+    "route": "/conclusion",
+    "routeKey": "conclusion",
+  },
+  {
+    "inclusion": {
+      "askAi": true,
+      "nav": true,
+      "pdf": true,
+      "search": true,
+      "sidebar": true,
+      "sitemap": true,
+      "uiSweep": true,
+    },
+    "kind": "extra",
+    "order": 1,
+    "route": "/extras/01",
+    "routeKey": "extras/01",
+  },
+  {
+    "inclusion": {
+      "askAi": true,
+      "nav": true,
+      "pdf": true,
+      "search": true,
+      "sidebar": true,
+      "sitemap": true,
+      "uiSweep": true,
+    },
+    "kind": "extra",
+    "order": 2,
+    "route": "/extras/02",
+    "routeKey": "extras/02",
+  },
+  {
+    "inclusion": {
+      "askAi": true,
+      "nav": true,
+      "pdf": true,
+      "search": true,
+      "sidebar": true,
+      "sitemap": true,
+      "uiSweep": true,
+    },
+    "kind": "extras-index",
+    "order": 0,
+    "route": "/extras/",
+    "routeKey": "extras/index",
+  },
+  {
+    "inclusion": {
+      "askAi": true,
+      "nav": false,
+      "pdf": false,
+      "search": true,
+      "sidebar": false,
+      "sitemap": true,
+      "uiSweep": false,
+    },
+    "kind": "home",
+    "order": 0,
+    "route": "/",
+    "routeKey": "index",
+  },
+  {
+    "inclusion": {
+      "askAi": true,
+      "nav": true,
+      "pdf": true,
+      "search": true,
+      "sidebar": true,
+      "sitemap": true,
+      "uiSweep": true,
+    },
+    "kind": "intro",
+    "order": 0,
+    "route": "/intro",
+    "routeKey": "intro",
+  },
+  {
+    "inclusion": {
+      "askAi": true,
+      "nav": true,
+      "pdf": true,
+      "search": true,
+      "sidebar": true,
+      "sitemap": true,
+      "uiSweep": true,
+    },
+    "kind": "lecture",
+    "order": 1,
+    "route": "/lectures/01",
+    "routeKey": "lectures/01",
+  },
+  {
+    "inclusion": {
+      "askAi": true,
+      "nav": true,
+      "pdf": true,
+      "search": true,
+      "sidebar": true,
+      "sitemap": true,
+      "uiSweep": true,
+    },
+    "kind": "lecture",
+    "order": 2,
+    "route": "/lectures/02",
+    "routeKey": "lectures/02",
+  },
+  {
+    "inclusion": {
+      "askAi": true,
+      "nav": true,
+      "pdf": true,
+      "search": true,
+      "sidebar": true,
+      "sitemap": true,
+      "uiSweep": true,
+    },
+    "kind": "lecture",
+    "order": 3,
+    "route": "/lectures/03",
+    "routeKey": "lectures/03",
+  },
+  {
+    "inclusion": {
+      "askAi": true,
+      "nav": true,
+      "pdf": true,
+      "search": true,
+      "sidebar": true,
+      "sitemap": true,
+      "uiSweep": true,
+    },
+    "kind": "lecture",
+    "order": 4,
+    "route": "/lectures/04",
+    "routeKey": "lectures/04",
+  },
+  {
+    "inclusion": {
+      "askAi": true,
+      "nav": true,
+      "pdf": true,
+      "search": true,
+      "sidebar": true,
+      "sitemap": true,
+      "uiSweep": true,
+    },
+    "kind": "lecture",
+    "order": 5,
+    "route": "/lectures/05",
+    "routeKey": "lectures/05",
+  },
+  {
+    "inclusion": {
+      "askAi": true,
+      "nav": true,
+      "pdf": true,
+      "search": true,
+      "sidebar": true,
+      "sitemap": true,
+      "uiSweep": true,
+    },
+    "kind": "lecture",
+    "order": 6,
+    "route": "/lectures/06",
+    "routeKey": "lectures/06",
+  },
+  {
+    "inclusion": {
+      "askAi": true,
+      "nav": true,
+      "pdf": true,
+      "search": true,
+      "sidebar": true,
+      "sitemap": true,
+      "uiSweep": true,
+    },
+    "kind": "lecture",
+    "order": 7,
+    "route": "/lectures/07",
+    "routeKey": "lectures/07",
+  },
+  {
+    "inclusion": {
+      "askAi": true,
+      "nav": true,
+      "pdf": true,
+      "search": true,
+      "sidebar": true,
+      "sitemap": true,
+      "uiSweep": true,
+    },
+    "kind": "lecture",
+    "order": 8,
+    "route": "/lectures/08",
+    "routeKey": "lectures/08",
+  },
+  {
+    "inclusion": {
+      "askAi": true,
+      "nav": true,
+      "pdf": true,
+      "search": true,
+      "sidebar": true,
+      "sitemap": true,
+      "uiSweep": true,
+    },
+    "kind": "lecture",
+    "order": 9,
+    "route": "/lectures/09",
+    "routeKey": "lectures/09",
+  },
+  {
+    "inclusion": {
+      "askAi": true,
+      "nav": true,
+      "pdf": true,
+      "search": true,
+      "sidebar": true,
+      "sitemap": true,
+      "uiSweep": true,
+    },
+    "kind": "lecture",
+    "order": 10,
+    "route": "/lectures/10",
+    "routeKey": "lectures/10",
+  },
+  {
+    "inclusion": {
+      "askAi": true,
+      "nav": true,
+      "pdf": true,
+      "search": true,
+      "sidebar": true,
+      "sitemap": true,
+      "uiSweep": true,
+    },
+    "kind": "lecture",
+    "order": 11,
+    "route": "/lectures/11",
+    "routeKey": "lectures/11",
+  },
+  {
+    "inclusion": {
+      "askAi": true,
+      "nav": true,
+      "pdf": true,
+      "search": true,
+      "sidebar": true,
+      "sitemap": true,
+      "uiSweep": true,
+    },
+    "kind": "lecture",
+    "order": 12,
+    "route": "/lectures/12",
+    "routeKey": "lectures/12",
+  },
+  {
+    "inclusion": {
+      "askAi": true,
+      "nav": true,
+      "pdf": true,
+      "search": true,
+      "sidebar": true,
+      "sitemap": true,
+      "uiSweep": true,
+    },
+    "kind": "lecture",
+    "order": 13,
+    "route": "/lectures/13",
+    "routeKey": "lectures/13",
+  },
+  {
+    "inclusion": {
+      "askAi": true,
+      "nav": true,
+      "pdf": true,
+      "search": true,
+      "sidebar": true,
+      "sitemap": true,
+      "uiSweep": true,
+    },
+    "kind": "lecture",
+    "order": 14,
+    "route": "/lectures/14",
+    "routeKey": "lectures/14",
+  },
+  {
+    "inclusion": {
+      "askAi": false,
+      "nav": false,
+      "pdf": false,
+      "search": false,
+      "sidebar": false,
+      "sitemap": false,
+      "uiSweep": false,
+    },
+    "kind": "service",
+    "order": 0,
+    "route": "/service-pages/ui-contract",
+    "routeKey": "service-pages/ui-contract",
+  },
+]
+`;
+
+exports[`published contract characterization > keeps catalog routes and channel inclusion stable 2`] = `
+[
+  "/intro",
+  "/lectures/01",
+  "/lectures/02",
+  "/lectures/03",
+  "/lectures/04",
+  "/lectures/05",
+  "/lectures/06",
+  "/lectures/07",
+  "/lectures/08",
+  "/lectures/09",
+  "/lectures/10",
+  "/lectures/11",
+  "/lectures/12",
+  "/lectures/13",
+  "/lectures/14",
+  "/extras/",
+  "/extras/01",
+  "/extras/02",
+  "/conclusion",
+]
+`;
+
+exports[`published contract characterization > keeps catalog routes and channel inclusion stable 3`] = `
+[
+  "/intro",
+  "/lectures/01",
+  "/lectures/02",
+  "/lectures/03",
+  "/lectures/04",
+  "/lectures/05",
+  "/lectures/06",
+  "/lectures/07",
+  "/lectures/08",
+  "/lectures/09",
+  "/lectures/10",
+  "/lectures/11",
+  "/lectures/12",
+  "/lectures/13",
+  "/lectures/14",
+  "/extras/",
+  "/extras/01",
+  "/extras/02",
+  "/conclusion",
+]
+`;
+
+exports[`published contract characterization > keeps navigation and rewrites stable 1`] = `
+[
+  {
+    "link": "/intro",
+    "text": "Введение",
+  },
+  {
+    "activeMatch": "^/lectures/",
+    "link": "/lectures/01",
+    "text": "Лекции",
+  },
+  {
+    "activeMatch": "^/extras/",
+    "link": "/extras/",
+    "text": "Дополнения",
+  },
+  {
+    "link": "/conclusion",
+    "text": "Заключение",
+  },
+]
+`;
+
+exports[`published contract characterization > keeps navigation and rewrites stable 2`] = `
+[
+  {
+    "items": [
+      {
+        "link": "/intro",
+        "text": "Введение",
+      },
+    ],
+    "text": "Начало",
+  },
+  {
+    "collapsed": false,
+    "items": [
+      {
+        "link": "/lectures/01",
+        "text": "Лекция 1. Введение в КПО",
+      },
+      {
+        "link": "/lectures/02",
+        "text": "Лекция 2. Внедрение зависимостей",
+      },
+      {
+        "link": "/lectures/03",
+        "text": "Лекция 3. Принципы эффективного юнит-тестирования",
+      },
+      {
+        "link": "/lectures/04",
+        "text": "Лекция 4. Паттерны проектирования GoF: порождающие паттерны",
+      },
+      {
+        "link": "/lectures/05",
+        "text": "Лекция 5. Поведенческие паттерны проектирования",
+      },
+      {
+        "link": "/lectures/06",
+        "text": "Лекция 6. Структурные паттерны проектирования",
+      },
+      {
+        "link": "/lectures/07",
+        "text": "Лекция 7. Предметно-ориентированное программирование",
+      },
+      {
+        "link": "/lectures/08",
+        "text": "Лекция 8. Эволюция Enterprise-архитектур",
+      },
+      {
+        "link": "/lectures/09",
+        "text": "Лекция 9. Виртуализация и эволюция баз данных",
+      },
+      {
+        "link": "/lectures/10",
+        "text": "Лекция 10. Семантика клиент-серверного и межсервисного обмена",
+      },
+      {
+        "link": "/lectures/11",
+        "text": "Лекция 11. Асинхронное межсервисное взаимодействие",
+      },
+      {
+        "link": "/lectures/12",
+        "text": "Лекция 12. Паттерны отказоустойчивости при межсервисном взаимодействии",
+      },
+      {
+        "link": "/lectures/13",
+        "text": "Лекция 13. Паттерны работы с данными",
+      },
+      {
+        "link": "/lectures/14",
+        "text": "Лекция 14. DevOps, SRE и Observability",
+      },
+    ],
+    "text": "Лекции",
+  },
+  {
+    "collapsed": false,
+    "items": [
+      {
+        "link": "/extras/",
+        "text": "О дополнениях",
+      },
+      {
+        "link": "/extras/01",
+        "text": "Песочница",
+      },
+      {
+        "link": "/extras/02",
+        "text": "Дополнительные материалы",
+      },
+    ],
+    "text": "Дополнения",
+  },
+  {
+    "items": [
+      {
+        "link": "/conclusion",
+        "text": "Заключение",
+      },
+    ],
+    "text": "Финал",
+  },
+]
+`;
+
+exports[`published contract characterization > keeps navigation and rewrites stable 3`] = `
+{
+  "conclusion/vitepress.md": "conclusion.md",
+  "extras/01/vitepress.md": "extras/01.md",
+  "extras/02/vitepress.md": "extras/02.md",
+  "extras/index/vitepress.md": "extras/index.md",
+  "home/vitepress.md": "index.md",
+  "intro/vitepress.md": "intro.md",
+  "lectures/Lec1/vitepress.md": "lectures/01.md",
+  "lectures/Lec10/vitepress.md": "lectures/10.md",
+  "lectures/Lec11/vitepress.md": "lectures/11.md",
+  "lectures/Lec12/vitepress.md": "lectures/12.md",
+  "lectures/Lec13/vitepress.md": "lectures/13.md",
+  "lectures/Lec14/vitepress.md": "lectures/14.md",
+  "lectures/Lec2/vitepress.md": "lectures/02.md",
+  "lectures/Lec3/vitepress.md": "lectures/03.md",
+  "lectures/Lec4/vitepress.md": "lectures/04.md",
+  "lectures/Lec5/vitepress.md": "lectures/05.md",
+  "lectures/Lec6/vitepress.md": "lectures/06.md",
+  "lectures/Lec7/vitepress.md": "lectures/07.md",
+  "lectures/Lec8/vitepress.md": "lectures/08.md",
+  "lectures/Lec9/vitepress.md": "lectures/09.md",
+  "service-pages/ui-contract/vitepress.md": "service-pages/ui-contract.md",
+}
+`;
+
+exports[`published contract characterization > keeps representative rendered HTML stable 1`] = `
+"<h1 data-kpo-ask-block-id="kpo-ai-1-heading-1o7x8u7">Заголовок</h1>
+<p data-kpo-ask-block-id="kpo-ai-3-paragraph-vi4d47">Обычный абзац.</p>
+<div class="kpo-content-block kpo-content-block--image kpo-content-block--wide" data-kpo-ask-block-id="kpo-ai-5-image-db1y4o">
+<p data-kpo-ask-block-id="kpo-ai-5-image-db1y4o"><img src="/diagram.svg" alt="Схема"></p>
+</div>
+<div class="kpo-content-block kpo-content-block--table kpo-content-block--wide" data-kpo-content-kind="table" data-kpo-ask-block-id="kpo-ai-7-table-13p0921">
+<table data-kpo-ask-block-id="kpo-ai-7-table-13p0921">
+<thead>
+<tr>
+<th>A</th>
+<th>B</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>2</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="kpo-content-block kpo-content-block--code kpo-content-block--wide" data-kpo-ask-block-id="kpo-ai-11-code-f39rcy">
+<pre><code class="language-kotlin">fun main() = println(&quot;ok&quot;)
+</code></pre>
+</div>
+<div class="kpo-content-block kpo-content-block--multi-code kpo-content-block--wide kpo-wide-block kpo-wide-block--code" data-kpo-ask-block-id="kpo-ai-15-multi-code-1njgo23">
+<CodeSwitcher title="Пример" langs="kotlin,java" labels="Kotlin,Java" initial-lang="kotlin" ask-block-id="kpo-ai-15-multi-code-1njgo23" author-default-lang="kotlin" :allow-playground="true">
+<pre><code class="language-kotlin">val answer = 42
+</code></pre>
+<pre><code class="language-java">var answer = 42;
+</code></pre>
+</CodeSwitcher>
+</div>"
+`;
