@@ -27,24 +27,27 @@ import { preserveViewportAnchor } from '../lib/viewportAnchor'
  * языка или сбое инициализации, а лишь деактивируется.
  */
 
-const props = withDefaults(defineProps<{
-  title?: string
-  langs: string
-  labels?: string
-  initialLang?: string
-  authorDefaultLang?: string
-  allowPlayground?: boolean
-  playgroundCode?: string
-  askBlockId?: string
-}>(), {
-  title: '',
-  labels: '',
-  initialLang: '',
-  authorDefaultLang: '',
-  allowPlayground: false,
-  playgroundCode: '',
-  askBlockId: ''
-})
+const props = withDefaults(
+  defineProps<{
+    title?: string
+    langs: string
+    labels?: string
+    initialLang?: string
+    authorDefaultLang?: string
+    allowPlayground?: boolean
+    playgroundCode?: string
+    askBlockId?: string
+  }>(),
+  {
+    title: '',
+    labels: '',
+    initialLang: '',
+    authorDefaultLang: '',
+    allowPlayground: false,
+    playgroundCode: '',
+    askBlockId: ''
+  }
+)
 
 const { activeLanguage, setActiveLanguage } = useCodeLanguage()
 const { playgroundMode, setPlaygroundMode } = usePlaygroundMode()
@@ -81,12 +84,15 @@ const displayLang = computed(() => {
 
 /** Playground возможен: блок им размечен, показан Kotlin, загрузка не падала */
 const playgroundUsable = computed(() => {
-  return mounted.value && canUsePlayground({
-    allowPlayground: props.allowPlayground,
-    displayLanguage: displayLang.value,
-    playgroundFailed: playgroundFailed.value,
-    hasKotlinCode: kotlinCode.value !== ''
-  })
+  return (
+    mounted.value &&
+    canUsePlayground({
+      allowPlayground: props.allowPlayground,
+      displayLanguage: displayLang.value,
+      playgroundFailed: playgroundFailed.value,
+      hasKotlinCode: kotlinCode.value !== ''
+    })
+  )
 })
 
 /** Playground показан: возможен + включён читателем + есть исходник */
@@ -109,9 +115,13 @@ onMounted(() => {
 
 watch([displayLang, mounted], syncActiveBlock)
 
-watch(playgroundActive, (active) => {
-  if (active) playgroundEverShown.value = true
-}, { immediate: true })
+watch(
+  playgroundActive,
+  (active) => {
+    if (active) playgroundEverShown.value = true
+  },
+  { immediate: true }
+)
 
 /** Переключает класс active на fence-блоке выбранного языка */
 function syncActiveBlock(): void {
@@ -163,9 +173,13 @@ async function selectLanguage(lang: string): Promise<void> {
 }
 
 async function togglePlayground(): Promise<void> {
-  await preserveViewportAnchor(rootElement.value, () => {
-    setPlaygroundMode(!playgroundMode.value)
-  }, { frames: 3 })
+  await preserveViewportAnchor(
+    rootElement.value,
+    () => {
+      setPlaygroundMode(!playgroundMode.value)
+    },
+    { frames: 3 }
+  )
 }
 
 function onTabsKeydown(event: KeyboardEvent): void {
@@ -207,12 +221,7 @@ function onTabsKeydown(event: KeyboardEvent): void {
           Playground
         </button>
 
-        <div
-          class="kpo-switcher__tabs"
-          role="tablist"
-          aria-label="Язык примера"
-          @keydown="onTabsKeydown"
-        >
+        <div class="kpo-switcher__tabs" role="tablist" aria-label="Язык примера" @keydown="onTabsKeydown">
           <button
             v-for="(lang, index) in langList"
             :key="lang"

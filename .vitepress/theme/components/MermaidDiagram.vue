@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { useData } from 'vitepress'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { stableHash } from '../../lib/hash'
-import { clamp } from '../../lib/math'
+import { stableHash } from '../../shared/core/hash'
+import { clamp } from '../../shared/core/math'
 import { CONTENT_LAYOUT_TOKENS } from '../lib/contentLayoutTokens'
 import {
   readSvgViewBox,
@@ -50,7 +50,14 @@ const userScrolledViewport = ref(false)
 const hovered = ref(false)
 const focusWithin = ref(false)
 const textRisk = ref(false)
-const scaleConfig = ref({
+type MermaidScaleConfig = {
+  desktopMinScale: number
+  mobileMinScale: number
+  wideDiagramMinWidth: number
+  minHeight: number
+}
+
+const scaleConfig = ref<MermaidScaleConfig>({
   desktopMinScale: CONTENT_LAYOUT_TOKENS.mermaidDesktopMinScale,
   mobileMinScale: CONTENT_LAYOUT_TOKENS.mermaidMobileMinScale,
   wideDiagramMinWidth: CONTENT_LAYOUT_TOKENS.mermaidWideDiagramMinWidth,
@@ -58,6 +65,7 @@ const scaleConfig = ref({
 })
 
 let renderCounter = 0
+let renderGeneration = 0
 let resizeObserver: ResizeObserver | null = null
 let isProgrammaticScroll = false
 let programmaticScrollLeft: number | null = null
@@ -75,6 +83,7 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+  renderGeneration += 1
   resizeObserver?.disconnect()
   window.removeEventListener('resize', onWindowResize)
 })
@@ -88,9 +97,8 @@ const autoScale = computed(() => {
     viewBoxWidth: viewBoxWidth.value,
     viewBoxHeight: viewBoxHeight.value,
     availableWidth: availableWidth.value,
-    minScale: viewportMode.value === 'mobile'
-      ? scaleConfig.value.mobileMinScale
-      : scaleConfig.value.desktopMinScale,
+    minScale:
+      viewportMode.value === 'mobile' ? scaleConfig.value.mobileMinScale : scaleConfig.value.desktopMinScale,
     minHeight: scaleConfig.value.minHeight,
     wideDiagramMinWidth: scaleConfig.value.wideDiagramMinWidth
   })
@@ -127,6 +135,7 @@ const canvasStyle = computed(() => {
 })
 
 async function render(): Promise<void> {
+  const generation = ++renderGeneration
   failed.value = false
   errorMessage.value = ''
   svg.value = ''
@@ -135,14 +144,13 @@ async function render(): Promise<void> {
 
   try {
     const { default: mermaid } = await import('mermaid')
+    if (generation !== renderGeneration) return
 
     mermaid.initialize(createMermaidConfig(mermaidThemeTokens()))
 
     renderCounter += 1
-    const { svg: rendered } = await mermaid.render(
-      `${instanceId}-${renderCounter}`,
-      decodedCode.value
-    )
+    const { svg: rendered } = await mermaid.render(`${instanceId}-${renderCounter}`, decodedCode.value)
+    if (generation !== renderGeneration) return
     const size = readSvgViewBox(rendered)
     viewBoxWidth.value = size.width
     viewBoxHeight.value = size.height
@@ -150,6 +158,7 @@ async function render(): Promise<void> {
     await syncViewportLayout()
     updateTextRisk()
   } catch (error) {
+    if (generation !== renderGeneration) return
     console.warn('[mermaid] не удалось отрисовать диаграмму:', error)
     errorMessage.value = error instanceof Error ? error.message : String(error)
     svg.value = ''
@@ -201,11 +210,7 @@ function updateMeasurements(): void {
       '--kpo-mermaid-wide-diagram-min-width',
       CONTENT_LAYOUT_TOKENS.mermaidWideDiagramMinWidth
     ),
-    minHeight: cssNumber(
-      style,
-      '--kpo-mermaid-min-height',
-      CONTENT_LAYOUT_TOKENS.mermaidMinHeight
-    )
+    minHeight: cssNumber(style, '--kpo-mermaid-min-height', CONTENT_LAYOUT_TOKENS.mermaidMinHeight)
   }
 }
 
@@ -219,10 +224,12 @@ async function updateManualScale(delta: number): Promise<void> {
   await syncViewportLayout({ centerRatio })
 }
 
-async function syncViewportLayout(options: {
-  forceCenter?: boolean
-  centerRatio?: number | null
-} = {}): Promise<void> {
+async function syncViewportLayout(
+  options: {
+    forceCenter?: boolean
+    centerRatio?: number | null
+  } = {}
+): Promise<void> {
   await nextTick()
   await waitAnimationFrames(2)
   updateMeasurements()
@@ -264,21 +271,25 @@ function centerViewportIfNeeded(force: boolean): void {
     return
   }
 
-  setViewportScrollLeft(resolveCenteredScrollLeft({
-    clientWidth: element.clientWidth,
-    scrollWidth: element.scrollWidth
-  }))
+  setViewportScrollLeft(
+    resolveCenteredScrollLeft({
+      clientWidth: element.clientWidth,
+      scrollWidth: element.scrollWidth
+    })
+  )
 }
 
 function restoreViewportCenterRatio(centerRatio: number): void {
   const element = viewport.value
   if (!element) return
 
-  setViewportScrollLeft(resolveScrollLeftForCenterRatio({
-    centerRatio,
-    clientWidth: element.clientWidth,
-    scrollWidth: element.scrollWidth
-  }))
+  setViewportScrollLeft(
+    resolveScrollLeftForCenterRatio({
+      centerRatio,
+      clientWidth: element.clientWidth,
+      scrollWidth: element.scrollWidth
+    })
+  )
 }
 
 function currentViewportCenterRatio(): number | null {
@@ -382,7 +393,6 @@ function cssNumber(style: CSSStyleDeclaration, property: string, fallback: numbe
   const parsed = Number.parseFloat(style.getPropertyValue(property))
   return Number.isFinite(parsed) ? parsed : fallback
 }
-
 </script>
 
 <template>
@@ -429,12 +439,7 @@ function cssNumber(style: CSSStyleDeclaration, property: string, fallback: numbe
         +
       </button>
     </div>
-    <div
-      v-if="svg"
-      ref="viewport"
-      class="kpo-mermaid__viewport"
-      @scroll.passive="onViewportScroll"
-    >
+    <div v-if="svg" ref="viewport" class="kpo-mermaid__viewport" @scroll.passive="onViewportScroll">
       <div class="kpo-mermaid__canvas" :style="canvasStyle" v-html="svg" />
     </div>
     <div v-else-if="failed" class="kpo-mermaid__error">

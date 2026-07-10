@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { useData, useRoute, withBase } from 'vitepress'
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
-import { clamp } from '../../lib/math'
+import { clamp } from '../../shared/core/math'
 import { useAskAiProvider } from '../composables/useAskAiProvider'
 import {
   ASK_AI_PROVIDERS,
@@ -13,10 +13,7 @@ import {
   type AskAiPageContext
 } from '../lib/askAiModel'
 import { copyPromptToClipboard } from '../lib/clipboardPrompt'
-import {
-  readPlaygroundCode,
-  readPlaygroundSelection
-} from '../lib/playgroundRegistry'
+import { readPlaygroundCode, readPlaygroundSelection } from '../lib/playgroundRegistry'
 
 type SelectionSnapshot = {
   selectedText: string
@@ -50,11 +47,14 @@ const contextCache = new Map<string, AskAiPageContext>()
 
 let toastTimer: number | null = null
 let mobileSelectionTimer: number | null = null
+let pageContextPrefetchTimer: number | null = null
+let pageContextAbortController: AbortController | null = null
 let prepareVersion = 0
 
 const menuLabel = computed(() => {
-  return ASK_AI_PROVIDERS.find((provider) => provider.id === askAiProvider.value)?.menuLabel
-    ?? 'Ask AI about this'
+  return (
+    ASK_AI_PROVIDERS.find((provider) => provider.id === askAiProvider.value)?.menuLabel ?? 'Ask AI about this'
+  )
 })
 
 const askAiButtonLabel = computed(() => {
@@ -83,13 +83,19 @@ onBeforeUnmount(() => {
   window.removeEventListener('resize', hideMenu)
   clearToast()
   clearMobileSelectionTimer()
+  clearPageContextPrefetch()
+  pageContextAbortController?.abort()
 })
 
-watch(() => route.path, () => {
-  hideMenu()
-  clearPreparedAction()
-  queuePageContextPrefetch()
-})
+watch(
+  () => route.path,
+  () => {
+    pageContextAbortController?.abort()
+    hideMenu()
+    clearPreparedAction()
+    queuePageContextPrefetch()
+  }
+)
 
 watch(askAiProvider, () => {
   if (!menu.visible || !snapshot.value) return
@@ -245,18 +251,34 @@ async function loadPageContext(): Promise<AskAiPageContext> {
   const cached = contextCache.get(key)
   if (cached) return cached
 
-  const response = await fetch(askAiContextUrlForRoute(route.path, site.value.base, withBase))
-  if (!response.ok) throw new Error(`Ask AI context HTTP ${response.status}`)
+  pageContextAbortController?.abort()
+  const controller = new AbortController()
+  pageContextAbortController = controller
+  try {
+    const response = await fetch(askAiContextUrlForRoute(route.path, site.value.base, withBase), {
+      signal: controller.signal
+    })
+    if (!response.ok) throw new Error(`Ask AI context HTTP ${response.status}`)
 
-  const context = await response.json() as AskAiPageContext
-  contextCache.set(key, context)
-  return context
+    const context = (await response.json()) as AskAiPageContext
+    contextCache.set(key, context)
+    return context
+  } finally {
+    if (pageContextAbortController === controller) pageContextAbortController = null
+  }
 }
 
 function queuePageContextPrefetch(): void {
-  window.setTimeout(() => {
+  clearPageContextPrefetch()
+  pageContextPrefetchTimer = window.setTimeout(() => {
+    pageContextPrefetchTimer = null
     loadPageContext().catch(() => undefined)
   }, 0)
+}
+
+function clearPageContextPrefetch(): void {
+  if (pageContextPrefetchTimer !== null) window.clearTimeout(pageContextPrefetchTimer)
+  pageContextPrefetchTimer = null
 }
 
 function createSelectionSnapshot(target: EventTarget | null): SelectionSnapshot | null {
@@ -297,9 +319,10 @@ function selectedBlockIds(selection: Selection, content: Element): string[] {
 
   for (let index = 0; index < selection.rangeCount; index += 1) {
     const range = selection.getRangeAt(index)
-    const ancestor = range.commonAncestorContainer.nodeType === Node.ELEMENT_NODE
-      ? range.commonAncestorContainer as Element
-      : range.commonAncestorContainer.parentElement
+    const ancestor =
+      range.commonAncestorContainer.nodeType === Node.ELEMENT_NODE
+        ? (range.commonAncestorContainer as Element)
+        : range.commonAncestorContainer.parentElement
     const closest = ancestor?.closest<HTMLElement>('[data-kpo-ask-block-id]')
     if (closest?.dataset.kpoAskBlockId) addId(ids, seen, closest.dataset.kpoAskBlockId)
 
@@ -316,9 +339,10 @@ function selectedBlockIds(selection: Selection, content: Element): string[] {
 function selectionBelongsToContent(selection: Selection, content: Element): boolean {
   for (let index = 0; index < selection.rangeCount; index += 1) {
     const range = selection.getRangeAt(index)
-    const container = range.commonAncestorContainer.nodeType === Node.ELEMENT_NODE
-      ? range.commonAncestorContainer as Element
-      : range.commonAncestorContainer.parentElement
+    const container =
+      range.commonAncestorContainer.nodeType === Node.ELEMENT_NODE
+        ? (range.commonAncestorContainer as Element)
+        : range.commonAncestorContainer.parentElement
     if (container && content.contains(container)) return true
   }
   return false
@@ -333,7 +357,9 @@ function selectedRangeRect(): DOMRect | null {
   return rect
 }
 
-function playgroundOverride(blockId: string): { kind: 'playground'; language: 'kotlin'; markdown: string } | undefined {
+function playgroundOverride(
+  blockId: string
+): { kind: 'playground'; language: 'kotlin'; markdown: string } | undefined {
   if (!blockId) return undefined
   const code = readPlaygroundCode(blockId)
   if (!code) return undefined
@@ -442,7 +468,6 @@ function clearMobileSelectionTimer(): void {
   if (mobileSelectionTimer !== null) window.clearTimeout(mobileSelectionTimer)
   mobileSelectionTimer = null
 }
-
 </script>
 
 <template>
@@ -469,7 +494,13 @@ function clearMobileSelectionTimer(): void {
       {{ toast }}
     </div>
 
-    <div v-if="manualPrompt" class="kpo-ai-manual" role="dialog" aria-modal="true" aria-label="Copy AI prompt">
+    <div
+      v-if="manualPrompt"
+      class="kpo-ai-manual"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Copy AI prompt"
+    >
       <div class="kpo-ai-manual__panel">
         <p class="kpo-ai-manual__title">Copy AI prompt</p>
         <textarea :value="manualPrompt" readonly />

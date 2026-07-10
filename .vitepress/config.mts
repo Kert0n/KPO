@@ -1,15 +1,17 @@
 import { defineConfig } from 'vitepress'
 import { askAiContextPlugin } from './lib/askAiContextPlugin'
-import { getRewrites, getSidebar } from './lib/content'
+import { getNav, getRewrites, getSidebar } from './lib/content'
 import { paletteCss } from './lib/paletteCss'
 import { kpoDark, kpoLight } from './lib/shikiThemes'
 import { applyMarkdownExtensions } from './markdown'
+import { getContentCatalog } from './shared/content/contentCatalog'
+import { SITE, STORAGE_KEYS, siteUrl } from './shared/site'
 
 export default defineConfig({
-  lang: 'ru-RU',
-  title: 'Конструирование ПО',
-  description: 'Конспект лекций по архитектуре приложений и инженерным практикам',
-  base: '/KPO/',
+  lang: SITE.language,
+  title: SITE.title,
+  description: SITE.description,
+  base: SITE.base,
   srcDir: 'content',
   cleanUrls: true,
   lastUpdated: true,
@@ -30,13 +32,17 @@ export default defineConfig({
   ],
 
   head: [
-    ['link', { rel: 'icon', type: 'image/svg+xml', href: '/KPO/favicon.svg' }],
+    ['link', { rel: 'icon', type: 'image/svg+xml', href: `${SITE.base}favicon.svg` }],
     // Палитра кода (--kpo-code-*) генерируется из того же источника,
     // что и Shiki-темы: см. .vitepress/lib/palette.ts
     ['style', {}, paletteCss()],
     // Выбранный язык применяется до отрисовки, чтобы секции ::: only /
     // <LangOnly> не мигали (приём тёмной темы VitePress)
-    ['script', {}, ';(function(){try{var l=localStorage.getItem("kpo:code-language");if(!/^(kotlin|csharp|java|go)$/.test(l||""))l="kotlin";document.documentElement.dataset.kpoLang=l}catch(e){document.documentElement.dataset.kpoLang="kotlin"}})()']
+    [
+      'script',
+      {},
+      `;(function(){try{var l=localStorage.getItem(${JSON.stringify(STORAGE_KEYS.codeLanguage)});if(!/^(kotlin|csharp|java|go)$/.test(l||''))l='kotlin';document.documentElement.dataset.kpoLang=l}catch(e){document.documentElement.dataset.kpoLang='kotlin'}})()`
+    ]
   ],
 
   markdown: {
@@ -48,6 +54,22 @@ export default defineConfig({
     }
   },
 
+  transformPageData(pageData) {
+    const sourcePath = `content/${pageData.relativePath}`
+    const page = getContentCatalog().pages.find((candidate) => candidate.sourcePath === sourcePath)
+    if (!page) return
+
+    const canonical = new URL(page.route.replace(/^\//, ''), `${SITE.origin}${SITE.base}`).toString()
+    const description = page.description || SITE.description
+    pageData.description = description
+    pageData.frontmatter.head ??= []
+    pageData.frontmatter.head.push(
+      ['link', { rel: 'canonical', href: canonical }],
+      ['meta', { property: 'og:title', content: `${page.title} | ${SITE.title}` }],
+      ['meta', { property: 'og:description', content: description }]
+    )
+  },
+
   vite: {
     build: {
       // Code examples intentionally stay searchable. The local search index and
@@ -57,24 +79,15 @@ export default defineConfig({
       chunkSizeWarningLimit: 900
     },
     plugins: [
-      askAiContextPlugin({
-        base: '/KPO/',
-        courseTitle: 'Конструирование ПО',
-        courseDescription: 'Конспект лекций по архитектуре приложений и инженерным практикам'
-      })
+      askAiContextPlugin({ base: SITE.base, courseTitle: SITE.title, courseDescription: SITE.description })
     ]
   },
 
   themeConfig: {
     siteTitle: 'КПО',
-    logo: { light: '/logo-light.svg', dark: '/logo-dark.svg' },
+    logo: { light: `${SITE.base}logo-light.svg`, dark: `${SITE.base}logo-dark.svg` },
 
-    nav: [
-      { text: 'Введение', link: '/intro' },
-      { text: 'Лекции', link: '/lectures/01', activeMatch: '^/lectures/' },
-      { text: 'Дополнения', link: '/extras/', activeMatch: '^/extras/' },
-      { text: 'Заключение', link: '/conclusion' }
-    ],
+    nav: getNav(),
     sidebar: getSidebar(),
 
     search: {
@@ -130,6 +143,22 @@ export default defineConfig({
       title: 'Страница не найдена',
       quote: 'Возможно, лекция ещё не написана или переехала.',
       linkText: 'На главную'
+    }
+  },
+
+  sitemap: {
+    hostname: siteUrl(),
+    transformItems(items) {
+      const allowed = new Set(
+        getContentCatalog()
+          .pages.filter((page) => page.inclusion.sitemap)
+          .map((page) => page.route)
+      )
+      return items.filter((item) => {
+        const withoutBase = item.url.replace(SITE.base.replace(/^\//, '/').replace(/\/$/, ''), '')
+        const route = withoutBase === '' ? '/' : `/${withoutBase.replace(/^\//, '')}`
+        return allowed.has(route)
+      })
     }
   }
 })

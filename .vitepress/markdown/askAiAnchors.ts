@@ -64,4 +64,3 @@ function assignBlockId(token: Token, kind: AskAiBlockKind, lines: string[]): voi
     token.attrSet('data-kpo-ask-block-id', id)
   }
 }
-

@@ -11,9 +11,7 @@ const { site, theme } = useData()
   <VPFlyout class="KpoNavBarExtra" label="extra navigation">
     <AskAiProviderMenuItems />
 
-    <div
-      v-if="site.appearance && site.appearance !== 'force-dark' && site.appearance !== 'force-auto'"
-    >
+    <div v-if="site.appearance && site.appearance !== 'force-dark' && site.appearance !== 'force-auto'">
       <div class="KpoNavBarExtra__divider" />
       <div class="KpoNavBarExtra__appearance">
         <p class="KpoNavBarExtra__label">{{ theme.darkModeSwitchLabel || 'Appearance' }}</p>

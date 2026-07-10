@@ -1,4 +1,4 @@
-import { clamp } from '../../lib/math'
+import { clamp } from '../../shared/core/math'
 
 export type ViewportAnchor = {
   root: HTMLElement
@@ -48,11 +48,7 @@ export async function preserveViewportAnchor(
 }
 
 export function resolveAnchoredScrollTop(input: ResolveAnchoredScrollTopInput): number {
-  return clamp(
-    input.newRootTop + input.relativeViewportTop,
-    0,
-    Math.max(0, input.maxScrollY)
-  )
+  return clamp(input.newRootTop + input.relativeViewportTop, 0, Math.max(0, input.maxScrollY))
 }
 
 export function waitAnimationFrames(frames: number): Promise<void> {
@@ -74,10 +70,6 @@ export function waitAnimationFrames(frames: number): Promise<void> {
 }
 
 function maxScrollY(): number {
-  const documentHeight = Math.max(
-    document.documentElement.scrollHeight,
-    document.body?.scrollHeight ?? 0
-  )
+  const documentHeight = Math.max(document.documentElement.scrollHeight, document.body?.scrollHeight ?? 0)
   return Math.max(0, documentHeight - window.innerHeight)
 }
-

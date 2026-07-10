@@ -2,7 +2,14 @@ import { readFileSync } from 'node:fs'
 import { defineLoader } from 'vitepress'
 import { parseLectureAdditionalReadings, type LectureAdditionalReadings } from '../lib/additionalReadings'
 
-export type { AdditionalReadingGroup, AdditionalReadingItem, LectureAdditionalReadings } from '../lib/additionalReadings'
+export type {
+  AdditionalReadingGroup,
+  AdditionalReadingItem,
+  LectureAdditionalReadings
+} from '../lib/additionalReadings'
+
+// VitePress replaces this declaration with the data-loader export at build time.
+export declare const data: LectureAdditionalReadings[]
 
 export default defineLoader({
   watch: '../../../content/lectures/Lec*/vitepress.md',

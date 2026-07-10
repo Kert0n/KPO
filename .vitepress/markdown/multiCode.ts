@@ -1,7 +1,7 @@
 import type MarkdownIt from 'markdown-it'
 import type Token from 'markdown-it/lib/token.mjs'
 import container from 'markdown-it-container'
-import { normalizeLanguage } from '../theme/lib/codeBlockModel'
+import { normalizeLanguage } from '../shared/core/codeBlockModel'
 import { askAiBlockAttribute, askAiBlockId } from './askAiAnchors'
 import { escapeAttribute } from './htmlUtils'
 
@@ -57,7 +57,12 @@ export function langOnlyPlugin(md: MarkdownIt): void {
       const token = tokens[index]
       if (token.nesting === -1) return '</div>\n'
 
-      const raw = token.info.trim().replace(/^only\s*/, '').trim().split(/\s+/)[0] ?? ''
+      const raw =
+        token.info
+          .trim()
+          .replace(/^only\s*/, '')
+          .trim()
+          .split(/\s+/)[0] ?? ''
       const lang = normalizeLanguage(raw)
 
       if (!lang) {
@@ -84,8 +89,10 @@ export function multiCodePlugin(md: MarkdownIt): void {
 
       if (meta.languages.length === 0) {
         console.warn('[multi-code] контейнер без блоков кода:', token.info)
-        return `<div class="kpo-content-block kpo-content-block--multi-code kpo-content-block--wide kpo-wide-block kpo-wide-block--code"${askAiBlockAttribute(token)}>\n`
-          + `<CodeSwitcher title="${escapeAttribute(info.title)}" langs="" ask-block-id="${escapeAttribute(askAiBlockId(token))}">\n`
+        return (
+          `<div class="kpo-content-block kpo-content-block--multi-code kpo-content-block--wide kpo-wide-block kpo-wide-block--code"${askAiBlockAttribute(token)}>\n` +
+          `<CodeSwitcher title="${escapeAttribute(info.title)}" langs="" ask-block-id="${escapeAttribute(askAiBlockId(token))}">\n`
+        )
       }
 
       markInitialFenceActive(fences, meta.initialLang)
@@ -97,15 +104,17 @@ export function multiCodePlugin(md: MarkdownIt): void {
         ? ` playground-code="${encodeURIComponent(meta.playgroundCode)}"`
         : ''
 
-      return `<div class="kpo-content-block kpo-content-block--multi-code kpo-content-block--wide kpo-wide-block kpo-wide-block--code"${askAiBlockAttribute(token)}>\n`
-        + `<CodeSwitcher title="${escapeAttribute(info.title)}"`
-        + ` langs="${meta.languages.join(',')}"`
-        + ` labels="${escapeAttribute(meta.labels.join(','))}"`
-        + ` initial-lang="${meta.initialLang}"`
-        + ` ask-block-id="${escapeAttribute(askAiBlockId(token))}"`
-        + authorDefaultAttribute
-        + playgroundCodeAttribute
-        + ` :allow-playground="${meta.allowPlayground}">\n`
+      return (
+        `<div class="kpo-content-block kpo-content-block--multi-code kpo-content-block--wide kpo-wide-block kpo-wide-block--code"${askAiBlockAttribute(token)}>\n` +
+        `<CodeSwitcher title="${escapeAttribute(info.title)}"` +
+        ` langs="${meta.languages.join(',')}"` +
+        ` labels="${escapeAttribute(meta.labels.join(','))}"` +
+        ` initial-lang="${meta.initialLang}"` +
+        ` ask-block-id="${escapeAttribute(askAiBlockId(token))}"` +
+        authorDefaultAttribute +
+        playgroundCodeAttribute +
+        ` :allow-playground="${meta.allowPlayground}">\n`
+      )
     }
   })
 }
@@ -219,8 +228,8 @@ function resolveAuthorDefault(requestedDefault: string, languages: string[], tok
   if (languages.includes(requestedDefault)) return requestedDefault
 
   console.warn(
-    `[multi-code] default="${requestedDefault}" не найден среди языков блока`
-      + (token ? `: ${token.info}` : '')
+    `[multi-code] default="${requestedDefault}" не найден среди языков блока` +
+      (token ? `: ${token.info}` : '')
   )
   return ''
 }
@@ -246,4 +255,3 @@ function markInitialFenceActive(fences: MultiCodeFence[], initialLang: string): 
     }
   }
 }
-

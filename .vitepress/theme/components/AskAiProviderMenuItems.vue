@@ -1,9 +1,6 @@
 <script setup lang="ts">
 import { useAskAiProvider } from '../composables/useAskAiProvider'
-import {
-  isAskAiProviderId,
-  type AskAiProviderId
-} from '../lib/askAiModel'
+import { isAskAiProviderId, type AskAiProviderId } from '../lib/askAiModel'
 
 const { askAiProvider, setAskAiProvider } = useAskAiProvider()
 
@@ -27,10 +24,7 @@ function selectProvider(value: string): void {
 <template>
   <div class="KpoAskAiProviderMenu">
     <p class="KpoAskAiProviderMenu__title">СПРОСИТЬ ИИ</p>
-    <template
-      v-for="provider in providerMenuItems"
-      :key="provider.id"
-    >
+    <template v-for="provider in providerMenuItems" :key="provider.id">
       <div v-if="provider.separated" class="KpoAskAiProviderMenu__divider" />
       <button
         type="button"
@@ -40,11 +34,7 @@ function selectProvider(value: string): void {
         @click="selectProvider(provider.id)"
       >
         <span>{{ provider.label }}</span>
-        <span
-          v-if="askAiProvider === provider.id"
-          class="KpoAskAiProviderMenu__check"
-          aria-hidden="true"
-        >
+        <span v-if="askAiProvider === provider.id" class="KpoAskAiProviderMenu__check" aria-hidden="true">
           ✓
         </span>
       </button>

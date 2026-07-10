@@ -1,10 +1,7 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref, useTemplateRef } from 'vue'
-import {
-  registerPlayground,
-  unregisterPlayground,
-  updatePlaygroundCode
-} from '../lib/playgroundRegistry'
+import { registerPlayground, unregisterPlayground, updatePlaygroundCode } from '../lib/playgroundRegistry'
+import { SITE } from '../../shared/site'
 
 /**
  * Обёртка над официальным kotlin-playground (npm-пакет).
@@ -21,14 +18,17 @@ import {
  * классом .dark. Поэтому смена темы сайта не требует пере-инициализации.
  */
 
-const props = withDefaults(defineProps<{
-  code: string
-  platform?: string
-  askBlockId?: string
-}>(), {
-  platform: 'java',
-  askBlockId: ''
-})
+const props = withDefaults(
+  defineProps<{
+    code: string
+    platform?: string
+    askBlockId?: string
+  }>(),
+  {
+    platform: 'java',
+    askBlockId: ''
+  }
+)
 
 const emit = defineEmits<{ failed: [] }>()
 
@@ -36,9 +36,11 @@ const host = useTemplateRef('host')
 const ready = ref(false)
 
 let targetElement: HTMLElement | undefined
+let disposed = false
 
 onMounted(async () => {
   if (!host.value) return
+  disposed = false
 
   targetElement = document.createElement('code')
   targetElement.textContent = props.code
@@ -47,18 +49,29 @@ onMounted(async () => {
   targetElement.setAttribute('match-brackets', 'true')
   targetElement.setAttribute('data-autocomplete', 'true')
   targetElement.setAttribute('data-target-platform', props.platform)
+  targetElement.setAttribute('data-version', SITE.kotlinVersion)
   host.value.appendChild(targetElement)
 
   try {
     const { default: createPlayground } = await import('kotlin-playground')
+    if (disposed || !targetElement?.isConnected) return
     await createPlayground(targetElement, {
       onChange(code) {
+        if (disposed) return
         updatePlaygroundCode(props.askBlockId, code)
       },
       getInstance(instance) {
+        if (disposed) {
+          instance.KotlinPlayground?.destroy?.()
+          return
+        }
         registerPlayground(props.askBlockId, props.code, instance)
       }
     })
+    if (disposed || !targetElement?.isConnected) {
+      playgroundInstance(targetElement)?.destroy?.()
+      return
+    }
     ready.value = true
   } catch (error) {
     console.warn('[kotlin-playground] инициализация не удалась:', error)
@@ -67,17 +80,19 @@ onMounted(async () => {
 })
 
 onBeforeUnmount(() => {
-  const instance = (targetElement as { KotlinPlayground?: { destroy: () => void } } | undefined)?.KotlinPlayground
-  instance?.destroy()
+  disposed = true
+  playgroundInstance(targetElement)?.destroy?.()
   unregisterPlayground(props.askBlockId)
   targetElement = undefined
 })
+
+function playgroundInstance(element: HTMLElement | undefined): { destroy?: () => void } | undefined {
+  return (element as { KotlinPlayground?: { destroy?: () => void } } | undefined)?.KotlinPlayground
+}
 </script>
 
 <template>
   <div ref="host" class="kpo-playground" :class="{ 'kpo-playground--ready': ready }">
-    <div v-if="!ready" class="kpo-playground__skeleton" aria-live="polite">
-      Загрузка Kotlin Playground…
-    </div>
+    <div v-if="!ready" class="kpo-playground__skeleton" aria-live="polite">Загрузка Kotlin Playground…</div>
   </div>
 </template>

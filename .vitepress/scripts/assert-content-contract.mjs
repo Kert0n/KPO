@@ -2,13 +2,7 @@ import { readdirSync } from 'node:fs'
 import { relative, resolve } from 'node:path'
 
 const root = process.cwd()
-const ignoredDirectories = new Set([
-  '.git',
-  'node_modules',
-  'dist',
-  'output',
-  'test-results'
-])
+const ignoredDirectories = new Set(['.git', 'node_modules', 'dist', 'output', 'test-results'])
 
 const publicSiteFiles = new Set([
   'content/home/vitepress.md',
@@ -60,10 +54,12 @@ function walk(directory) {
 
 function shouldIgnoreDirectory(relativePath, name) {
   if (ignoredDirectories.has(name)) return true
-  return relativePath === '.vitepress/cache'
-    || relativePath === '.vitepress/dist'
-    || relativePath.startsWith('.vitepress/cache/')
-    || relativePath.startsWith('.vitepress/dist/')
+  return (
+    relativePath === '.vitepress/cache' ||
+    relativePath === '.vitepress/dist' ||
+    relativePath.startsWith('.vitepress/cache/') ||
+    relativePath.startsWith('.vitepress/dist/')
+  )
 }
 
 function classifyMarkdownPath(path) {
@@ -71,6 +67,7 @@ function classifyMarkdownPath(path) {
 
   if (publicSiteFiles.has(normalized)) return 'site'
   if (internalFiles.has(normalized)) return 'internal'
+  if (/^docs\/.+\.md$/.test(normalized)) return 'internal'
   if (/^content\/lectures\/Lec\d+\/vitepress\.md$/.test(normalized)) return 'site'
   if (/^content\/extras\/\d+\/vitepress\.md$/.test(normalized)) return 'site'
   if (/^content\/service-pages\/_internal\/[^/]+\/vitepress\.md$/.test(normalized)) return 'internal'

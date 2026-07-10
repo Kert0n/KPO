@@ -7,38 +7,20 @@ import { spawn } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { chromium } from 'playwright'
 import { PDFDocument } from 'pdf-lib'
+import { getContentCatalog, getPdfPages } from '../.vitepress/shared/content/contentCatalog'
+import { SITE } from '../.vitepress/shared/site'
 
 const root = resolve(fileURLToPath(new URL('..', import.meta.url)))
 const remote = process.argv.includes('--remote')
-const configuredBaseUrl = process.env.KPO_PDF_BASE_URL
-const localBaseUrl = 'http://127.0.0.1:4175/KPO/'
+const configuredBaseUrl = process.env.KPO_PDF_BASE_URL ?? (remote ? `${SITE.origin}${SITE.base}` : undefined)
+const localBaseUrl = `http://127.0.0.1:4175${SITE.base}`
 const outputDirectory = join(root, 'output', 'pdf')
 const pagesDirectory = join(outputDirectory, 'pages')
 
-const PDF_ROUTES = [
-  ['intro', '001-intro'],
-  ['lectures/01', '002-lecture-01'],
-  ['lectures/02', '003-lecture-02'],
-  ['lectures/03', '004-lecture-03'],
-  ['lectures/04', '005-lecture-04'],
-  ['lectures/05', '006-lecture-05'],
-  ['lectures/06', '007-lecture-06'],
-  ['lectures/07', '008-lecture-07'],
-  ['lectures/08', '009-lecture-08'],
-  ['lectures/09', '010-lecture-09'],
-  ['lectures/10', '011-lecture-10'],
-  ['lectures/11', '012-lecture-11'],
-  ['lectures/12', '013-lecture-12'],
-  ['lectures/13', '014-lecture-13'],
-  ['lectures/14', '015-lecture-14'],
-  ['extras/', '016-extras'],
-  ['extras/01', '017-playground'],
-  ['conclusion', '018-conclusion']
-]
-
-if (remote && !configuredBaseUrl) {
-  throw new Error('KPO_PDF_BASE_URL is required with --remote')
-}
+const PDF_ROUTES = getPdfPages(getContentCatalog(root)).map((page, index) => [
+  page.route.replace(/^\//, ''),
+  `${String(index + 1).padStart(3, '0')}-${pdfFileStem(page)}`
+])
 
 const baseUrl = normalizeBaseUrl(configuredBaseUrl ?? localBaseUrl)
 let previewProcess
@@ -162,12 +144,16 @@ async function waitForHttp(url) {
 }
 
 async function waitForMermaid(page, route) {
-  await page.waitForFunction(() => {
-    const diagrams = [...document.querySelectorAll('.kpo-mermaid')]
-    return diagrams.every((diagram) => {
-      return diagram.querySelector('svg') || diagram.querySelector('.kpo-mermaid__error')
-    })
-  }, null, { timeout: 30_000 })
+  await page.waitForFunction(
+    () => {
+      const diagrams = [...document.querySelectorAll('.kpo-mermaid')]
+      return diagrams.every((diagram) => {
+        return diagram.querySelector('svg') || diagram.querySelector('.kpo-mermaid__error')
+      })
+    },
+    null,
+    { timeout: 30_000 }
+  )
 
   const errors = await page.locator('.kpo-mermaid__error').evaluateAll((nodes) => {
     return nodes.map((node) => node.textContent?.trim().replace(/\s+/g, ' ') ?? '')
@@ -224,4 +210,11 @@ function normalizeBaseUrl(value) {
 
 function delay(ms) {
   return new Promise((resolvePromise) => setTimeout(resolvePromise, ms))
+}
+
+function pdfFileStem(page) {
+  if (page.kind === 'lecture') return `lecture-${String(page.order).padStart(2, '0')}`
+  if (page.kind === 'extra') return `extra-${String(page.order).padStart(2, '0')}`
+  if (page.kind === 'extras-index') return 'extras'
+  return page.kind
 }

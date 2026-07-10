@@ -3,6 +3,7 @@ node_modules/
 .vitepress/cache/
 .vitepress/dist/
 test-results/
+coverage/
 analysis-results/
 analysis/
 \#/
@@ -13,6 +14,7 @@ analysis/
 .claude/settings.local.json
 npm-debug.log*
 *.log
+*.tsbuildinfo
 
 # Материалы редактора в папках лекций и дополнений:
 # публикуются (и коммитятся) только vitepress.md и его ресурсы (assets/).
@@ -37,3 +39,5 @@ content/service-pages/*/*
 !content/service-pages/_internal/**
 /.lecture-tree/
 output/pdf/
+tooling/kotlin-snippets/.gradle/
+tooling/kotlin-snippets/build/

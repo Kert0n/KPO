@@ -1,5 +1,6 @@
 import type { Ref } from 'vue'
 import { booleanCodec, createPersistentState } from './persistentState'
+import { STORAGE_KEYS } from '../../shared/site'
 
 /**
  * Глобальный режим Kotlin Playground.
@@ -8,7 +9,7 @@ import { booleanCodec, createPersistentState } from './persistentState'
  */
 
 const mode = createPersistentState<boolean>({
-  key: 'kpo:playground-mode',
+  key: STORAGE_KEYS.playgroundMode,
   initial: true,
   validate: (value) => typeof value === 'boolean',
   ...booleanCodec

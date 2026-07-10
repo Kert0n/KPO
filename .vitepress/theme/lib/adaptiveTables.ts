@@ -13,7 +13,7 @@ type AdaptiveTableController = {
 }
 
 type AdaptiveTableInstallState = {
-  controllers: WeakMap<HTMLElement, AdaptiveTableController>
+  controllers: Map<HTMLElement, AdaptiveTableController>
   scanFrame: number | null
 }
 
@@ -23,7 +23,7 @@ export function installAdaptiveTables(router?: Router): void {
   if (typeof window === 'undefined' || typeof document === 'undefined') return
 
   const state = installState ?? {
-    controllers: new WeakMap<HTMLElement, AdaptiveTableController>(),
+    controllers: new Map<HTMLElement, AdaptiveTableController>(),
     scanFrame: null
   }
   installState = state
@@ -52,6 +52,7 @@ function scheduleScan(state: AdaptiveTableInstallState): void {
 }
 
 function scanTables(state: AdaptiveTableInstallState): void {
+  disposeDisconnectedTables(state)
   const blocks = [...document.querySelectorAll<HTMLElement>(TABLE_BLOCK_SELECTOR)]
 
   for (const block of blocks) {
@@ -73,6 +74,15 @@ function scanTables(state: AdaptiveTableInstallState): void {
     state.controllers.set(block, controller)
     controller.observer.observe(block)
     scheduleTableLayout(controller)
+  }
+}
+
+function disposeDisconnectedTables(state: AdaptiveTableInstallState): void {
+  for (const [block, controller] of state.controllers) {
+    if (document.contains(block)) continue
+    if (controller.frame !== null) window.cancelAnimationFrame(controller.frame)
+    controller.observer.disconnect()
+    state.controllers.delete(block)
   }
 }
 
@@ -107,7 +117,8 @@ function applyAdaptiveTableLayout(controller: AdaptiveTableController): void {
   if (mode !== 'wrap') return
 
   window.requestAnimationFrame(() => {
-    const hasWrappedOverflow = block.scrollWidth > block.clientWidth + CONTENT_LAYOUT_TOKENS.tableOverflowEpsilon
+    const hasWrappedOverflow =
+      block.scrollWidth > block.clientWidth + CONTENT_LAYOUT_TOKENS.tableOverflowEpsilon
     if (hasWrappedOverflow) {
       setTableMode(block, 'scroll')
     }

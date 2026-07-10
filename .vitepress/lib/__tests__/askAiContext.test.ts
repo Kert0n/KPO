@@ -3,13 +3,16 @@ import { buildAskAiPageContext } from '../askAiContext'
 
 describe('askAiContext', () => {
   it('extracts stable markdown blocks for code, mermaid, table and multi-code', () => {
-    const context = buildAskAiPageContext({
-      routeKey: 'service-pages/ui-contract',
-      sourcePath: 'content/service-pages/ui-contract/vitepress.md'
-    }, {
-      courseTitle: 'Course',
-      courseDescription: 'Description'
-    })
+    const context = buildAskAiPageContext(
+      {
+        routeKey: 'service-pages/ui-contract',
+        sourcePath: 'content/service-pages/ui-contract/vitepress.md'
+      },
+      {
+        courseTitle: 'Course',
+        courseDescription: 'Description'
+      }
+    )
 
     expect(context.pageTitle).toBe('UI Contract Fixtures')
     expect(context.blocks.some((block) => block.kind === 'multi-code')).toBe(true)

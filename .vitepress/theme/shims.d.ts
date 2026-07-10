@@ -4,6 +4,11 @@ declare module '*.vue' {
   export default component
 }
 
+declare module '*.js' {
+  const module: unknown
+  export default module
+}
+
 declare module 'kotlin-playground' {
   type PlaygroundOptions = {
     server?: string
@@ -11,6 +16,7 @@ declare module 'kotlin-playground' {
     onChange?: (code: string) => void
     getInstance?: (instance: {
       getCode: () => string
+      KotlinPlayground?: { destroy?: () => void }
       codemirror?: {
         getSelection?: () => string
       }

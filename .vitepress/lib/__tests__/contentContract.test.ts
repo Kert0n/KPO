@@ -24,22 +24,27 @@ describe('content contract', () => {
     expect(classifyMarkdownPath('content/lectures/_template/vitepress.md')).toBe('internal')
     expect(classifyMarkdownPath('content/extras/_template/README.md')).toBe('internal')
     expect(classifyMarkdownPath('content/extras/_template/vitepress.md')).toBe('internal')
-    expect(classifyMarkdownPath('content/service-pages/_internal/editorial-rubric/vitepress.md')).toBe('internal')
+    expect(classifyMarkdownPath('content/service-pages/_internal/editorial-rubric/vitepress.md')).toBe(
+      'internal'
+    )
+    expect(classifyMarkdownPath('docs/architecture.md')).toBe('internal')
   })
 
   it('rejects old root and flat content locations', () => {
-    expect(unexpectedMarkdownPaths([
-      'intro.md',
-      'conclusion.md',
-      'index.md',
-      'lectures/Lec1/vitepress.md',
-      'extras/01.md',
-      'review/editorial-rubric.md',
-      'test-fixtures/ui-contract.md',
-      'content/draft.md',
-      'content/extras/02.md',
-      'content/lectures/notes.md'
-    ])).toEqual([
+    expect(
+      unexpectedMarkdownPaths([
+        'intro.md',
+        'conclusion.md',
+        'index.md',
+        'lectures/Lec1/vitepress.md',
+        'extras/01.md',
+        'review/editorial-rubric.md',
+        'test-fixtures/ui-contract.md',
+        'content/draft.md',
+        'content/extras/02.md',
+        'content/lectures/notes.md'
+      ])
+    ).toEqual([
       'conclusion.md',
       'content/draft.md',
       'content/extras/02.md',
@@ -54,10 +59,8 @@ describe('content contract', () => {
   })
 
   it('throws a readable contract error', () => {
-    expect(() => assertMarkdownRouteContract([
-      'README.md',
-      'content/home/vitepress.md',
-      'draft.md'
-    ])).toThrow(/draft\.md/)
+    expect(() => assertMarkdownRouteContract(['README.md', 'content/home/vitepress.md', 'draft.md'])).toThrow(
+      /draft\.md/
+    )
   })
 })

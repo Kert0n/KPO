@@ -67,7 +67,9 @@ describe('additional readings parser', () => {
   })
 
   it('parses lecture metadata from a lecture markdown file', () => {
-    const reading = parseLectureAdditionalReadings('/repo/content/lectures/Lec15/vitepress.md', `---
+    const reading = parseLectureAdditionalReadings(
+      '/repo/content/lectures/Lec15/vitepress.md',
+      `---
 title: Лекция 15. Итоговая тема
 ---
 
@@ -77,7 +79,8 @@ title: Лекция 15. Итоговая тема
 
 ### Материалы
 
-- [Статья](https://example.com/article)`)
+- [Статья](https://example.com/article)`
+    )
 
     expect(reading).toEqual({
       lecture: 15,
@@ -93,7 +96,9 @@ title: Лекция 15. Итоговая тема
   })
 
   it('skips markdown files outside lecture folders', () => {
-    expect(parseLectureAdditionalReadings('/repo/content/extras/02/vitepress.md', '## Дополнительное чтение')).toBeNull()
+    expect(
+      parseLectureAdditionalReadings('/repo/content/extras/02/vitepress.md', '## Дополнительное чтение')
+    ).toBeNull()
   })
 
   it('finds additional readings in real lectures 1-12', () => {

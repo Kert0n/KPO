@@ -1,4 +1,4 @@
-import { clamp } from '../../lib/math'
+import { clamp } from '../../shared/core/math'
 
 export type MermaidViewportMode = 'desktop' | 'mobile'
 
@@ -87,7 +87,10 @@ export function resolveMermaidRenderedWidth(width: number | null | undefined, sc
   return Math.ceil(viewWidth * scale)
 }
 
-export function resolveMermaidRenderedHeight(height: number | null | undefined, scale: number): number | null {
+export function resolveMermaidRenderedHeight(
+  height: number | null | undefined,
+  scale: number
+): number | null {
   const viewHeight = positive(height)
   if (!viewHeight) return null
   return Math.ceil(viewHeight * scale)
@@ -102,10 +105,7 @@ export function resolveMermaidOverflow(input: ResolveMermaidOverflowInput): Merm
   }
 }
 
-export function resolveCenteredScrollLeft(input: {
-  clientWidth: number
-  scrollWidth: number
-}): number {
+export function resolveCenteredScrollLeft(input: { clientWidth: number; scrollWidth: number }): number {
   return Math.max(0, Math.round((input.scrollWidth - input.clientWidth) / 2))
 }
 
@@ -120,11 +120,9 @@ export function resolveScrollLeftForCenterRatio(input: {
 }
 
 export function shouldShowMermaidToolbar(input: ShouldShowMermaidToolbarInput): boolean {
-  return input.hasOverflowX
-    || input.hasOverflowY
-    || input.hasManualScale
-    || input.isHovered
-    || input.isFocusWithin
+  return (
+    input.hasOverflowX || input.hasOverflowY || input.hasManualScale || input.isHovered || input.isFocusWithin
+  )
 }
 
 function positive(value: number | null | undefined): number | null {

@@ -1,5 +1,6 @@
 import { expect, test, type Locator, type Page } from '@playwright/test'
 import { CONTENT_LAYOUT_TOKENS, LAYOUT_VIEWPORTS } from '../../.vitepress/theme/lib/contentLayoutTokens'
+import { getContentCatalog, getUiSweepPages } from '../../.vitepress/shared/content/contentCatalog'
 
 const CENTER_TOLERANCE_PX = 2
 const SCALE_TOLERANCE = 0.05
@@ -9,26 +10,9 @@ const MERMAID_FOREIGN_OBJECT_TOLERANCE_PX = 2
 const MERMAID_VIEWBOX_TOLERANCE_PX = 8
 const MIN_READABLE_MERMAID_HEIGHT_PX = CONTENT_LAYOUT_TOKENS.mermaidMinHeight
 const UI_FIXTURE_ROUTE = 'service-pages/ui-contract'
-const PUBLIC_CONTENT_ROUTES = [
-  'intro',
-  'lectures/01',
-  'lectures/02',
-  'lectures/03',
-  'lectures/04',
-  'lectures/05',
-  'lectures/06',
-  'lectures/07',
-  'lectures/08',
-  'lectures/09',
-  'lectures/10',
-  'lectures/11',
-  'lectures/12',
-  'lectures/13',
-  'lectures/14',
-  'extras/',
-  'extras/01',
-  'conclusion'
-] as const
+const PUBLIC_CONTENT_ROUTES = getUiSweepPages(getContentCatalog()).map((page) =>
+  page.route.replace(/^\//, '')
+)
 
 type AdaptiveTableMode = 'fit' | 'wrap' | 'scroll'
 
@@ -57,10 +41,7 @@ async function searchFor(page: Page, query: string): Promise<void> {
   await expect(page.locator('.VPLocalSearchBox .result').first()).toBeVisible()
 }
 
-async function waitForMermaid(
-  page: Page,
-  options: { requireDiagrams?: boolean } = {}
-): Promise<void> {
+async function waitForMermaid(page: Page, options: { requireDiagrams?: boolean } = {}): Promise<void> {
   await page.locator('.vp-doc').first().waitFor({ state: 'attached' })
 
   if (!options.requireDiagrams) {
@@ -70,7 +51,7 @@ async function waitForMermaid(
       })
     })
 
-    if (await page.locator('.kpo-mermaid').count() === 0) return
+    if ((await page.locator('.kpo-mermaid').count()) === 0) return
   }
 
   await page.waitForFunction((requireDiagrams) => {
@@ -100,9 +81,11 @@ async function waitForAdaptiveTables(page: Page): Promise<void> {
   await page.waitForFunction(() => {
     const tableBlocks = [...document.querySelectorAll('.kpo-content-block--table')]
     return tableBlocks.every((block) => {
-      return block.classList.contains('kpo-table--fit') ||
+      return (
+        block.classList.contains('kpo-table--fit') ||
         block.classList.contains('kpo-table--wrap') ||
         block.classList.contains('kpo-table--scroll')
+      )
     })
   })
 
@@ -127,7 +110,10 @@ async function expectNoPageOverflowFromVpDoc(page: Page): Promise<void> {
           display: style.display,
           overflowX: style.overflowX,
           whiteSpace: style.whiteSpace,
-          text: String(el.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 120),
+          text: String(el.textContent || '')
+            .replace(/\s+/g, ' ')
+            .trim()
+            .slice(0, 120),
           left: Math.round(rect.left),
           right: Math.round(rect.right),
           width: Math.round(rect.width)
@@ -144,19 +130,21 @@ async function expectNoPageOverflowFromVpDoc(page: Page): Promise<void> {
   expect(result.overflow, JSON.stringify(result.offenders, null, 2)).toBe(0)
 }
 
-async function getAdaptiveTableStates(page: Page): Promise<Array<{
-  mode: AdaptiveTableMode | 'none'
-  display: string
-  tableLayout: string
-  cellOverflowWrap: string
-  blockOverflowX: string
-  blockScrollWidth: number
-  blockClientWidth: number
-  hasLocalScroll: boolean
-  right: number
-  viewport: number
-  columnCount: number
-}>> {
+async function getAdaptiveTableStates(page: Page): Promise<
+  Array<{
+    mode: AdaptiveTableMode | 'none'
+    display: string
+    tableLayout: string
+    cellOverflowWrap: string
+    blockOverflowX: string
+    blockScrollWidth: number
+    blockClientWidth: number
+    hasLocalScroll: boolean
+    right: number
+    viewport: number
+    columnCount: number
+  }>
+> {
   return page.locator('.kpo-content-block--table').evaluateAll((nodes) => {
     return nodes.map((node) => {
       const block = node as HTMLElement
@@ -207,21 +195,23 @@ async function expectNoGlobalOverflowMask(page: Page): Promise<void> {
   expect(result.bodyOverflowX).not.toBe('hidden')
 }
 
-async function getMermaidMetrics(page: Page): Promise<Array<{
-  index: number
-  containerClientWidth: number
-  containerScrollWidth: number
-  containerClientHeight: number
-  containerScrollHeight: number
-  svgWidth: number
-  svgHeight: number
-  viewBoxWidth: number
-  viewBoxHeight: number
-  scaleX: number
-  scaleY: number
-  hasLocalXScroll: boolean
-  hasLocalYScroll: boolean
-}>> {
+async function getMermaidMetrics(page: Page): Promise<
+  Array<{
+    index: number
+    containerClientWidth: number
+    containerScrollWidth: number
+    containerClientHeight: number
+    containerScrollHeight: number
+    svgWidth: number
+    svgHeight: number
+    viewBoxWidth: number
+    viewBoxHeight: number
+    scaleX: number
+    scaleY: number
+    hasLocalXScroll: boolean
+    hasLocalYScroll: boolean
+  }>
+> {
   return page.evaluate(() => {
     return [...document.querySelectorAll('.kpo-mermaid')].map((root, index) => {
       const element = (root.querySelector('.kpo-mermaid__viewport') ?? root) as HTMLElement
@@ -285,18 +275,17 @@ async function getMermaidLabelContrasts(page: Page): Promise<MermaidLabelContras
     const rootStyle = getComputedStyle(document.documentElement)
     const pageBackground = rootStyle.getPropertyValue('--vp-c-bg').trim()
 
-    return [...document.querySelectorAll('.kpo-mermaid svg .nodeLabel, .kpo-mermaid svg .edgeLabel span')]
-      .map((node) => {
-        const style = getComputedStyle(node)
-        const background = style.backgroundColor === 'rgba(0, 0, 0, 0)'
-          ? pageBackground
-          : style.backgroundColor
-        return {
-          color: style.color,
-          background,
-          contrast: contrast(style.color, background)
-        }
-      })
+    return [
+      ...document.querySelectorAll('.kpo-mermaid svg .nodeLabel, .kpo-mermaid svg .edgeLabel span')
+    ].map((node) => {
+      const style = getComputedStyle(node)
+      const background = style.backgroundColor === 'rgba(0, 0, 0, 0)' ? pageBackground : style.backgroundColor
+      return {
+        color: style.color,
+        background,
+        contrast: contrast(style.color, background)
+      }
+    })
   })
 }
 
@@ -307,49 +296,55 @@ type MermaidClipIssue = {
 }
 
 async function getMermaidClipIssues(page: Page): Promise<MermaidClipIssue[]> {
-  return page.evaluate((tolerances) => {
-    return [...document.querySelectorAll('.kpo-mermaid svg')].flatMap((svg, diagramIndex) => {
-      const svgIssues: Array<{ diagramIndex: number; reason: string; text: string }> = []
-      const viewBox = svg.getAttribute('viewBox')?.trim().split(/\s+/).map(Number) ?? []
-      const [viewMinX, viewMinY, viewWidth, viewHeight] = viewBox
+  return page.evaluate(
+    (tolerances) => {
+      return [...document.querySelectorAll('.kpo-mermaid svg')].flatMap((svg, diagramIndex) => {
+        const svgIssues: Array<{ diagramIndex: number; reason: string; text: string }> = []
+        const viewBox = svg.getAttribute('viewBox')?.trim().split(/\s+/).map(Number) ?? []
+        const [viewMinX, viewMinY, viewWidth, viewHeight] = viewBox
 
-      for (const node of [...svg.querySelectorAll('foreignObject')]) {
-        const child = node.firstElementChild
-        if (!child) continue
+        for (const node of [...svg.querySelectorAll('foreignObject')]) {
+          const child = node.firstElementChild
+          if (!child) continue
 
-        const containerRect = node.getBoundingClientRect()
-        const childRect = child.getBoundingClientRect()
-        const text = String(node.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 80)
-        if (childRect.width > containerRect.width + tolerances.foreignObject) {
-          svgIssues.push({ diagramIndex, reason: 'foreignObject-x', text })
-        }
-        if (childRect.height > containerRect.height + tolerances.foreignObject) {
-          svgIssues.push({ diagramIndex, reason: 'foreignObject-y', text })
-        }
-      }
-
-      if (Number.isFinite(viewWidth) && Number.isFinite(viewHeight)) {
-        try {
-          const box = (svg as SVGSVGElement).getBBox()
-          if (
-            box.x < viewMinX - tolerances.viewBox ||
-            box.y < viewMinY - tolerances.viewBox ||
-            box.x + box.width > viewMinX + viewWidth + tolerances.viewBox ||
-            box.y + box.height > viewMinY + viewHeight + tolerances.viewBox
-          ) {
-            svgIssues.push({ diagramIndex, reason: 'svg-viewbox', text: '' })
+          const containerRect = node.getBoundingClientRect()
+          const childRect = child.getBoundingClientRect()
+          const text = String(node.textContent || '')
+            .replace(/\s+/g, ' ')
+            .trim()
+            .slice(0, 80)
+          if (childRect.width > containerRect.width + tolerances.foreignObject) {
+            svgIssues.push({ diagramIndex, reason: 'foreignObject-x', text })
           }
-        } catch {
-          // Some SVG fragments may not expose getBBox while hidden during route changes.
+          if (childRect.height > containerRect.height + tolerances.foreignObject) {
+            svgIssues.push({ diagramIndex, reason: 'foreignObject-y', text })
+          }
         }
-      }
 
-      return svgIssues
-    })
-  }, {
-    foreignObject: MERMAID_FOREIGN_OBJECT_TOLERANCE_PX,
-    viewBox: MERMAID_VIEWBOX_TOLERANCE_PX
-  })
+        if (Number.isFinite(viewWidth) && Number.isFinite(viewHeight)) {
+          try {
+            const box = (svg as SVGSVGElement).getBBox()
+            if (
+              box.x < viewMinX - tolerances.viewBox ||
+              box.y < viewMinY - tolerances.viewBox ||
+              box.x + box.width > viewMinX + viewWidth + tolerances.viewBox ||
+              box.y + box.height > viewMinY + viewHeight + tolerances.viewBox
+            ) {
+              svgIssues.push({ diagramIndex, reason: 'svg-viewbox', text: '' })
+            }
+          } catch {
+            // Some SVG fragments may not expose getBBox while hidden during route changes.
+          }
+        }
+
+        return svgIssues
+      })
+    },
+    {
+      foreignObject: MERMAID_FOREIGN_OBJECT_TOLERANCE_PX,
+      viewBox: MERMAID_VIEWBOX_TOLERANCE_PX
+    }
+  )
 }
 
 async function hideSidebar(page: Page): Promise<void> {
@@ -357,9 +352,11 @@ async function hideSidebar(page: Page): Promise<void> {
   const isHidden = await html.evaluate((node) => node.classList.contains('kpo-sidebar-hidden'))
   if (!isHidden) {
     await page.locator('.kpo-sidebar-toggle').click()
-    await expect.poll(async () => {
-      return html.evaluate((node) => node.classList.contains('kpo-sidebar-hidden'))
-    }).toBe(true)
+    await expect
+      .poll(async () => {
+        return html.evaluate((node) => node.classList.contains('kpo-sidebar-hidden'))
+      })
+      .toBe(true)
   }
   await page.waitForTimeout(350)
 }
@@ -384,9 +381,12 @@ async function measureWideLane(page: Page): Promise<{
 }
 
 async function measureFirstWidth(page: Page, selector: string): Promise<number> {
-  return page.locator(selector).first().evaluate((node) => {
-    return Math.round(node.getBoundingClientRect().width)
-  })
+  return page
+    .locator(selector)
+    .first()
+    .evaluate((node) => {
+      return Math.round(node.getBoundingClientRect().width)
+    })
 }
 
 async function measureViewportRelativeTo(locator: Locator): Promise<number> {
@@ -422,106 +422,112 @@ async function expectCenteredAgainstPage(page: Page, locator: Locator): Promise<
 
 async function selectTextAndOpenAskAiMenu(page: Page, text: string, activate = false): Promise<void> {
   await page.locator('.vp-doc [data-kpo-ask-block-id]').first().waitFor({ state: 'attached' })
-  await page.evaluate(async ({ targetText, activateMenuItem }) => {
-    const root = [...document.querySelectorAll('.vp-doc *')]
-      .filter((node) => node.textContent?.includes(targetText))
-      .sort((left, right) => {
-        return (left.textContent?.length ?? 0) - (right.textContent?.length ?? 0)
-      })[0]
+  await page.evaluate(
+    async ({ targetText, activateMenuItem }) => {
+      const root = [...document.querySelectorAll('.vp-doc *')]
+        .filter((node) => node.textContent?.includes(targetText))
+        .sort((left, right) => {
+          return (left.textContent?.length ?? 0) - (right.textContent?.length ?? 0)
+        })[0]
 
-    if (!root) throw new Error(`Text not found: ${targetText}`)
-    root.scrollIntoView({ block: 'center', inline: 'nearest' })
-    await new Promise<void>((resolve) => {
-      requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
-    })
-    await new Promise<void>((resolve) => window.setTimeout(resolve, 120))
-
-    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT)
-    const textNodes: Text[] = []
-    let combinedText = ''
-    while (walker.nextNode()) {
-      const textNode = walker.currentNode as Text
-      textNodes.push(textNode)
-      combinedText += textNode.nodeValue ?? ''
-    }
-
-    const start = combinedText.indexOf(targetText)
-    if (start === -1) throw new Error(`Text node not found: ${targetText}`)
-
-    const end = start + targetText.length
-    let cursor = 0
-    let startNode: Text | null = null
-    let endNode: Text | null = null
-    let startOffset = 0
-    let endOffset = 0
-
-    for (const textNode of textNodes) {
-      const value = textNode.nodeValue ?? ''
-      const nextCursor = cursor + value.length
-      if (!startNode && start >= cursor && start <= nextCursor) {
-        startNode = textNode
-        startOffset = start - cursor
-      }
-      if (!endNode && end >= cursor && end <= nextCursor) {
-        endNode = textNode
-        endOffset = end - cursor
-        break
-      }
-      cursor = nextCursor
-    }
-
-    if (!startNode || !endNode) throw new Error(`Text range not found: ${targetText}`)
-
-    const range = document.createRange()
-    range.setStart(startNode, startOffset)
-    range.setEnd(endNode, endOffset)
-
-    const selection = window.getSelection()
-    selection?.removeAllRanges()
-    selection?.addRange(range)
-
-    const rect = range.getBoundingClientRect()
-    const target = startNode.parentElement ?? root
-    const dispatchContextMenu = () => {
-      target.dispatchEvent(new MouseEvent('contextmenu', {
-        bubbles: true,
-        cancelable: true,
-        button: 2,
-        clientX: rect.left + Math.min(12, Math.max(2, rect.width / 2)),
-        clientY: rect.top + Math.min(10, Math.max(2, rect.height / 2))
-      }))
-    }
-
-    dispatchContextMenu()
-
-    for (let attempt = 0; attempt < 5; attempt += 1) {
+      if (!root) throw new Error(`Text not found: ${targetText}`)
+      root.scrollIntoView({ block: 'center', inline: 'nearest' })
       await new Promise<void>((resolve) => {
         requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
       })
-      if (document.querySelector('.kpo-ai-menu__item')) break
-      dispatchContextMenu()
-      await new Promise<void>((resolve) => window.setTimeout(resolve, 80))
-    }
+      await new Promise<void>((resolve) => window.setTimeout(resolve, 120))
 
-    if (activateMenuItem) {
-      let button: HTMLElement | null = null
-      for (let attempt = 0; attempt < 50; attempt += 1) {
+      const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT)
+      const textNodes: Text[] = []
+      let combinedText = ''
+      while (walker.nextNode()) {
+        const textNode = walker.currentNode as Text
+        textNodes.push(textNode)
+        combinedText += textNode.nodeValue ?? ''
+      }
+
+      const start = combinedText.indexOf(targetText)
+      if (start === -1) throw new Error(`Text node not found: ${targetText}`)
+
+      const end = start + targetText.length
+      let cursor = 0
+      let startNode: Text | null = null
+      let endNode: Text | null = null
+      let startOffset = 0
+      let endOffset = 0
+
+      for (const textNode of textNodes) {
+        const value = textNode.nodeValue ?? ''
+        const nextCursor = cursor + value.length
+        if (!startNode && start >= cursor && start <= nextCursor) {
+          startNode = textNode
+          startOffset = start - cursor
+        }
+        if (!endNode && end >= cursor && end <= nextCursor) {
+          endNode = textNode
+          endOffset = end - cursor
+          break
+        }
+        cursor = nextCursor
+      }
+
+      if (!startNode || !endNode) throw new Error(`Text range not found: ${targetText}`)
+
+      const range = document.createRange()
+      range.setStart(startNode, startOffset)
+      range.setEnd(endNode, endOffset)
+
+      const selection = window.getSelection()
+      selection?.removeAllRanges()
+      selection?.addRange(range)
+
+      const rect = range.getBoundingClientRect()
+      const target = startNode.parentElement ?? root
+      const dispatchContextMenu = () => {
+        target.dispatchEvent(
+          new MouseEvent('contextmenu', {
+            bubbles: true,
+            cancelable: true,
+            button: 2,
+            clientX: rect.left + Math.min(12, Math.max(2, rect.width / 2)),
+            clientY: rect.top + Math.min(10, Math.max(2, rect.height / 2))
+          })
+        )
+      }
+
+      dispatchContextMenu()
+
+      for (let attempt = 0; attempt < 5; attempt += 1) {
         await new Promise<void>((resolve) => {
           requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
         })
-        button = document.querySelector<HTMLElement>('.kpo-ai-menu__item')
-        if (button && !(button as HTMLButtonElement).disabled) break
-
-        if (!button) {
-          dispatchContextMenu()
-        }
+        if (document.querySelector('.kpo-ai-menu__item')) break
+        dispatchContextMenu()
         await new Promise<void>((resolve) => window.setTimeout(resolve, 80))
       }
 
-      if (!button || (button as HTMLButtonElement).disabled) throw new Error('Ask AI menu item is not ready')
-      button.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
-    }
-  }, { targetText: text, activateMenuItem: activate })
+      if (activateMenuItem) {
+        let button: HTMLElement | null = null
+        for (let attempt = 0; attempt < 50; attempt += 1) {
+          await new Promise<void>((resolve) => {
+            requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+          })
+          button = document.querySelector<HTMLElement>('.kpo-ai-menu__item')
+          if (button && !(button as HTMLButtonElement).disabled) break
+
+          if (!button) {
+            dispatchContextMenu()
+          }
+          await new Promise<void>((resolve) => window.setTimeout(resolve, 80))
+        }
+
+        if (!button || (button as HTMLButtonElement).disabled)
+          throw new Error('Ask AI menu item is not ready')
+        button.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
+      }
+    },
+    { targetText: text, activateMenuItem: activate }
+  )
 
   if (!activate) {
     await expect(page.locator('.kpo-ai-menu')).toBeVisible()
@@ -603,7 +609,6 @@ test('desktop ask ai provider uses vitepress flyout pattern', async ({ page }) =
   await expect(menu).toContainText('Claude')
   await expect(menu).toContainText('DeepSeek')
   await expect(menu).toContainText('Копировать промпт')
-
 })
 
 test('desktop ask ai flyout uses default vitepress hover and open behavior', async ({ page }) => {
@@ -623,9 +628,11 @@ test('desktop ask ai flyout uses default vitepress hover and open behavior', asy
   await expect(menu).toBeVisible()
 
   await page.mouse.move(1, 1)
-  await expect.poll(async () => {
-    return button.getAttribute('aria-expanded')
-  }).toBe('false')
+  await expect
+    .poll(async () => {
+      return button.getAttribute('aria-expanded')
+    })
+    .toBe('false')
   await expect(menu).toBeHidden()
 })
 
@@ -824,13 +831,17 @@ test('ask ai provider menu keeps selected and hover states clear', async ({ page
   expect(selectedColor).not.toBe(claudeColor)
 
   await claude.hover()
-  await expect.poll(async () => {
-    return claude.evaluate((node) => getComputedStyle(node).backgroundColor)
-  }).not.toBe(claudeBackground)
+  await expect
+    .poll(async () => {
+      return claude.evaluate((node) => getComputedStyle(node).backgroundColor)
+    })
+    .not.toBe(claudeBackground)
   await deepSeek.hover()
-  await expect.poll(async () => {
-    return deepSeek.evaluate((node) => getComputedStyle(node).backgroundColor)
-  }).not.toBe(menuBackground)
+  await expect
+    .poll(async () => {
+      return deepSeek.evaluate((node) => getComputedStyle(node).backgroundColor)
+    })
+    .not.toBe(menuBackground)
   const deepSeekHoverBackground = await deepSeek.evaluate((node) => getComputedStyle(node).backgroundColor)
   expect(deepSeekHoverBackground).not.toBe(menuBackground)
 })
@@ -902,7 +913,10 @@ test('local search shows matching excerpts by default', async ({ page }) => {
   await expect(result).toHaveAttribute('href', /\/extras\/01#runnable-kotlin-playground/)
 
   await expect(
-    page.locator('.VPLocalSearchBox .excerpt mark[data-markjs="true"]').filter({ hasText: /customerTier|CustomerTier/ }).first()
+    page
+      .locator('.VPLocalSearchBox .excerpt mark[data-markjs="true"]')
+      .filter({ hasText: /customerTier|CustomerTier/ })
+      .first()
   ).toBeVisible()
 })
 
@@ -963,8 +977,9 @@ test('ask ai waits for prompt preparation before first clipboard copy', async ({
   })
 
   await page.route('**/__ask-ai-context/**', async (route) => {
+    const response = await route.fetch()
     await contextGate
-    await route.continue()
+    await route.fulfill({ response })
   })
 
   await page.goto('lectures/10')
@@ -1228,14 +1243,17 @@ test('ask ai mobile bubble appears after text selection', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 })
   await page.goto(UI_FIXTURE_ROUTE)
 
-  await page.locator('.vp-doc p').first().evaluate((node) => {
-    const range = document.createRange()
-    range.selectNodeContents(node)
-    const selection = window.getSelection()
-    selection?.removeAllRanges()
-    selection?.addRange(range)
-    document.dispatchEvent(new Event('selectionchange'))
-  })
+  await page
+    .locator('.vp-doc p')
+    .first()
+    .evaluate((node) => {
+      const range = document.createRange()
+      range.selectNodeContents(node)
+      const selection = window.getSelection()
+      selection?.removeAllRanges()
+      selection?.addRange(range)
+      document.dispatchEvent(new Event('selectionchange'))
+    })
 
   await expect(page.locator('.kpo-ai-menu--mobile')).toBeVisible()
   await expect(page.locator('.kpo-ai-menu--mobile')).toContainText('Ask AI')
@@ -1342,9 +1360,11 @@ test('sidebar toggle does not navigate away from the current page', async ({ pag
   await page.locator('.kpo-sidebar-toggle').click()
 
   await expect(page).toHaveURL(beforeUrl)
-  await expect.poll(async () => {
-    return html.evaluate((node) => node.classList.contains('kpo-sidebar-hidden'))
-  }).toBe(!wasHidden)
+  await expect
+    .poll(async () => {
+      return html.evaluate((node) => node.classList.contains('kpo-sidebar-hidden'))
+    })
+    .toBe(!wasHidden)
   await expectNoPageOverflowFromVpDoc(page)
 })
 
@@ -1402,14 +1422,13 @@ test('moderately wide mermaid diagrams fit the expanded lane when sidebar is hid
   await expectNoPageOverflowFromVpDoc(page)
 
   const hiddenMetrics = await getMermaidMetrics(page)
-  fitted.push(...hiddenMetrics.filter((item) => {
-    return openMetrics[item.index]?.hasLocalXScroll && !item.hasLocalXScroll
-  }))
+  fitted.push(
+    ...hiddenMetrics.filter((item) => {
+      return openMetrics[item.index]?.hasLocalXScroll && !item.hasLocalXScroll
+    })
+  )
 
-  expect(
-    fitted.length,
-    JSON.stringify({ openMetrics, hiddenMetrics }, null, 2)
-  ).toBeGreaterThan(0)
+  expect(fitted.length, JSON.stringify({ openMetrics, hiddenMetrics }, null, 2)).toBeGreaterThan(0)
 
   for (const item of fitted) {
     expect(item.hasLocalXScroll).toBe(false)
@@ -1469,7 +1488,9 @@ test('hidden sidebar enters focused-wide mode and removes the outline from layou
 
   const state = await page.evaluate(() => {
     const aside = document.querySelector('.VPDoc.has-aside > .container > .aside')
-    const contentContainer = document.querySelector('.VPDoc.has-aside > .container > .content > .content-container')
+    const contentContainer = document.querySelector(
+      '.VPDoc.has-aside > .container > .content > .content-container'
+    )
     const rect = contentContainer?.getBoundingClientRect()
     const style = aside ? getComputedStyle(aside) : null
     return {
@@ -1514,7 +1535,9 @@ test('mermaid zoom controls adjust scale without page overflow', async ({ page }
   await expectNoPageOverflowFromVpDoc(page)
 })
 
-test('fixture theme switch does not create page overflow or rely on global overflow masking', async ({ page }) => {
+test('fixture theme switch does not create page overflow or rely on global overflow masking', async ({
+  page
+}) => {
   await page.setViewportSize(LAYOUT_VIEWPORTS.desktop)
   await page.goto(UI_FIXTURE_ROUTE)
   await waitForMermaid(page, { requireDiagrams: true })
@@ -1573,7 +1596,9 @@ test('language click preserves viewport position inside the interacted code bloc
   await expectNoPageOverflowFromVpDoc(page)
 })
 
-test('keyboard language switch preserves viewport position inside the interacted code block', async ({ page }) => {
+test('keyboard language switch preserves viewport position inside the interacted code block', async ({
+  page
+}) => {
   await page.setViewportSize(LAYOUT_VIEWPORTS.desktop)
   await clearStorage(page)
   await page.goto(UI_FIXTURE_ROUTE)
@@ -1613,32 +1638,31 @@ test('playground toggle preserves viewport position inside the interacted code b
 })
 
 test('overflowing mermaid diagrams start centered in their local viewport', async ({ page }) => {
-  for (const viewport of [
-    LAYOUT_VIEWPORTS.mobilePhone,
-    LAYOUT_VIEWPORTS.narrowDesktop
-  ]) {
+  for (const viewport of [LAYOUT_VIEWPORTS.mobilePhone, LAYOUT_VIEWPORTS.narrowDesktop]) {
     await page.setViewportSize(viewport)
     await page.goto(UI_FIXTURE_ROUTE)
     await waitForMermaid(page, { requireDiagrams: true })
 
-    await expect.poll(async () => {
-      return page.locator('.kpo-mermaid__viewport').evaluateAll((nodes) => {
-        return nodes
-          .map((node) => {
-            const element = node as HTMLElement
-            return {
-              clientWidth: element.clientWidth,
-              scrollWidth: element.scrollWidth,
-              scrollLeft: Math.round(element.scrollLeft)
-            }
-          })
-          .filter((item) => item.scrollWidth > item.clientWidth + 1)
-          .every((item) => {
-            const expected = Math.round((item.scrollWidth - item.clientWidth) / 2)
-            return Math.abs(item.scrollLeft - expected) <= 2
-          })
+    await expect
+      .poll(async () => {
+        return page.locator('.kpo-mermaid__viewport').evaluateAll((nodes) => {
+          return nodes
+            .map((node) => {
+              const element = node as HTMLElement
+              return {
+                clientWidth: element.clientWidth,
+                scrollWidth: element.scrollWidth,
+                scrollLeft: Math.round(element.scrollLeft)
+              }
+            })
+            .filter((item) => item.scrollWidth > item.clientWidth + 1)
+            .every((item) => {
+              const expected = Math.round((item.scrollWidth - item.clientWidth) / 2)
+              return Math.abs(item.scrollLeft - expected) <= 2
+            })
+        })
       })
-    }).toBe(true)
+      .toBe(true)
 
     await expectNoPageOverflowFromVpDoc(page)
   }
@@ -1649,9 +1673,12 @@ test('manual mermaid scroll is preserved across zoom and reset recenters', async
   await page.goto(UI_FIXTURE_ROUTE)
   await waitForMermaid(page, { requireDiagrams: true })
 
-  const diagram = page.locator('.kpo-mermaid').filter({
-    has: page.locator('.kpo-mermaid__viewport')
-  }).first()
+  const diagram = page
+    .locator('.kpo-mermaid')
+    .filter({
+      has: page.locator('.kpo-mermaid__viewport')
+    })
+    .first()
   const viewport = diagram.locator('.kpo-mermaid__viewport')
 
   await viewport.evaluate((node) => {
@@ -1730,9 +1757,11 @@ test('fixture mermaid dark theme keeps label colors readable and token-based', a
   if (!isDark) {
     await page.locator('.VPSwitchAppearance').first().click()
   }
-  await expect.poll(async () => {
-    return page.locator('html').evaluate((node) => node.classList.contains('dark'))
-  }).toBe(true)
+  await expect
+    .poll(async () => {
+      return page.locator('html').evaluate((node) => node.classList.contains('dark'))
+    })
+    .toBe(true)
   await page.waitForTimeout(500)
 
   const labels = await getMermaidLabelContrasts(page)
@@ -1756,9 +1785,11 @@ test('public mermaid dark theme labels are readable when present', async ({ page
     if (!isDark) {
       await page.locator('.VPSwitchAppearance').first().click()
     }
-    await expect.poll(async () => {
-      return page.locator('html').evaluate((node) => node.classList.contains('dark'))
-    }).toBe(true)
+    await expect
+      .poll(async () => {
+        return page.locator('html').evaluate((node) => node.classList.contains('dark'))
+      })
+      .toBe(true)
     await page.waitForTimeout(250)
 
     const labels = await getMermaidLabelContrasts(page)
@@ -1776,7 +1807,8 @@ test('fixture mermaid text and foreignObject labels are not clipped', async ({ p
   await page.goto(UI_FIXTURE_ROUTE)
   await waitForMermaid(page, { requireDiagrams: true })
 
-  await expect.poll(async () => page.locator('.kpo-mermaid svg .nodeLabel, .kpo-mermaid svg .edgeLabel span').count())
+  await expect
+    .poll(async () => page.locator('.kpo-mermaid svg .nodeLabel, .kpo-mermaid svg .edgeLabel span').count())
     .toBeGreaterThan(0)
 
   const issues = await getMermaidClipIssues(page)
@@ -1784,7 +1816,9 @@ test('fixture mermaid text and foreignObject labels are not clipped', async ({ p
   await expectNoPageOverflowFromVpDoc(page)
 })
 
-test('public mermaid diagrams render without errors and labels are not clipped when present', async ({ page }) => {
+test('public mermaid diagrams render without errors and labels are not clipped when present', async ({
+  page
+}) => {
   await page.setViewportSize(LAYOUT_VIEWPORTS.desktop)
 
   for (const route of PUBLIC_CONTENT_ROUTES) {
@@ -1841,7 +1875,7 @@ test('wide elements use the expanded lane when sidebar is hidden', async ({ page
     { route: UI_FIXTURE_ROUTE, selector: '.kpo-content-block--table' },
     { route: UI_FIXTURE_ROUTE, selector: '.vp-doc p:has(> img:only-child)' },
     { route: UI_FIXTURE_ROUTE, selector: '.kpo-playground', playground: true }
-  ] as const
+  ] satisfies ReadonlyArray<{ route: string; selector: string; playground?: boolean }>
 
   for (const item of cases) {
     await page.goto(item.route)
@@ -1888,15 +1922,27 @@ test('published markdown tables all use the adaptive table contract on mobile', 
     const result = await page.evaluate(() => {
       const orphanTables = [...document.querySelectorAll('.vp-doc table')]
         .filter((table) => !table.closest('.kpo-content-block--table'))
-        .map((table) => String(table.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 120))
+        .map((table) =>
+          String(table.textContent || '')
+            .replace(/\s+/g, ' ')
+            .trim()
+            .slice(0, 120)
+        )
 
       const unresolvedTables = [...document.querySelectorAll('.kpo-content-block--table')]
         .filter((block) => {
-          return !block.classList.contains('kpo-table--fit') &&
+          return (
+            !block.classList.contains('kpo-table--fit') &&
             !block.classList.contains('kpo-table--wrap') &&
             !block.classList.contains('kpo-table--scroll')
+          )
         })
-        .map((block) => String(block.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 120))
+        .map((block) =>
+          String(block.textContent || '')
+            .replace(/\s+/g, ' ')
+            .trim()
+            .slice(0, 120)
+        )
 
       return { orphanTables, unresolvedTables }
     })
@@ -1927,7 +1973,9 @@ test('markdown tables wrap before falling back to local scroll on mobile', async
     expect(state.tableLayout).toBe('fixed')
     expect(state.cellOverflowWrap).toBe('anywhere')
     expect(state.hasLocalScroll, JSON.stringify(state)).toBe(false)
-    expect(state.blockScrollWidth).toBeLessThanOrEqual(state.blockClientWidth + CONTENT_LAYOUT_TOKENS.tableOverflowEpsilon)
+    expect(state.blockScrollWidth).toBeLessThanOrEqual(
+      state.blockClientWidth + CONTENT_LAYOUT_TOKENS.tableOverflowEpsilon
+    )
   }
 
   for (const state of states) {
@@ -1953,8 +2001,9 @@ test('dense markdown tables keep overflow local after wrap is not readable', asy
     expect(state.display).toBe('table')
     expect(state.tableLayout).toBe('auto')
     expect(state.hasLocalScroll, JSON.stringify(state)).toBe(true)
-    expect(state.columnCount * CONTENT_LAYOUT_TOKENS.tableDenseMinColumnWidth)
-      .toBeGreaterThan(state.blockClientWidth)
+    expect(state.columnCount * CONTENT_LAYOUT_TOKENS.tableDenseMinColumnWidth).toBeGreaterThan(
+      state.blockClientWidth
+    )
   }
 
   await expectNoPageOverflowFromVpDoc(page)
@@ -2063,7 +2112,7 @@ test('special content elements are viewport-contained on mobile', async ({ page 
     { route: UI_FIXTURE_ROUTE, selector: '.vp-doc code:not(pre code)' },
     { route: UI_FIXTURE_ROUTE, selector: '.kpo-content-block--code' },
     { route: UI_FIXTURE_ROUTE, selector: '.vp-doc h1, .vp-doc h2, .vp-doc h3' }
-  ] as const
+  ] satisfies ReadonlyArray<{ route: string; selector: string; playground?: boolean }>
 
   for (const item of cases) {
     await page.goto(item.route)

@@ -1,0 +1,8 @@
+{
+  "maxJavaScriptChunkBytes": 921600,
+  "maxCssBytes": 163840,
+  "maxAskAiContextBytes": 230400,
+  "maxAskAiContextsBytes": 2726298,
+  "maxHtmlPageBytes": 460800,
+  "maxDistBytes": 23068672
+}

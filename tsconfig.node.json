@@ -1,0 +1,17 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "composite": true,
+    "noEmit": true
+  },
+  "include": [
+    ".vitepress/config.mts",
+    ".vitepress/lib/**/*.ts",
+    ".vitepress/markdown/**/*.ts",
+    ".vitepress/shared/**/*.ts",
+    ".vitepress/theme/lib/askAiModel.ts",
+    "scripts/**/*.mts",
+    "vitest.config.ts"
+  ],
+  "exclude": [".vitepress/**/__tests__/**"]
+}
