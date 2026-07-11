@@ -1275,8 +1275,27 @@ test('ask ai copies and opens Claude without showing manual prompt', async ({ pa
 
 test('ask ai mobile bubble appears after text selection', async ({ page }) => {
   await clearStorage(page)
+  await page.addInitScript(() => {
+    const originalAddEventListener = document.addEventListener.bind(document)
+    document.addEventListener = ((
+      type: string,
+      listener: EventListenerOrEventListenerObject,
+      options?: boolean | AddEventListenerOptions
+    ) => {
+      if (type === 'selectionchange') {
+        ;(
+          window as unknown as { __kpoSelectionListenerReady: boolean }
+        ).__kpoSelectionListenerReady = true
+      }
+      originalAddEventListener(type, listener, options)
+    }) as typeof document.addEventListener
+  })
   await page.setViewportSize({ width: 390, height: 844 })
   await page.goto(UI_FIXTURE_ROUTE)
+  await page.waitForFunction(() => {
+    return (window as unknown as { __kpoSelectionListenerReady?: boolean })
+      .__kpoSelectionListenerReady
+  })
 
   await page
     .locator('.vp-doc p')
@@ -1290,8 +1309,9 @@ test('ask ai mobile bubble appears after text selection', async ({ page }) => {
       document.dispatchEvent(new Event('selectionchange'))
     })
 
-  await expect(page.locator('.kpo-ai-menu--mobile')).toBeVisible()
-  await expect(page.locator('.kpo-ai-menu--mobile')).toContainText('Ask AI')
+  const mobileMenu = page.locator('.kpo-ai-menu--mobile')
+  await expect(mobileMenu).toBeVisible()
+  await expect(mobileMenu).toContainText('Ask AI')
 })
 
 test('code switchers without author defaults follow the latest global language', async ({
