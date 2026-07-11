@@ -1128,6 +1128,18 @@ test('ask ai manual prompt appears only after clipboard methods fail', async ({ 
 
   await expect(page.locator('.kpo-ai-toast')).toHaveText('Copy prompt manually')
   await expect(page.locator('.kpo-ai-manual')).toBeVisible()
+  const manualTextarea = page.locator('.kpo-ai-manual textarea')
+  const manualClose = page.locator('.kpo-ai-manual button')
+  await expect(manualTextarea).toBeFocused()
+  await page.keyboard.press('Tab')
+  await expect(manualClose).toBeFocused()
+  await page.keyboard.press('Tab')
+  await expect(manualTextarea).toBeFocused()
+  await page.keyboard.press('Shift+Tab')
+  await expect(manualClose).toBeFocused()
+  await page.keyboard.press('Escape')
+  await expect(page.locator('.kpo-ai-manual')).toHaveCount(0)
+  await expect(page.locator('.KpoAskAiProvider > button')).toBeFocused()
 
   const attempts = await page.evaluate(() => {
     return (window as unknown as { __kpoCopyAttempts: string[] }).__kpoCopyAttempts

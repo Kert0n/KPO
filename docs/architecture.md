@@ -19,3 +19,11 @@ Adaptive tables follow this rule through `AdaptiveTablesController`:
 
 The controller changes lifecycle ownership only. Table markup, CSS and the
 fit/wrap/scroll geometry policy remain separate stable contracts.
+
+Ask AI follows the same ownership model. Context loading owns an abortable
+request and prefetch timer; route invalidation aborts both and advances a
+generation token. Action preparation has a separate generation token so a
+slower earlier selection cannot overwrite the latest one. The manual clipboard
+fallback traps focus inside the existing dialog and restores it to the visible
+provider control when the dialog closes. Component unmount removes every
+document/window listener and disposes both loaders.
