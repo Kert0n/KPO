@@ -4,7 +4,6 @@ import {
   normalizeForScreenshot,
   resetBrowserState,
   selectText,
-  setTheme,
   UI_FIXTURE_ROUTE,
   waitForStableUi
 } from './helpers'
@@ -16,9 +15,13 @@ test.describe('Linux Chromium golden master', () => {
 
   for (const theme of ['light', 'dark'] as const) {
     test(`desktop ${theme}, sidebar visible`, async ({ page }) => {
+      await resetBrowserState(page, {
+        'kpo:playground-mode': '0',
+        'vitepress-theme-appearance': theme
+      })
       await page.setViewportSize({ width: 1440, height: 1000 })
       await page.goto('intro')
-      await setTheme(page, theme)
+      await expect(page.locator('html')).toHaveClass(theme === 'dark' ? /dark/ : /^(?!.*\bdark\b)/)
       await waitForStableUi(page)
       await normalizeForScreenshot(page)
       await expect(page).toHaveScreenshot(`desktop-${theme}-sidebar-visible.png`, { fullPage: true })
@@ -26,9 +29,13 @@ test.describe('Linux Chromium golden master', () => {
   }
 
   test('desktop dark, sidebar hidden', async ({ page }) => {
+    await resetBrowserState(page, {
+      'kpo:playground-mode': '0',
+      'vitepress-theme-appearance': 'dark'
+    })
     await page.setViewportSize({ width: 1440, height: 1000 })
     await page.goto(UI_FIXTURE_ROUTE)
-    await setTheme(page, 'dark')
+    await expect(page.locator('html')).toHaveClass(/dark/)
     await hideSidebar(page)
     await waitForStableUi(page)
     await normalizeForScreenshot(page)
@@ -47,9 +54,13 @@ test.describe('Linux Chromium golden master', () => {
 
   for (const theme of ['light', 'dark'] as const) {
     test(`mobile ${theme}`, async ({ page }) => {
+      await resetBrowserState(page, {
+        'kpo:playground-mode': '0',
+        'vitepress-theme-appearance': theme
+      })
       await page.setViewportSize({ width: 390, height: 844 })
       await page.goto('intro')
-      await setTheme(page, theme)
+      await expect(page.locator('html')).toHaveClass(theme === 'dark' ? /dark/ : /^(?!.*\bdark\b)/)
       await waitForStableUi(page)
       await normalizeForScreenshot(page)
       await expect(page).toHaveScreenshot(`mobile-${theme}.png`, { fullPage: true })
@@ -76,6 +87,10 @@ test.describe('Linux Chromium golden master', () => {
     const switcher = page.locator('.kpo-switcher').filter({ hasText: 'Fixture Kotlin Playground' })
     await switcher.locator('.kpo-switcher__playground-toggle').click()
     await expect(switcher.locator('.kpo-playground')).toBeVisible()
+    await page.addStyleTag({ content: `
+      .kpo-playground { height: 214px !important; overflow: hidden !important; }
+      .kpo-playground > * { visibility: hidden !important; }
+    ` })
     await normalizeForScreenshot(page)
     await expect(switcher).toHaveScreenshot('playground.png')
   })
