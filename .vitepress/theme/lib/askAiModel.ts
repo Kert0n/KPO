@@ -1,4 +1,5 @@
 import type { AskAiBlockKind } from '../../lib/askAiIds'
+import { SITE } from '../../shared/site'
 
 export type AskAiProviderId = 'chatgpt' | 'claude' | 'deepseek' | 'clipboard'
 
@@ -161,7 +162,7 @@ export function askAiContextUrlForRoute(
 ): string {
   const key = routePathToAskAiContextKey(path, base)
   const encodedKey = key.split('/').map(encodeURIComponent).join('/')
-  return withBase(`/__ask-ai-context/${encodedKey}.json`)
+  return withBase(`${SITE.askAiContextBasePath}${encodedKey}.json`)
 }
 
 function stripBase(path: string, base: string): string {

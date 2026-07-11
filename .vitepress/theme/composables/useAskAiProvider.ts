@@ -1,9 +1,10 @@
 import type { Ref } from 'vue'
 import { isAskAiProviderId, type AskAiProviderId } from '../lib/askAiModel'
 import { createPersistentState } from './persistentState'
+import { SITE } from '../../shared/site'
 
 const provider = createPersistentState<AskAiProviderId>({
-  key: 'kpo:ask-ai-provider',
+  key: SITE.storageKeys.askAiProvider,
   initial: 'chatgpt',
   encode: (value) => value,
   decode: (raw) => raw as AskAiProviderId,

@@ -1,12 +1,12 @@
-import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs'
+import { mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import MarkdownIt from 'markdown-it'
 import type Token from 'markdown-it/lib/token.mjs'
 import container from 'markdown-it-container'
 import matter from 'gray-matter'
 import { isImageOnlyParagraph } from '../markdown/tokenUtils'
+import { contentPagesFor } from '../shared/content/contentCatalog'
 import { createAskAiBlockId, type AskAiBlockKind } from './askAiIds'
-import { extractNumber } from './content'
 import type { AskAiBlock, AskAiPageContext } from '../theme/lib/askAiModel'
 
 export type AskAiContextEntry = {
@@ -27,24 +27,29 @@ type CacheEntry = {
 
 const cache = new Map<string, CacheEntry>()
 const markdown = MarkdownIt({ html: true }).use(container, 'multi-code')
-const contentDirectory = 'content'
-
 export function listAskAiContextEntries(root = process.cwd()): AskAiContextEntry[] {
-  const entries: AskAiContextEntry[] = []
+  return contentPagesFor('askAi', { root, fresh: true })
+    .sort(
+      (left, right) =>
+        askAiPageRank(left.kind) - askAiPageRank(right.kind) ||
+        left.sourcePath.localeCompare(right.sourcePath, 'en')
+    )
+    .map((page) => ({
+      routeKey: page.routeKey,
+      sourcePath: page.sourcePath
+    }))
+}
 
-  addIfExists(entries, root, 'index', 'content/home/vitepress.md')
-  addIfExists(entries, root, 'intro', 'content/intro/vitepress.md')
-  addIfExists(entries, root, 'conclusion', 'content/conclusion/vitepress.md')
-  scanNumberedPages(entries, root, 'lectures')
-  addIfExists(entries, root, 'extras/index', 'content/extras/index/vitepress.md')
-  scanNumberedPages(entries, root, 'extras')
-
-  const seen = new Set<string>()
-  return entries.filter((entry) => {
-    if (seen.has(entry.routeKey)) return false
-    seen.add(entry.routeKey)
-    return true
-  })
+function askAiPageRank(kind: ReturnType<typeof contentPagesFor>[number]['kind']): number {
+  return {
+    home: 0,
+    intro: 1,
+    conclusion: 2,
+    lecture: 3,
+    'extras-index': 4,
+    extra: 5,
+    service: 6
+  }[kind]
 }
 
 export function buildAskAiPageContext(
@@ -173,41 +178,6 @@ function createBlock(
     lineStart: start + 1,
     lineEnd: end,
     ...extra
-  }
-}
-
-function addIfExists(
-  entries: AskAiContextEntry[],
-  root: string,
-  routeKey: string,
-  sourcePath: string
-): void {
-  if (existsSync(resolve(root, sourcePath))) {
-    entries.push({ routeKey, sourcePath })
-  }
-}
-
-function scanNumberedPages(
-  entries: AskAiContextEntry[],
-  root: string,
-  directory: 'lectures' | 'extras'
-): void {
-  const directoryPath = resolve(root, contentDirectory, directory)
-  if (!existsSync(directoryPath)) return
-
-  for (const entry of readdirSync(directoryPath, { withFileTypes: true })) {
-    if (entry.name === 'index' || entry.name.startsWith('.') || entry.name.startsWith('_')) continue
-
-    if (entry.isDirectory()) {
-      const sourcePath = `${contentDirectory}/${directory}/${entry.name}/vitepress.md`
-      if (!existsSync(resolve(root, sourcePath))) continue
-      const order = extractNumber(entry.name)
-      const slug = Number.isFinite(order) ? String(order).padStart(2, '0') : entry.name
-      entries.push({
-        routeKey: `${directory}/${slug}`,
-        sourcePath
-      })
-    }
   }
 }
 

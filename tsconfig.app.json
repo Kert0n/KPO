@@ -11,7 +11,8 @@
     ".vitepress/theme/**/*.d.ts",
     ".vitepress/types/**/*.d.ts",
     ".vitepress/lib/**/*.ts",
-    ".vitepress/markdown/**/*.ts"
+    ".vitepress/markdown/**/*.ts",
+    ".vitepress/shared/**/*.ts"
   ],
   "exclude": [".vitepress/**/*.test.ts", ".vitepress/dist/**", ".vitepress/cache/**"]
 }

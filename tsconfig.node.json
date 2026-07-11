@@ -9,6 +9,7 @@
     ".vitepress/config.mts",
     ".vitepress/lib/**/*.ts",
     ".vitepress/markdown/**/*.ts",
+    ".vitepress/shared/**/*.ts",
     ".vitepress/theme/lib/**/*.ts",
     ".vitepress/types/**/*.d.ts",
     ".vitepress/scripts/**/*.mjs",
