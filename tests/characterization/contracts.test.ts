@@ -1,5 +1,5 @@
 import { readFileSync, readdirSync, statSync } from 'node:fs'
-import { join, relative, resolve } from 'node:path'
+import { join, resolve } from 'node:path'
 import { describe, expect, test } from 'vitest'
 import { buildAskAiPageContext, listAskAiContextEntries } from '../../.vitepress/lib/askAiContext'
 import { getNav, getRewrites, getSidebar } from '../../.vitepress/lib/content'
@@ -73,6 +73,6 @@ describe('stable public contracts', () => {
 function walk(directory: string): string[] {
   return readdirSync(directory).flatMap((name) => {
     const path = join(directory, name)
-    return statSync(path).isDirectory() ? walk(path) : [relative(root, path).startsWith('..') ? path : path]
+    return statSync(path).isDirectory() ? walk(path) : [path]
   })
 }

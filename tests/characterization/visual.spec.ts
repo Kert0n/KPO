@@ -10,7 +10,10 @@ import {
 
 test.describe('Linux Chromium golden master', () => {
   test.beforeEach(async ({ page }) => {
-    await resetBrowserState(page, { 'kpo:playground-mode': '0' })
+    await resetBrowserState(page, {
+      'kpo:playground-mode': '0',
+      'vitepress-theme-appearance': 'light'
+    })
   })
 
   for (const theme of ['light', 'dark'] as const) {
@@ -127,6 +130,7 @@ test.describe('Linux Chromium golden master', () => {
   test('logo and title crop guard', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 })
     await page.goto('intro')
+    await waitForStableUi(page)
     await normalizeForScreenshot(page)
     await expect(page.locator('.VPNavBarTitle')).toHaveScreenshot('logo-title-mobile.png')
   })
