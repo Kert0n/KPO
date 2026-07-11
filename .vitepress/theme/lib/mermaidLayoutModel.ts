@@ -21,14 +21,11 @@ export type ResolveMermaidManualScaleInput = {
 
 export type MermaidOverflowState = {
   hasOverflowX: boolean
-  hasOverflowY: boolean
 }
 
 export type ResolveMermaidOverflowInput = {
   clientWidth: number
   scrollWidth: number
-  clientHeight: number
-  scrollHeight: number
   epsilon?: number
 }
 
@@ -97,8 +94,7 @@ export function resolveMermaidOverflow(input: ResolveMermaidOverflowInput): Merm
   const epsilon = input.epsilon ?? 1
 
   return {
-    hasOverflowX: input.scrollWidth > input.clientWidth + epsilon,
-    hasOverflowY: input.scrollHeight > input.clientHeight + epsilon
+    hasOverflowX: input.scrollWidth > input.clientWidth + epsilon
   }
 }
 
@@ -121,7 +117,6 @@ export function resolveScrollLeftForCenterRatio(input: {
 
 export function shouldShowMermaidToolbar(input: ShouldShowMermaidToolbarInput): boolean {
   return input.hasOverflowX
-    || input.hasOverflowY
     || input.hasManualScale
     || input.isHovered
     || input.isFocusWithin

@@ -220,7 +220,6 @@ async function getMermaidMetrics(page: Page): Promise<Array<{
   scaleX: number
   scaleY: number
   hasLocalXScroll: boolean
-  hasLocalYScroll: boolean
 }>> {
   return page.evaluate(() => {
     return [...document.querySelectorAll('.kpo-mermaid')].map((root, index) => {
@@ -244,8 +243,7 @@ async function getMermaidMetrics(page: Page): Promise<Array<{
         viewBoxHeight,
         scaleX: rect && viewBoxWidth > 0 ? rect.width / viewBoxWidth : 1,
         scaleY: rect && viewBoxHeight > 0 ? rect.height / viewBoxHeight : 1,
-        hasLocalXScroll: element.scrollWidth > element.clientWidth + 1,
-        hasLocalYScroll: element.scrollHeight > element.clientHeight + 1
+        hasLocalXScroll: element.scrollWidth > element.clientWidth + 1
       }
     })
   })
@@ -1459,6 +1457,82 @@ test('very wide mermaid diagrams stay readable and scroll locally on desktop', a
     expect(item.hasLocalXScroll).toBe(true)
   }
 
+  await expectNoPageOverflowFromVpDoc(page)
+})
+
+test('public mermaid viewports use automatic height and horizontal-only local overflow', async ({ page }) => {
+  await page.setViewportSize(LAYOUT_VIEWPORTS.mobilePhone)
+  const mermaidRoutes = PUBLIC_CONTENT_ROUTES.filter((route) => {
+    return route === 'intro' || route.startsWith('lectures/')
+  })
+
+  for (const route of mermaidRoutes) {
+    await page.goto(route)
+    await waitForMermaid(page, { requireDiagrams: true })
+
+    const states = await page.locator('.kpo-mermaid').evaluateAll((nodes) => {
+      return nodes.map((root) => {
+        const viewport = root.querySelector('.kpo-mermaid__viewport') as HTMLElement | null
+        const svg = root.querySelector('svg')
+        const viewportRect = viewport?.getBoundingClientRect()
+        const svgRect = svg?.getBoundingClientRect()
+        return {
+          hasViewport: Boolean(viewport),
+          clientHeight: viewport?.clientHeight ?? 0,
+          scrollHeight: viewport?.scrollHeight ?? 0,
+          viewportHeight: viewportRect?.height ?? 0,
+          svgHeight: svgRect?.height ?? 0,
+          hasLocalXScroll: Boolean(viewport && viewport.scrollWidth > viewport.clientWidth + 1),
+          successfulSourceDetails: root.querySelectorAll(':scope > details, .kpo-mermaid__source').length
+        }
+      })
+    })
+
+    expect(states.length, route).toBeGreaterThan(0)
+    for (const state of states) {
+      expect(state.hasViewport, JSON.stringify({ route, state })).toBe(true)
+      expect(state.scrollHeight, JSON.stringify({ route, state })).toBe(state.clientHeight)
+      expect(Math.abs(state.viewportHeight - state.svgHeight), JSON.stringify({ route, state }))
+        .toBeLessThanOrEqual(1)
+      expect(state.successfulSourceDetails, JSON.stringify({ route, state })).toBe(0)
+    }
+
+    await expectNoPageOverflowFromVpDoc(page)
+  }
+})
+
+test('a taller mermaid SVG expands the page while horizontal overflow remains local', async ({ page }) => {
+  await page.setViewportSize(LAYOUT_VIEWPORTS.mobilePhone)
+  await page.goto(UI_FIXTURE_ROUTE)
+  await waitForMermaid(page, { requireDiagrams: true })
+
+  const diagram = page.locator('.kpo-mermaid').first()
+  const before = await diagram.evaluate((root) => {
+    const viewport = root.querySelector('.kpo-mermaid__viewport') as HTMLElement
+    return {
+      documentHeight: document.documentElement.scrollHeight,
+      viewportHeight: viewport.clientHeight
+    }
+  })
+
+  await diagram.getByRole('button', { name: 'Увеличить диаграмму' }).click()
+  await expect.poll(async () => diagram.locator('.kpo-mermaid__viewport').evaluate((viewport) => {
+    return (viewport as HTMLElement).clientHeight
+  })).toBeGreaterThan(before.viewportHeight)
+
+  const after = await diagram.evaluate((root) => {
+    const viewport = root.querySelector('.kpo-mermaid__viewport') as HTMLElement
+    return {
+      documentHeight: document.documentElement.scrollHeight,
+      viewportHeight: viewport.clientHeight,
+      scrollHeight: viewport.scrollHeight,
+      hasLocalXScroll: viewport.scrollWidth > viewport.clientWidth + 1
+    }
+  })
+
+  expect(after.documentHeight).toBeGreaterThan(before.documentHeight)
+  expect(after.scrollHeight).toBe(after.viewportHeight)
+  expect(after.hasLocalXScroll).toBe(true)
   await expectNoPageOverflowFromVpDoc(page)
 })
 

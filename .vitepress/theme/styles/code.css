@@ -267,7 +267,9 @@ html:not([data-kpo-lang]) .kpo-only--kotlin {
 
 .kpo-mermaid__viewport {
   max-width: 100%;
-  overflow: auto;
+  overflow-x: auto;
+  overflow-y: visible;
+  max-height: none;
   -webkit-overflow-scrolling: touch;
 }
 
@@ -353,10 +355,6 @@ html:not([data-kpo-lang]) .kpo-only--kotlin {
 }
 
 @media (max-width: 639px) {
-  .kpo-mermaid__viewport {
-    max-height: var(--kpo-mermaid-max-mobile-height);
-  }
-
   .kpo-switcher__header {
     align-items: stretch;
   }
