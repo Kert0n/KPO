@@ -162,12 +162,16 @@ async function waitForHttp(url) {
 }
 
 async function waitForMermaid(page, route) {
-  await page.waitForFunction(() => {
-    const diagrams = [...document.querySelectorAll('.kpo-mermaid')]
-    return diagrams.every((diagram) => {
-      return diagram.querySelector('svg') || diagram.querySelector('.kpo-mermaid__error')
-    })
-  }, null, { timeout: 30_000 })
+  await page.waitForFunction(
+    () => {
+      const diagrams = [...document.querySelectorAll('.kpo-mermaid')]
+      return diagrams.every((diagram) => {
+        return diagram.querySelector('svg') || diagram.querySelector('.kpo-mermaid__error')
+      })
+    },
+    null,
+    { timeout: 30_000 }
+  )
 
   const errors = await page.locator('.kpo-mermaid__error').evaluateAll((nodes) => {
     return nodes.map((node) => node.textContent?.trim().replace(/\s+/g, ' ') ?? '')

@@ -71,27 +71,29 @@ export function buildAskAiPrompt(input: AskAiPromptInput): string {
   const firstIndex = selectedIndexes[0] ?? -1
   const lastIndex = selectedIndexes[selectedIndexes.length - 1] ?? firstIndex
 
-  const before = firstIndex > 0
-    ? collectBeforeContextBlocks(blocks, firstIndex, CONTEXT_BEFORE_TARGET_CHARS)
-      .map((block) => blockToPromptText(block))
-      .join('\n\n')
-    : ''
-  const after = lastIndex >= 0 && lastIndex < blocks.length - 1
-    ? collectAfterContextBlocks(blocks, lastIndex, CONTEXT_AFTER_TARGET_CHARS)
-      .map((block) => blockToPromptText(block))
-      .join('\n\n')
-    : ''
+  const before =
+    firstIndex > 0
+      ? collectBeforeContextBlocks(blocks, firstIndex, CONTEXT_BEFORE_TARGET_CHARS)
+          .map((block) => blockToPromptText(block))
+          .join('\n\n')
+      : ''
+  const after =
+    lastIndex >= 0 && lastIndex < blocks.length - 1
+      ? collectAfterContextBlocks(blocks, lastIndex, CONTEXT_AFTER_TARGET_CHARS)
+          .map((block) => blockToPromptText(block))
+          .join('\n\n')
+      : ''
   const current = input.currentOverride
     ? blockToPromptText({
-      id: 'runtime-current',
-      kind: input.currentOverride.kind,
-      language: input.currentOverride.language,
-      title: input.currentOverride.title,
-      markdown: input.currentOverride.markdown,
-      plainText: input.currentOverride.markdown,
-      lineStart: 0,
-      lineEnd: 0
-    })
+        id: 'runtime-current',
+        kind: input.currentOverride.kind,
+        language: input.currentOverride.language,
+        title: input.currentOverride.title,
+        markdown: input.currentOverride.markdown,
+        plainText: input.currentOverride.markdown,
+        lineStart: 0,
+        lineEnd: 0
+      })
     : selectedIndexes.map((index) => blockToPromptText(blocks[index])).join('\n\n')
 
   const sections = {
@@ -139,10 +141,13 @@ export function resolveAskAiProviderAction(
 }
 
 export function routePathToAskAiContextKey(path: string, base = '/'): string {
-  const cleanPath = stripBase(path
-    .split(/[?#]/)[0]
-    .replace(/\.html$/, '')
-    .replace(/^\/+/, ''), base)
+  const cleanPath = stripBase(
+    path
+      .split(/[?#]/)[0]
+      .replace(/\.html$/, '')
+      .replace(/^\/+/, ''),
+    base
+  )
 
   if (cleanPath === '') return 'index'
   if (cleanPath.endsWith('/')) return `${cleanPath}index`.replace(/^\/+/, '')
@@ -173,7 +178,7 @@ function stripBase(path: string, base: string): string {
 function blockIndexes(blocks: AskAiBlock[], ids: string[]): number[] {
   const idSet = new Set(ids)
   return blocks
-    .map((block, index) => idSet.has(block.id) ? index : -1)
+    .map((block, index) => (idSet.has(block.id) ? index : -1))
     .filter((index) => index !== -1)
 }
 
@@ -186,8 +191,10 @@ function isBridgeBlock(block: AskAiBlock): boolean {
   const plainText = normalizeText(block.plainText || block.markdown)
   if (block.kind === 'heading') return true
   if (plainText.endsWith(':')) return true
-  if ((block.kind === 'paragraph' || block.kind === 'list' || block.kind === 'blockquote') &&
-    plainText.length <= SHORT_BRIDGE_BLOCK_CHARS) {
+  if (
+    (block.kind === 'paragraph' || block.kind === 'list' || block.kind === 'blockquote') &&
+    plainText.length <= SHORT_BRIDGE_BLOCK_CHARS
+  ) {
     return true
   }
   return false
@@ -198,7 +205,8 @@ function isSubstantiveBlock(block: AskAiBlock): boolean {
 
   const plainText = normalizeText(block.plainText || block.markdown)
   if (plainText.length > SHORT_BRIDGE_BLOCK_CHARS) return true
-  if ((block.kind === 'list' || block.kind === 'blockquote') && plainText.split('\n').length > 1) return true
+  if ((block.kind === 'list' || block.kind === 'blockquote') && plainText.split('\n').length > 1)
+    return true
   return false
 }
 
@@ -221,7 +229,7 @@ export function collectBeforeContextBlocks(
     const substantive = isSubstantiveBlock(block)
     const bridge = isBridgeBlock(block)
 
-    if (wouldExceed && (foundSubstantive || selected.length > 0 && !substantive && !bridge)) break
+    if (wouldExceed && (foundSubstantive || (selected.length > 0 && !substantive && !bridge))) break
     if (!foundSubstantive || substantive || bridge) {
       const separatorLength = sectionSeparatorLength(selected)
       selected.unshift(block)
@@ -255,7 +263,7 @@ export function collectAfterContextBlocks(
     const substantive = isSubstantiveBlock(block)
     const bridge = isBridgeBlock(block)
 
-    if (wouldExceed && (foundSubstantive || selected.length > 0 && !substantive && !bridge)) break
+    if (wouldExceed && (foundSubstantive || (selected.length > 0 && !substantive && !bridge))) break
     if (!foundSubstantive || substantive || bridge) {
       const separatorLength = sectionSeparatorLength(selected)
       selected.push(block)
@@ -328,7 +336,10 @@ function trimPromptSections(
   }
 
   while (renderPrompt(context, next).length > maxChars && next.selected.length > 80) {
-    next = { ...next, selected: trimMiddle(next.selected, Math.max(80, next.selected.length - 500)) }
+    next = {
+      ...next,
+      selected: trimMiddle(next.selected, Math.max(80, next.selected.length - 500))
+    }
   }
 
   return renderPrompt(context, next)

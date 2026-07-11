@@ -62,10 +62,7 @@ export function askAiContextPlugin(options: AskAiContextPluginOptions): Plugin {
 
 function routeKeyFromRequestUrl(rawUrl: string, base: string): string | null {
   const pathname = decodeURIComponent(rawUrl.split(/[?#]/)[0] ?? '')
-  const prefixes = [
-    '/__ask-ai-context/',
-    `${normalizeBase(base)}__ask-ai-context/`
-  ]
+  const prefixes = ['/__ask-ai-context/', `${normalizeBase(base)}__ask-ai-context/`]
 
   for (const prefix of prefixes) {
     if (!pathname.startsWith(prefix)) continue

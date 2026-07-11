@@ -1,6 +1,10 @@
 import type { Router } from 'vitepress'
 import { CONTENT_LAYOUT_TOKENS } from './contentLayoutTokens'
-import { countTableColumns, resolveAdaptiveTableMode, type AdaptiveTableMode } from './adaptiveTableModel'
+import {
+  countTableColumns,
+  resolveAdaptiveTableMode,
+  type AdaptiveTableMode
+} from './adaptiveTableModel'
 
 const TABLE_BLOCK_SELECTOR = '.kpo-content-block--table'
 const TABLE_MODE_CLASSES = ['kpo-table--fit', 'kpo-table--wrap', 'kpo-table--scroll'] as const
@@ -107,7 +111,8 @@ function applyAdaptiveTableLayout(controller: AdaptiveTableController): void {
   if (mode !== 'wrap') return
 
   window.requestAnimationFrame(() => {
-    const hasWrappedOverflow = block.scrollWidth > block.clientWidth + CONTENT_LAYOUT_TOKENS.tableOverflowEpsilon
+    const hasWrappedOverflow =
+      block.scrollWidth > block.clientWidth + CONTENT_LAYOUT_TOKENS.tableOverflowEpsilon
     if (hasWrappedOverflow) {
       setTableMode(block, 'scroll')
     }

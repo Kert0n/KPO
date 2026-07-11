@@ -42,7 +42,9 @@ fun main() {}
 :::
 `)
 
-    expect(warn).toHaveBeenCalledWith(expect.stringContaining('default="go" не найден среди языков блока'))
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining('default="go" не найден среди языков блока')
+    )
     expect(html).not.toContain('author-default-lang')
     expect(html).toContain('initial-lang="kotlin"')
   })

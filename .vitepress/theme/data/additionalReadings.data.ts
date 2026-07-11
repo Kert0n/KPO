@@ -1,8 +1,15 @@
 import { readFileSync } from 'node:fs'
 import { defineLoader } from 'vitepress'
-import { parseLectureAdditionalReadings, type LectureAdditionalReadings } from '../lib/additionalReadings'
+import {
+  parseLectureAdditionalReadings,
+  type LectureAdditionalReadings
+} from '../lib/additionalReadings'
 
-export type { AdditionalReadingGroup, AdditionalReadingItem, LectureAdditionalReadings } from '../lib/additionalReadings'
+export type {
+  AdditionalReadingGroup,
+  AdditionalReadingItem,
+  LectureAdditionalReadings
+} from '../lib/additionalReadings'
 
 export default defineLoader({
   watch: '../../../content/lectures/Lec*/vitepress.md',

@@ -74,7 +74,13 @@ function buildTheme(name: string, type: 'light' | 'dark', c: CodePalette): Theme
         settings: { foreground: c.constant }
       },
       {
-        scope: ['entity.name.type', 'entity.name.class', 'entity.name.namespace', 'support.type', 'support.class'],
+        scope: [
+          'entity.name.type',
+          'entity.name.class',
+          'entity.name.namespace',
+          'support.type',
+          'support.class'
+        ],
         settings: { foreground: c.type }
       }
     ]

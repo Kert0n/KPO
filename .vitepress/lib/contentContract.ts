@@ -23,7 +23,8 @@ export function classifyMarkdownPath(path: string): ContentContractKind {
   if (internalFiles.has(normalized)) return 'internal'
   if (/^content\/lectures\/Lec\d+\/vitepress\.md$/.test(normalized)) return 'site'
   if (/^content\/extras\/\d+\/vitepress\.md$/.test(normalized)) return 'site'
-  if (/^content\/service-pages\/_internal\/[^/]+\/vitepress\.md$/.test(normalized)) return 'internal'
+  if (/^content\/service-pages\/_internal\/[^/]+\/vitepress\.md$/.test(normalized))
+    return 'internal'
 
   return 'unexpected'
 }
@@ -41,8 +42,8 @@ export function assertMarkdownRouteContract(paths: string[]): void {
   if (unexpected.length === 0) return
 
   throw new Error(
-    'Unexpected markdown files. Site content must live under content/**/vitepress.md:\n'
-      + unexpected.map((path) => `  - ${path}`).join('\n')
+    'Unexpected markdown files. Site content must live under content/**/vitepress.md:\n' +
+      unexpected.map((path) => `  - ${path}`).join('\n')
   )
 }
 

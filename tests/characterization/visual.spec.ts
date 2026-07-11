@@ -27,7 +27,9 @@ test.describe('Linux Chromium golden master', () => {
       await expect(page.locator('html')).toHaveClass(theme === 'dark' ? /dark/ : /^(?!.*\bdark\b)/)
       await waitForStableUi(page)
       await normalizeForScreenshot(page)
-      await expect(page).toHaveScreenshot(`desktop-${theme}-sidebar-visible.png`, { fullPage: true })
+      await expect(page).toHaveScreenshot(`desktop-${theme}-sidebar-visible.png`, {
+        fullPage: true
+      })
     })
   }
 
@@ -90,10 +92,12 @@ test.describe('Linux Chromium golden master', () => {
     const switcher = page.locator('.kpo-switcher').filter({ hasText: 'Fixture Kotlin Playground' })
     await switcher.locator('.kpo-switcher__playground-toggle').click()
     await expect(switcher.locator('.kpo-playground')).toBeVisible()
-    await page.addStyleTag({ content: `
+    await page.addStyleTag({
+      content: `
       .kpo-playground { height: 214px !important; overflow: hidden !important; }
       .kpo-playground > * { visibility: hidden !important; }
-    ` })
+    `
+    })
     await normalizeForScreenshot(page)
     await expect(switcher).toHaveScreenshot('playground.png')
   })
@@ -111,7 +115,11 @@ test.describe('Linux Chromium golden master', () => {
     await page.addInitScript(() => {
       Object.defineProperty(navigator, 'clipboard', {
         configurable: true,
-        value: { writeText: async () => { throw new DOMException('blocked', 'NotAllowedError') } }
+        value: {
+          writeText: async () => {
+            throw new DOMException('blocked', 'NotAllowedError')
+          }
+        }
       })
       document.execCommand = (() => false) as typeof document.execCommand
     })

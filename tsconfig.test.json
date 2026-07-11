@@ -1,0 +1,16 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "composite": true,
+    "tsBuildInfoFile": "./node_modules/.cache/tsconfig.test.tsbuildinfo",
+    "types": ["node", "vitepress/client", "vitest/globals"]
+  },
+  "include": [
+    ".vitepress/**/*.ts",
+    ".vitepress/types/**/*.d.ts",
+    "tests/**/*.ts",
+    "playwright*.ts",
+    "vitest.config.ts"
+  ],
+  "exclude": [".vitepress/dist/**", ".vitepress/cache/**", ".vitepress/config.mts"]
+}

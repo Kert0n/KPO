@@ -3,7 +3,10 @@ import { expect, type Page } from '@playwright/test'
 export const UI_FIXTURE_ROUTE = 'service-pages/ui-contract'
 export const BREAKPOINTS = [390, 767, 768, 769, 800, 959, 960, 1279, 1280, 1440] as const
 
-export async function resetBrowserState(page: Page, entries: Record<string, string> = {}): Promise<void> {
+export async function resetBrowserState(
+  page: Page,
+  entries: Record<string, string> = {}
+): Promise<void> {
   await page.addInitScript((stored) => {
     localStorage.clear()
     sessionStorage.clear()
@@ -25,14 +28,17 @@ export async function waitForStableUi(page: Page): Promise<void> {
     const diagrams = [...document.querySelectorAll('.kpo-mermaid')]
     return diagrams.every((diagram) => diagram.querySelector('svg, .kpo-mermaid__error'))
   })
-  await page.evaluate(() => new Promise<void>((resolve) => {
-    requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
-  }))
+  await page.evaluate(
+    () =>
+      new Promise<void>((resolve) => {
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+      })
+  )
 }
 
 export async function hideSidebar(page: Page): Promise<void> {
   const html = page.locator('html')
-  if (!await html.evaluate((node) => node.classList.contains('kpo-sidebar-hidden'))) {
+  if (!(await html.evaluate((node) => node.classList.contains('kpo-sidebar-hidden')))) {
     await page.locator('.kpo-sidebar-toggle').click()
   }
   await expect(html).toHaveClass(/kpo-sidebar-hidden/)
@@ -81,20 +87,24 @@ export async function selectText(page: Page, text: string): Promise<void> {
     selection?.removeAllRanges()
     selection?.addRange(range)
     const rect = range.getBoundingClientRect()
-    ;(startNode.parentElement ?? root).dispatchEvent(new MouseEvent('contextmenu', {
-      bubbles: true,
-      cancelable: true,
-      button: 2,
-      clientX: rect.left + 4,
-      clientY: rect.top + 4
-    }))
+    ;(startNode.parentElement ?? root).dispatchEvent(
+      new MouseEvent('contextmenu', {
+        bubbles: true,
+        cancelable: true,
+        button: 2,
+        clientX: rect.left + 4,
+        clientY: rect.top + 4
+      })
+    )
   }, text)
   await expect(page.locator('.kpo-ai-menu')).toBeVisible()
 }
 
 export async function normalizeForScreenshot(page: Page): Promise<void> {
-  await page.addStyleTag({ content: `
+  await page.addStyleTag({
+    content: `
     *, *::before, *::after { caret-color: transparent !important; }
     .VPNavBarAppearance, .VPNavScreenAppearance { transition: none !important; }
-  ` })
+  `
+  })
 }

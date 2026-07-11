@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { getContentBlockContract, isWideContentBlock, ownsLocalOverflow } from '../contentBlockModel'
+import {
+  getContentBlockContract,
+  isWideContentBlock,
+  ownsLocalOverflow
+} from '../contentBlockModel'
 
 describe('contentBlockModel', () => {
   it('classifies tables as page-centered wide blocks with self-owned overflow', () => {

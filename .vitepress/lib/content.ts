@@ -114,7 +114,10 @@ function scanPages(directory: (typeof sections)[number]['directory']): Page[] {
   const fallback = sections.find((s) => s.directory === directory)!.fallback
 
   const pages = readdirSync(directoryPath, { withFileTypes: true })
-    .filter((entry) => entry.name !== 'index' && !entry.name.startsWith('_') && !entry.name.startsWith('.'))
+    .filter(
+      (entry) =>
+        entry.name !== 'index' && !entry.name.startsWith('_') && !entry.name.startsWith('.')
+    )
     .map((entry) => toPage(directory, entry, fallback))
     .filter((page): page is Page => page !== null)
     .sort((a, b) => a.order - b.order || a.link.localeCompare(b.link, 'ru'))

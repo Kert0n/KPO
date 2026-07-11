@@ -7,10 +7,7 @@ import { darkCode, lightCode, type CodePalette } from './palette'
  * что и Shiki-темы. Смена темы — чистый CSS, без JS.
  */
 export function paletteCss(): string {
-  return [
-    `:root{${toVars(lightCode)}}`,
-    `.dark{${toVars(darkCode)}}`
-  ].join('\n')
+  return [`:root{${toVars(lightCode)}}`, `.dark{${toVars(darkCode)}}`].join('\n')
 }
 
 function toVars(c: CodePalette): string {

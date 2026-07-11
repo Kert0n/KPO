@@ -61,7 +61,10 @@ export function parseAdditionalReadingsSection(section: string): AdditionalReadi
   return groups.filter((group) => group.items.length > 0)
 }
 
-export function parseLectureAdditionalReadings(filePath: string, markdown: string): LectureAdditionalReadings | null {
+export function parseLectureAdditionalReadings(
+  filePath: string,
+  markdown: string
+): LectureAdditionalReadings | null {
   const lecture = extractLectureNumber(filePath)
   if (lecture === null) return null
 
@@ -104,9 +107,10 @@ function extractLectureNumber(filePath: string): number | null {
 function extractLectureTitle(markdown: string, lecture: number): string {
   const { data, content } = matter(markdown)
 
-  const rawTitle = typeof data.title === 'string' && data.title.trim() !== ''
-    ? data.title.trim()
-    : content.match(/^#\s+(.+?)\s*$/m)?.[1]?.trim()
+  const rawTitle =
+    typeof data.title === 'string' && data.title.trim() !== ''
+      ? data.title.trim()
+      : content.match(/^#\s+(.+?)\s*$/m)?.[1]?.trim()
 
   if (!rawTitle) return `Лекция ${lecture}`
 

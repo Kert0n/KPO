@@ -11,21 +11,23 @@ describe('math rendering', () => {
       }
     })
 
-    const html = md.render([
-      '::: tip',
-      'Пусть `φ(x)` — свойство, доказуемое для объектов `x` типа `T`.',
-      '',
-      '$$',
-      '\\begin{aligned}',
-      'S <: T',
-      '&\\quad\\Longrightarrow\\quad',
-      '(\\forall x : T,\\ \\varphi(x)) \\\\',
-      '&\\quad\\Rightarrow\\quad',
-      '(\\forall y : S,\\ \\varphi(y))',
-      '\\end{aligned}',
-      '$$',
-      ':::'
-    ].join('\n'))
+    const html = md.render(
+      [
+        '::: tip',
+        'Пусть `φ(x)` — свойство, доказуемое для объектов `x` типа `T`.',
+        '',
+        '$$',
+        '\\begin{aligned}',
+        'S <: T',
+        '&\\quad\\Longrightarrow\\quad',
+        '(\\forall x : T,\\ \\varphi(x)) \\\\',
+        '&\\quad\\Rightarrow\\quad',
+        '(\\forall y : S,\\ \\varphi(y))',
+        '\\end{aligned}',
+        '$$',
+        ':::'
+      ].join('\n')
+    )
 
     expect(html).toContain('class="tip custom-block"')
     expect(html).toContain('<mjx-container tabindex="0"')

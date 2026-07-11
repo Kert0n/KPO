@@ -46,7 +46,9 @@ describe('mermaid lint', () => {
   })
 
   it('accepts mermaid database shape labels', () => {
-    expect(lintMermaidCode('flowchart TD\n  DB[(Database)] --> Cache[(orders + lines JSON)]')).toEqual([])
+    expect(
+      lintMermaidCode('flowchart TD\n  DB[(Database)] --> Cache[(orders + lines JSON)]')
+    ).toEqual([])
   })
 
   it('rejects classDiagram inheritance arrows inside flowchart', () => {

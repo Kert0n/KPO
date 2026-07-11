@@ -77,10 +77,7 @@ export function buildAskAiPageContext(
   return context
 }
 
-export function writeAskAiContexts(
-  outDir: string,
-  options: AskAiContextOptions
-): void {
+export function writeAskAiContexts(outDir: string, options: AskAiContextOptions): void {
   for (const entry of listAskAiContextEntries(options.root)) {
     const context = buildAskAiPageContext(entry, options)
     const file = join(outDir, '__ask-ai-context', `${entry.routeKey}.json`)
@@ -89,7 +86,10 @@ export function writeAskAiContexts(
   }
 }
 
-export function findAskAiContextEntry(routeKey: string, root = process.cwd()): AskAiContextEntry | null {
+export function findAskAiContextEntry(
+  routeKey: string,
+  root = process.cwd()
+): AskAiContextEntry | null {
   return listAskAiContextEntries(root).find((entry) => entry.routeKey === routeKey) ?? null
 }
 
@@ -176,13 +176,22 @@ function createBlock(
   }
 }
 
-function addIfExists(entries: AskAiContextEntry[], root: string, routeKey: string, sourcePath: string): void {
+function addIfExists(
+  entries: AskAiContextEntry[],
+  root: string,
+  routeKey: string,
+  sourcePath: string
+): void {
   if (existsSync(resolve(root, sourcePath))) {
     entries.push({ routeKey, sourcePath })
   }
 }
 
-function scanNumberedPages(entries: AskAiContextEntry[], root: string, directory: 'lectures' | 'extras'): void {
+function scanNumberedPages(
+  entries: AskAiContextEntry[],
+  root: string,
+  directory: 'lectures' | 'extras'
+): void {
   const directoryPath = resolve(root, contentDirectory, directory)
   if (!existsSync(directoryPath)) return
 

@@ -1,5 +1,11 @@
 import { expect, test } from '@playwright/test'
-import { BREAKPOINTS, resetBrowserState, setTheme, UI_FIXTURE_ROUTE, waitForStableUi } from './helpers'
+import {
+  BREAKPOINTS,
+  resetBrowserState,
+  setTheme,
+  UI_FIXTURE_ROUTE,
+  waitForStableUi
+} from './helpers'
 
 test.describe('stable geometry and DOM contracts', () => {
   for (const width of BREAKPOINTS) {
@@ -31,9 +37,17 @@ test.describe('stable geometry and DOM contracts', () => {
           rootTransform: getComputedStyle(document.documentElement).transform,
           scrollWidth: document.documentElement.scrollWidth,
           clientWidth: document.documentElement.clientWidth,
-          logoTitleOverlap: logo && title ? Math.max(0, Math.min(logo.right, title.right) - Math.max(logo.left, title.left)) : 0,
-          controlsOverlap: controls.some((left, index) => controls.slice(index + 1)
-            .some((right) => Math.max(left.left, right.left) < Math.min(left.right, right.right) - 1)),
+          logoTitleOverlap:
+            logo && title
+              ? Math.max(0, Math.min(logo.right, title.right) - Math.max(logo.left, title.left))
+              : 0,
+          controlsOverlap: controls.some((left, index) =>
+            controls
+              .slice(index + 1)
+              .some(
+                (right) => Math.max(left.left, right.left) < Math.min(left.right, right.right) - 1
+              )
+          ),
           sidebar: visibleRect('.VPSidebar'),
           outline: visibleRect('.VPDocAside')
         }
@@ -56,12 +70,13 @@ test.describe('stable geometry and DOM contracts', () => {
     await resetBrowserState(page)
     await page.setViewportSize({ width: 1440, height: 900 })
     await page.goto('intro')
-    const colors = async () => page.evaluate(() => ({
-      token: getComputedStyle(document.documentElement).getPropertyValue('--vp-c-bg').trim(),
-      navbar: getComputedStyle(document.querySelector('.VPNavBar')!).backgroundColor,
-      sidebar: getComputedStyle(document.querySelector('.VPSidebar')!).backgroundColor,
-      content: getComputedStyle(document.querySelector('.VPContent')!).backgroundColor
-    }))
+    const colors = async () =>
+      page.evaluate(() => ({
+        token: getComputedStyle(document.documentElement).getPropertyValue('--vp-c-bg').trim(),
+        navbar: getComputedStyle(document.querySelector('.VPNavBar')!).backgroundColor,
+        sidebar: getComputedStyle(document.querySelector('.VPSidebar')!).backgroundColor,
+        content: getComputedStyle(document.querySelector('.VPContent')!).backgroundColor
+      }))
     await setTheme(page, 'light')
     const light = await colors()
     await setTheme(page, 'dark')
@@ -77,26 +92,41 @@ test.describe('stable geometry and DOM contracts', () => {
     await waitForStableUi(page)
     const html = await page.evaluate(() => {
       const selectors = [
-        '.VPNav', '.VPSidebar', '.VPDoc .content-container', '.KpoAskAiProvider',
-        '.kpo-switcher', '.kpo-mermaid', '.kpo-content-block--table'
+        '.VPNav',
+        '.VPSidebar',
+        '.VPDoc .content-container',
+        '.KpoAskAiProvider',
+        '.kpo-switcher',
+        '.kpo-mermaid',
+        '.kpo-content-block--table'
       ]
       const sanitize = (node: Element) => {
         const clone = node.cloneNode(true) as Element
-        clone.querySelectorAll('svg').forEach((svg) => svg.replaceWith(document.createElement('svg')))
+        clone
+          .querySelectorAll('svg')
+          .forEach((svg) => svg.replaceWith(document.createElement('svg')))
         clone.querySelectorAll('*').forEach((element) => {
           element.removeAttribute('style')
           for (const attribute of [...element.attributes]) {
-            if (/^(?:data-v-|aria-controls$|id$)/.test(attribute.name) && /\d|mermaid|kpo-code/.test(attribute.value)) {
+            if (
+              /^(?:data-v-|aria-controls$|id$)/.test(attribute.name) &&
+              /\d|mermaid|kpo-code/.test(attribute.value)
+            ) {
               element.setAttribute(attribute.name, '<stable-id>')
             }
           }
         })
-        return clone.outerHTML.replace(/>\s+</g, '><').replace(/\s{2,}/g, ' ').trim()
+        return clone.outerHTML
+          .replace(/>\s+</g, '><')
+          .replace(/\s{2,}/g, ' ')
+          .trim()
       }
-      return Object.fromEntries(selectors.map((selector) => {
-        const node = document.querySelector(selector)
-        return [selector, node ? sanitize(node) : null]
-      }))
+      return Object.fromEntries(
+        selectors.map((selector) => {
+          const node = document.querySelector(selector)
+          return [selector, node ? sanitize(node) : null]
+        })
+      )
     })
     expect(JSON.stringify(html, null, 2)).toMatchSnapshot('representative-html.txt')
   })
