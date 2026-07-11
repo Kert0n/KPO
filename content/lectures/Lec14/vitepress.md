@@ -317,7 +317,7 @@ flowchart LR
     Policy -->|"no"| Stabilize["Freeze risky releases and fix reliability"]
 ```
 
-::: multi-code "Расчет error budget" {default=kotlin}
+::: multi-code "Расчет error budget"
 
 ```kotlin
 data class Slo(val targetPercent: Double) {
@@ -419,7 +419,7 @@ white box мониторинг.
 ломаться из-за платежного сервиса, базы данных, очереди или ошибки авторизации. Поэтому black box и white box не
 заменяют друг друга.
 
-::: multi-code "Health check result" {default=kotlin}
+::: multi-code "Health check result"
 
 ```kotlin
 enum class HealthStatus { UP, DEGRADED, DOWN }
@@ -614,7 +614,7 @@ Middleware → handler → repository — контекст проходит яв
 может быть нормальная утилизация ресурса. Алерт нужен там, где требуется действие.
 :::
 
-::: multi-code "Измерение duration и status" {default=kotlin}
+::: multi-code "Измерение duration и status"
 
 ```kotlin
 interface Metrics {
@@ -747,7 +747,7 @@ func HandleRequest(path string, status int, durationMillis int64, metrics Metric
 и Kibana. Инструменты меняются, но контур обычно похож: собрать, распарсить, сохранить, визуализировать, при
 необходимости породить алерт.
 
-::: multi-code "Структурированный лог события заказа" {default=kotlin}
+::: multi-code "Структурированный лог события заказа"
 
 ```kotlin
 data class OrderEvent(
@@ -875,7 +875,7 @@ sequenceDiagram
 Без трейсинга команда может видеть только "Order Service медленный". С трейсингом видно, что Order Service большую
 часть времени ждал Payment Service, а Payment Service ждал Bank API. Это меняет место расследования.
 
-::: multi-code "Ручная модель span" {default=kotlin}
+::: multi-code "Ручная модель span"
 
 ```kotlin
 data class Span(
@@ -996,7 +996,7 @@ runbook или создать задачу, это, вероятно, не page-
 меньше алертов, но каждый должен иметь владельца, порог, инструкцию и понятное действие.
 :::
 
-::: multi-code "Классификация алерта" {default=kotlin}
+::: multi-code "Классификация алерта"
 
 ```kotlin
 enum class AlertTarget { PAGE_NOW, BUSINESS_HOURS, DASHBOARD_ONLY }

@@ -93,7 +93,7 @@ cp -R content/extras/_template content/extras/NN
 ### Многоязычные примеры
 
 ````md
-::: multi-code "Заголовок примера" {default=kotlin playground=off}
+::: multi-code "Заголовок примера"
 
 ```kotlin
 fun main() = println("Привет")
@@ -106,7 +106,49 @@ Console.WriteLine("Привет");
 :::
 ````
 
-Поддерживаются `kotlin`, `csharp`, `java`, `go` и алиасы `kt`, `cs`. Выбранный язык хранится в `localStorage` как `kpo:code-language`. Опция `{playground=off}` отключает Kotlin Playground для конкретного блока.
+Поддерживаются `kotlin`, `csharp`, `java`, `go` и алиасы `kt`, `cs`. Выбранный язык хранится в `localStorage` как `kpo:code-language`. Если блок должен начинаться с Kotlin, просто поставьте Kotlin fence первым. Не добавляйте `{default=kotlin}` как boilerplate: `default` означает защищённый авторский override и будет сильнее сохранённого выбора пользователя до первого клика в этом конкретном блоке.
+
+Опция `{playground=off}` отключает Kotlin Playground для конкретного блока:
+
+````md
+::: multi-code "Фрагмент API" {playground=off}
+
+```kotlin
+interface Repository<T> {
+    fun save(value: T)
+}
+```
+
+```java
+interface Repository<T> {
+    void save(T value);
+}
+```
+
+:::
+````
+
+Авторский default используйте только когда конкретный пример действительно лучше открыть на другом языке:
+
+````md
+::: multi-code "Горутина проще всего видна на Go" {default=go playground=off}
+
+```kotlin
+thread {
+    println("work")
+}
+```
+
+```go
+go func() {
+    fmt.Println("work")
+}()
+```
+
+:::
+````
+
+Такой блок покажет Go до первого клика в нём. После клика он присоединится к общему глобальному выбору языка; остальные untouched author-default блоки останутся защищены.
 
 Для запускаемой версии Kotlin можно добавить отдельный fence:
 

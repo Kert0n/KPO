@@ -179,7 +179,7 @@ classDiagram
 1. реализует интерфейс, знакомый клиенту;
 2. хранит ссылку на объект с несовместимым интерфейсом и переводит вызовы.
 
-::: multi-code "Adapter: биржевой клиент" {default=kotlin playground=off}
+::: multi-code "Adapter: биржевой клиент" {playground=off}
 
 ```kotlin
 data class PricePoint(val time: String, val value: Double)
@@ -446,7 +446,7 @@ flowchart LR
 Фасад не обязан скрывать подсистему полностью. Часто классы подсистемы остаются доступными для сложных сценариев, а
 фасад покрывает самые частые и безопасные сценарии.
 
-::: multi-code "Facade: оформление заказа" {default=kotlin playground=off}
+::: multi-code "Facade: оформление заказа" {playground=off}
 
 ```kotlin
 data class OrderRequest(
@@ -667,7 +667,7 @@ classDiagram
 
 ### Решение
 
-::: multi-code "Proxy: ленивая загрузка изображения" {default=kotlin playground=off}
+::: multi-code "Proxy: ленивая загрузка изображения" {playground=off}
 
 ```kotlin
 interface Image {
@@ -875,7 +875,7 @@ classDiagram
   NotifierDecorator --> Notifier
 ```
 
-::: multi-code "Decorator: уведомления" {default=kotlin playground=off}
+::: multi-code "Decorator: уведомления" {playground=off}
 
 ```kotlin
 interface Notifier {
@@ -1208,7 +1208,7 @@ flowchart LR
 
 ### Решение
 
-::: multi-code "Flyweight: частицы" {default=kotlin playground=off}
+::: multi-code "Flyweight: частицы" {playground=off}
 
 ```kotlin
 data class Sprite(val path: String)

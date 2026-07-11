@@ -23,8 +23,9 @@ import { preserveViewportAnchor } from '../lib/viewportAnchor'
  * ставит markdown-плагин), к глобально выбранному языку компонент
  * синхронизируется после монтирования (см. mounted).
  *
- * Геометрия шапки постоянна: кнопка Playground не исчезает при смене
- * языка или сбое инициализации, а лишь деактивируется.
+ * Кнопка Playground относится только к активному Kotlin-варианту:
+ * для других языков она не рендерится, а изменение геометрии шапки
+ * компенсируется viewport anchor вокруг пользовательского действия.
  */
 
 const props = withDefaults(
@@ -92,6 +93,15 @@ const playgroundUsable = computed(() => {
       playgroundFailed: playgroundFailed.value,
       hasKotlinCode: kotlinCode.value !== ''
     })
+  )
+})
+
+const shouldShowPlaygroundToggle = computed(() => {
+  return (
+    props.allowPlayground &&
+    displayLang.value === 'kotlin' &&
+    hasKotlin.value &&
+    !playgroundFailed.value
   )
 })
 
@@ -207,7 +217,7 @@ function onTabsKeydown(event: KeyboardEvent): void {
 
       <div class="kpo-switcher__controls">
         <button
-          v-if="allowPlayground"
+          v-if="shouldShowPlaygroundToggle"
           type="button"
           class="kpo-switcher__playground-toggle"
           :disabled="!playgroundUsable"

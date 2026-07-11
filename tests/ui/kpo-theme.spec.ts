@@ -1333,6 +1333,32 @@ test('code switchers without author defaults follow the latest global language',
   await expectActiveTab(switchers.nth(2), 'Kotlin')
 })
 
+test('public lecture switchers honor persisted global language without boilerplate defaults', async ({
+  page
+}) => {
+  await setStorage(page, {
+    'kpo:code-language': 'java',
+    'kpo:playground-mode': '0'
+  })
+  await page.goto('lectures/02')
+
+  const switchers = page.locator('.kpo-switcher')
+  await expect.poll(async () => switchers.count()).toBeGreaterThan(3)
+
+  const compatible = switchers.filter({
+    has: page.getByRole('tab', { name: 'Java' })
+  })
+  const compatibleCount = Math.min(5, await compatible.count())
+
+  expect(compatibleCount).toBeGreaterThan(0)
+
+  for (let index = 0; index < compatibleCount; index += 1) {
+    await expectActiveTab(compatible.nth(index), 'Java')
+  }
+
+  await expectNoPageOverflowFromVpDoc(page)
+})
+
 test('author default beats restored language until that block is clicked', async ({ page }) => {
   await setStorage(page, {
     'kpo:code-language': 'kotlin',
@@ -1349,6 +1375,104 @@ test('author default beats restored language until that block is clicked', async
 
   await expectActiveTab(switcher, 'Kotlin')
   await expectNoPageOverflowFromVpDoc(page)
+})
+
+test('released author-default block follows subsequent global language changes', async ({
+  page
+}) => {
+  await clearStorage(page)
+  await page.goto(UI_FIXTURE_ROUTE)
+
+  const switchers = page.locator('.kpo-switcher')
+  const authorDefault = switchers.nth(3)
+
+  await expectActiveTab(authorDefault, 'Go')
+
+  await authorDefault.getByRole('tab', { name: 'Java' }).click()
+  await expectNoPageOverflowFromVpDoc(page)
+
+  await expectActiveTab(authorDefault, 'Java')
+  await expectActiveTab(switchers.nth(0), 'Java')
+
+  await switchers.nth(1).getByRole('tab', { name: 'Kotlin' }).click()
+  await expectNoPageOverflowFromVpDoc(page)
+
+  await expectActiveTab(authorDefault, 'Kotlin')
+  await expectActiveTab(switchers.nth(0), 'Kotlin')
+})
+
+test('intentional author default remains protected on intro until clicked', async ({
+  page
+}) => {
+  await setStorage(page, {
+    'kpo:code-language': 'kotlin',
+    'kpo:playground-mode': '0'
+  })
+  await page.goto('intro')
+
+  const authorDefault = page.locator('.kpo-switcher').filter({
+    hasText: 'Авторский default: Go'
+  })
+  const firstSwitcher = page.locator('.kpo-switcher').first()
+
+  await expectActiveTab(authorDefault, 'Go')
+  await expectActiveTab(firstSwitcher, 'Kotlin')
+
+  await authorDefault.getByRole('tab', { name: 'Kotlin' }).click()
+  await expectNoPageOverflowFromVpDoc(page)
+  await expectActiveTab(authorDefault, 'Kotlin')
+
+  await firstSwitcher.getByRole('tab', { name: 'Go' }).click()
+  await expectNoPageOverflowFromVpDoc(page)
+  await expectActiveTab(authorDefault, 'Go')
+})
+
+test('language-only text follows global language used by ordinary code switchers', async ({
+  page
+}) => {
+  await setStorage(page, {
+    'kpo:code-language': 'java',
+    'kpo:playground-mode': '0'
+  })
+  await page.goto('intro')
+
+  const firstSwitcher = page.locator('.kpo-switcher').first()
+  await expectActiveTab(firstSwitcher, 'Java')
+
+  await expect
+    .poll(async () =>
+      page.evaluate(() => document.documentElement.dataset.kpoLang ?? '')
+    )
+    .toBe('java')
+  await expect(page.locator('.kpo-only--java').filter({ hasText: 'System.exit' })).toBeVisible()
+  await expect(page.locator('.kpo-only--kotlin').filter({ hasText: 'exitProcess' })).toBeHidden()
+  await expectNoPageOverflowFromVpDoc(page)
+})
+
+test('playground toggle is only rendered for the active kotlin tab', async ({ page }) => {
+  await setStorage(page, {
+    'kpo:code-language': 'kotlin',
+    'kpo:playground-mode': '0'
+  })
+  await page.goto(UI_FIXTURE_ROUTE)
+
+  const playgroundSwitcher = page.locator('.kpo-switcher').filter({
+    hasText: 'Fixture Kotlin Playground'
+  })
+
+  await expectActiveTab(playgroundSwitcher, 'Kotlin')
+  await expect(playgroundSwitcher.locator('.kpo-switcher__playground-toggle')).toHaveCount(1)
+
+  await playgroundSwitcher.getByRole('tab', { name: 'Java' }).click()
+  await expectNoPageOverflowFromVpDoc(page)
+  await expect(playgroundSwitcher.locator('.kpo-switcher__playground-toggle')).toHaveCount(0)
+
+  await playgroundSwitcher.getByRole('tab', { name: 'Kotlin' }).click()
+  await expectNoPageOverflowFromVpDoc(page)
+  await expect(playgroundSwitcher.locator('.kpo-switcher__playground-toggle')).toHaveCount(1)
+
+  const playgroundOff = page.locator('.kpo-switcher').filter({ hasText: 'Fixture playground off' })
+  await expect(playgroundOff.locator('.kpo-switcher__playground-toggle')).toHaveCount(0)
 })
 
 test('fixture renders mermaid and keeps playground disabled for marked blocks', async ({

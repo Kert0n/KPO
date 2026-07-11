@@ -27,6 +27,7 @@ function walk(directory) {
 }
 
 function shouldIgnoreDirectory(relativePath, name) {
+  if (name.startsWith('.') && name !== '.vitepress') return true
   if (ignoredDirectories.has(name)) return true
   return (
     relativePath === '.vitepress/cache' ||
