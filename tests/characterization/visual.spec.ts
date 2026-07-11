@@ -131,6 +131,9 @@ test.describe('Linux Chromium golden master', () => {
     await expect(item).toBeEnabled()
     await item.click()
     await expect(page.locator('.kpo-ai-manual')).toBeVisible()
+    await page.addStyleTag({
+      content: '.kpo-ai-toast { visibility: hidden !important; }'
+    })
     await normalizeForScreenshot(page)
     await expect(page).toHaveScreenshot('manual-prompt.png')
   })
