@@ -1,15 +1,17 @@
 import { defineConfig } from 'vitepress'
 import { askAiContextPlugin } from './lib/askAiContextPlugin'
-import { getRewrites, getSidebar } from './lib/content'
+import { getNav, getRewrites, getSidebar } from './lib/content'
 import { paletteCss } from './lib/paletteCss'
 import { kpoDark, kpoLight } from './lib/shikiThemes'
 import { applyMarkdownExtensions } from './markdown'
+import { contentPagesFor, findContentPageByOutputPath } from './shared/content/contentCatalog'
+import { SITE, siteUrl } from './shared/site'
 
 export default defineConfig({
-  lang: 'ru-RU',
-  title: 'Конструирование ПО',
-  description: 'Конспект лекций по архитектуре приложений и инженерным практикам',
-  base: '/KPO/',
+  lang: SITE.language,
+  title: SITE.title,
+  description: SITE.description,
+  base: SITE.base,
   srcDir: 'content',
   cleanUrls: true,
   lastUpdated: true,
@@ -17,6 +19,42 @@ export default defineConfig({
   // Папочные страницы (lectures/Lec1/vitepress.md) получают чистые URL
   // вида /lectures/01 — карта строится автоматически из файловой системы
   rewrites: getRewrites(),
+  sitemap: {
+    hostname: siteUrl('/'),
+    transformItems: (items) => {
+      const publishedUrls = new Set(
+        contentPagesFor('sitemap').map((page) =>
+          page.outputPath.replace(/(^|\/)index\.md$/, '$1').replace(/\.md$/, '')
+        )
+      )
+      return items.filter((item) => publishedUrls.has(item.url))
+    }
+  },
+
+  transformPageData(pageData) {
+    const page = findContentPageByOutputPath(pageData.relativePath)
+    if (!page) return
+    const canonical = siteUrl(page.route)
+    const existingHead = Array.isArray(pageData.frontmatter.head) ? pageData.frontmatter.head : []
+    return {
+      description: pageData.description || page.description,
+      frontmatter: {
+        ...pageData.frontmatter,
+        search: page.inclusion.search,
+        head: [
+          ...existingHead,
+          ['link', { rel: 'canonical', href: canonical }],
+          ['meta', { property: 'og:title', content: page.title }],
+          ['meta', { property: 'og:description', content: page.description || SITE.description }],
+          ['meta', { property: 'og:url', content: canonical }],
+          ['meta', { property: 'og:type', content: 'article' }],
+          ...(page.kind === 'service'
+            ? [['meta', { name: 'robots', content: 'noindex,nofollow' }] as const]
+            : [])
+        ]
+      }
+    }
+  },
 
   // В папках лекций/дополнений публикуется только vitepress.md;
   // остальные .md — материалы редактора (черновики, заметки)
@@ -39,7 +77,7 @@ export default defineConfig({
     [
       'script',
       {},
-      ';(function(){try{var l=localStorage.getItem("kpo:code-language");if(!/^(kotlin|csharp|java|go)$/.test(l||""))l="kotlin";document.documentElement.dataset.kpoLang=l}catch(e){document.documentElement.dataset.kpoLang="kotlin"}})()'
+      `;(function(){try{var l=localStorage.getItem(${JSON.stringify(SITE.storageKeys.codeLanguage)});if(!/^(kotlin|csharp|java|go)$/.test(l||""))l="kotlin";document.documentElement.dataset.kpoLang=l}catch(e){document.documentElement.dataset.kpoLang="kotlin"}})()`
     ]
   ],
 
@@ -62,23 +100,18 @@ export default defineConfig({
     },
     plugins: [
       askAiContextPlugin({
-        base: '/KPO/',
-        courseTitle: 'Конструирование ПО',
-        courseDescription: 'Конспект лекций по архитектуре приложений и инженерным практикам'
+        base: SITE.base,
+        courseTitle: SITE.title,
+        courseDescription: SITE.description
       })
     ]
   },
 
   themeConfig: {
-    siteTitle: 'КПО',
+    siteTitle: SITE.shortTitle,
     logo: { light: '/logo-light.svg', dark: '/logo-dark.svg' },
 
-    nav: [
-      { text: 'Введение', link: '/intro' },
-      { text: 'Лекции', link: '/lectures/01', activeMatch: '^/lectures/' },
-      { text: 'Дополнения', link: '/extras/', activeMatch: '^/extras/' },
-      { text: 'Заключение', link: '/conclusion' }
-    ],
+    nav: getNav(),
     sidebar: getSidebar(),
 
     search: {

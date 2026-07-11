@@ -3,6 +3,7 @@ import {
   CONTENT_LAYOUT_TOKENS,
   LAYOUT_VIEWPORTS
 } from '../../.vitepress/theme/lib/contentLayoutTokens'
+import { contentPagesFor } from '../../.vitepress/shared/content/contentCatalog'
 
 const CENTER_TOLERANCE_PX = 2
 const SCALE_TOLERANCE = 0.05
@@ -12,26 +13,9 @@ const MERMAID_FOREIGN_OBJECT_TOLERANCE_PX = 2
 const MERMAID_VIEWBOX_TOLERANCE_PX = 8
 const MIN_READABLE_MERMAID_HEIGHT_PX = CONTENT_LAYOUT_TOKENS.mermaidMinHeight
 const UI_FIXTURE_ROUTE = 'service-pages/ui-contract'
-const PUBLIC_CONTENT_ROUTES = [
-  'intro',
-  'lectures/01',
-  'lectures/02',
-  'lectures/03',
-  'lectures/04',
-  'lectures/05',
-  'lectures/06',
-  'lectures/07',
-  'lectures/08',
-  'lectures/09',
-  'lectures/10',
-  'lectures/11',
-  'lectures/12',
-  'lectures/13',
-  'lectures/14',
-  'extras/',
-  'extras/01',
-  'conclusion'
-] as const
+const PUBLIC_CONTENT_ROUTES = contentPagesFor('uiSweep')
+  .filter((page) => page.kind !== 'home' && page.kind !== 'service')
+  .map((page) => page.route.replace(/^\//, ''))
 
 type AdaptiveTableMode = 'fit' | 'wrap' | 'scroll'
 

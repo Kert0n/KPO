@@ -3,6 +3,8 @@ import { join, resolve } from 'node:path'
 import { describe, expect, test } from 'vitest'
 import { buildAskAiPageContext, listAskAiContextEntries } from '../../.vitepress/lib/askAiContext'
 import { getNav, getRewrites, getSidebar } from '../../.vitepress/lib/content'
+import { contentPagesFor, getContentCatalog } from '../../.vitepress/shared/content/contentCatalog'
+import { buildPdfPagePlan } from '../../.vitepress/shared/content/contentPolicy'
 import { buildAskAiPrompt } from '../../.vitepress/theme/lib/askAiModel'
 
 const root = resolve(import.meta.dirname, '../..')
@@ -21,15 +23,21 @@ describe('stable public contracts', () => {
     }).toMatchSnapshot()
   })
 
-  test('PDF route order remains stable before the catalog migration', () => {
-    const source = readFileSync(join(root, 'scripts/export-pdf.mjs'), 'utf8')
-    const routeBlock = source.match(/const PDF_ROUTES = \[([\s\S]*?)\n\]/)?.[1]
-    expect(routeBlock).toBeTruthy()
-    const routes = [...(routeBlock ?? '').matchAll(/\['([^']*)',\s*'([^']+)'\]/g)].map((match) => ({
-      route: match[1],
-      file: match[2]
-    }))
-    expect(routes).toMatchSnapshot()
+  test('PDF routes come from the catalog', () => {
+    expect(buildPdfPagePlan(contentPagesFor('pdf'))).toMatchSnapshot()
+  })
+
+  test('content catalog channels and metadata remain explicit', () => {
+    expect(
+      getContentCatalog().map((page) => ({
+        kind: page.kind,
+        route: page.route,
+        sourcePath: page.sourcePath,
+        order: page.order,
+        title: page.title,
+        inclusion: page.inclusion
+      }))
+    ).toMatchSnapshot()
   })
 
   test('Ask AI context routes, block IDs and representative prompt remain stable', () => {
