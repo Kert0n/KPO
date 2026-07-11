@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { useData, useRoute, withBase } from 'vitepress'
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
-import { clamp } from '../../lib/math'
+import { clamp } from '../../shared/core/math'
 import { useAskAiProvider } from '../composables/useAskAiProvider'
 import {
   ASK_AI_PROVIDERS,

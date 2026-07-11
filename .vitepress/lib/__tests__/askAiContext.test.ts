@@ -1,5 +1,14 @@
-import { describe, expect, it } from 'vitest'
+import { mkdtempSync, mkdirSync, rmSync, utimesSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { dirname, join } from 'node:path'
+import { afterEach, describe, expect, it } from 'vitest'
 import { buildAskAiPageContext } from '../askAiContext'
+
+const temporaryRoots: string[] = []
+
+afterEach(() => {
+  for (const root of temporaryRoots.splice(0)) rmSync(root, { recursive: true, force: true })
+})
 
 describe('askAiContext', () => {
   it('extracts stable markdown blocks for code, mermaid, table and multi-code', () => {
@@ -27,5 +36,44 @@ describe('askAiContext', () => {
     const multiCode = context.blocks.find((block) => block.kind === 'multi-code')
     expect(multiCode?.markdown).toContain(':::: multi-code')
     expect(multiCode?.markdown).toContain('```kotlin')
+  })
+
+  it('replaces the absolute-path cache entry when source mtime changes', () => {
+    const root = mkdtempSync(join(tmpdir(), 'kpo-ask-ai-cache-'))
+    temporaryRoots.push(root)
+    const sourcePath = 'content/lectures/Lec1/vitepress.md'
+    const absolutePath = join(root, sourcePath)
+    mkdirSync(dirname(absolutePath), { recursive: true })
+    writeFileSync(absolutePath, '# First title\n\nFirst paragraph with enough context.', 'utf8')
+    utimesSync(absolutePath, 1, 1)
+
+    const entry = { routeKey: 'lectures/01', sourcePath }
+    const options = { root, courseTitle: 'Course', courseDescription: 'Description' }
+    expect(buildAskAiPageContext(entry, options).pageTitle).toBe('First title')
+
+    writeFileSync(absolutePath, '# Updated title\n\nUpdated paragraph with enough context.', 'utf8')
+    utimesSync(absolutePath, 2, 2)
+    expect(buildAskAiPageContext(entry, options).pageTitle).toBe('Updated title')
+  })
+
+  it('keeps multi-code as one context block without duplicating inner fences', () => {
+    const root = mkdtempSync(join(tmpdir(), 'kpo-ask-ai-multi-code-'))
+    temporaryRoots.push(root)
+    const sourcePath = 'content/lectures/Lec1/vitepress.md'
+    const absolutePath = join(root, sourcePath)
+    mkdirSync(dirname(absolutePath), { recursive: true })
+    writeFileSync(
+      absolutePath,
+      '# Example\n\n::: multi-code\n```kotlin\nval x = 1\n```\n```java\nvar x = 1;\n```\n:::',
+      'utf8'
+    )
+
+    const context = buildAskAiPageContext(
+      { routeKey: 'lectures/01', sourcePath },
+      { root, courseTitle: 'Course', courseDescription: 'Description' }
+    )
+
+    expect(context.blocks.filter((block) => block.kind === 'multi-code')).toHaveLength(1)
+    expect(context.blocks.filter((block) => block.kind === 'code')).toHaveLength(0)
   })
 })

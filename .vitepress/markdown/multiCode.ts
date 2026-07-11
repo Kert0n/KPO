@@ -1,7 +1,8 @@
 import type MarkdownIt from 'markdown-it'
 import type Token from 'markdown-it/lib/token.mjs'
 import container from 'markdown-it-container'
-import { normalizeLanguage } from '../theme/lib/codeBlockModel'
+import { normalizeLanguage } from '../shared/core/codeLanguage'
+import { classifyMarkdownToken, findMatchingMultiCodeClose } from '../shared/core/markdownStructure'
 import { askAiBlockAttribute, askAiBlockId } from './askAiAnchors'
 import { escapeAttribute } from './htmlUtils'
 
@@ -143,16 +144,17 @@ export function parseContainerInfo(token: Token): ContainerInfo {
 
 /** Собирает fence-блоки только внутри текущего контейнера. */
 export function collectCodeFences(tokens: Token[], openIndex: number): MultiCodeFence[] {
-  const openToken = tokens[openIndex]
   const fences: MultiCodeFence[] = []
   const seen = new Set<string>()
+  const closeIndex = findMatchingMultiCodeClose(tokens, openIndex)
+  const endIndex = closeIndex === -1 ? tokens.length : closeIndex
 
-  for (let i = openIndex + 1; i < tokens.length; i += 1) {
+  for (let i = openIndex + 1; i < endIndex; i += 1) {
     const token = tokens[i]
-    if (token.nesting === -1 && token.level === openToken.level) break
-    if (token.type !== 'fence') continue
+    const classification = classifyMarkdownToken(tokens, i)
+    if (classification?.kind !== 'code' && classification?.kind !== 'mermaid') continue
 
-    const language = normalizeLanguage(token.info)
+    const language = normalizeLanguage(classification.language ?? '')
     const playgroundOnly = isPlaygroundFence(token)
     if (seen.has(language)) {
       if (!playgroundOnly) {
