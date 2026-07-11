@@ -137,11 +137,7 @@ async function askAi(): Promise<void> {
   const prepared = preparedAction.value
   hideMenu()
   if (!prepared) return
-  clipboardFallback.setRestoreFocusTarget(
-    [...document.querySelectorAll<HTMLElement>('.KpoAskAiProvider > button')].find(
-      (button) => button.offsetParent !== null
-    ) ?? null
-  )
+  clipboardFallback.setRestoreFocusTarget(visibleProviderControl())
 
   const { action, contextUnavailable } = prepared
   let openedWindow: Window | null = null
@@ -202,6 +198,15 @@ function actionToast(
 
 function isMobileLike(): boolean {
   return window.matchMedia('(max-width: 767px), (pointer: coarse)').matches
+}
+
+function visibleProviderControl(): HTMLElement | null {
+  const selectors = ['.KpoAskAiProvider > button', '.KpoNavBarExtra > button', '.VPNavBarHamburger']
+  for (const selector of selectors) {
+    const control = document.querySelector<HTMLElement>(selector)
+    if (control?.offsetParent !== null) return control
+  }
+  return null
 }
 
 function openBlankWindow(): Window | null {
