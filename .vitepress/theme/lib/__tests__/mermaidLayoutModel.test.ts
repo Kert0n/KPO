@@ -116,22 +116,16 @@ describe('mermaidLayoutModel', () => {
   it('resolves local overflow state with an epsilon', () => {
     expect(resolveMermaidOverflow({
       clientWidth: 400,
-      scrollWidth: 401,
-      clientHeight: 200,
-      scrollHeight: 201
+      scrollWidth: 401
     })).toEqual({
-      hasOverflowX: false,
-      hasOverflowY: false
+      hasOverflowX: false
     })
 
     expect(resolveMermaidOverflow({
       clientWidth: 400,
-      scrollWidth: 430,
-      clientHeight: 200,
-      scrollHeight: 260
+      scrollWidth: 430
     })).toEqual({
-      hasOverflowX: true,
-      hasOverflowY: true
+      hasOverflowX: true
     })
   })
 
@@ -157,7 +151,6 @@ describe('mermaidLayoutModel', () => {
   it('shows toolbar only when useful or requested by interaction', () => {
     expect(shouldShowMermaidToolbar({
       hasOverflowX: false,
-      hasOverflowY: false,
       hasManualScale: false,
       isHovered: false,
       isFocusWithin: false
@@ -165,7 +158,6 @@ describe('mermaidLayoutModel', () => {
 
     expect(shouldShowMermaidToolbar({
       hasOverflowX: true,
-      hasOverflowY: false,
       hasManualScale: false,
       isHovered: false,
       isFocusWithin: false
@@ -173,7 +165,6 @@ describe('mermaidLayoutModel', () => {
 
     expect(shouldShowMermaidToolbar({
       hasOverflowX: false,
-      hasOverflowY: false,
       hasManualScale: true,
       isHovered: false,
       isFocusWithin: false
@@ -181,7 +172,6 @@ describe('mermaidLayoutModel', () => {
 
     expect(shouldShowMermaidToolbar({
       hasOverflowX: false,
-      hasOverflowY: false,
       hasManualScale: false,
       isHovered: true,
       isFocusWithin: false
@@ -189,7 +179,6 @@ describe('mermaidLayoutModel', () => {
 
     expect(shouldShowMermaidToolbar({
       hasOverflowX: false,
-      hasOverflowY: false,
       hasManualScale: false,
       isHovered: false,
       isFocusWithin: true

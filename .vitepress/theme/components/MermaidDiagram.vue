@@ -45,7 +45,6 @@ const viewBoxWidth = ref<number | null>(null)
 const viewBoxHeight = ref<number | null>(null)
 const viewportMode = ref<MermaidViewportMode>('desktop')
 const hasOverflowX = ref(false)
-const hasOverflowY = ref(false)
 const userScrolledViewport = ref(false)
 const hovered = ref(false)
 const focusWithin = ref(false)
@@ -103,7 +102,6 @@ const scaleLabel = computed(() => `${Math.round(effectiveScale.value * 100)}%`)
 const controlsVisible = computed(() => {
   return shouldShowMermaidToolbar({
     hasOverflowX: hasOverflowX.value,
-    hasOverflowY: hasOverflowY.value,
     hasManualScale: manualScale.value !== null,
     isHovered: hovered.value,
     isFocusWithin: focusWithin.value
@@ -156,7 +154,6 @@ async function render(): Promise<void> {
     viewBoxWidth.value = null
     viewBoxHeight.value = null
     hasOverflowX.value = false
-    hasOverflowY.value = false
     textRisk.value = false
     failed.value = true
   }
@@ -240,19 +237,15 @@ function updateOverflowState(): void {
   const element = viewport.value
   if (!element) {
     hasOverflowX.value = false
-    hasOverflowY.value = false
     return
   }
 
   const state = resolveMermaidOverflow({
     clientWidth: element.clientWidth,
-    scrollWidth: element.scrollWidth,
-    clientHeight: element.clientHeight,
-    scrollHeight: element.scrollHeight
+    scrollWidth: element.scrollWidth
   })
 
   hasOverflowX.value = state.hasOverflowX
-  hasOverflowY.value = state.hasOverflowY
 }
 
 function centerViewportIfNeeded(force: boolean): void {
@@ -391,7 +384,7 @@ function cssNumber(style: CSSStyleDeclaration, property: string, fallback: numbe
     class="kpo-mermaid"
     :class="{
       'kpo-mermaid--controls-visible': controlsVisible,
-      'kpo-mermaid--has-overflow': hasOverflowX || hasOverflowY,
+      'kpo-mermaid--has-overflow': hasOverflowX,
       'kpo-mermaid--text-risk': textRisk
     }"
     @mouseenter="hovered = true"
