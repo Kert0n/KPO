@@ -37,7 +37,6 @@ export default defineConfig({
     const canonical = siteUrl(page.route)
     const existingHead = Array.isArray(pageData.frontmatter.head) ? pageData.frontmatter.head : []
     return {
-      description: pageData.description || page.description,
       frontmatter: {
         ...pageData.frontmatter,
         search: page.inclusion.search,
@@ -54,6 +53,20 @@ export default defineConfig({
         ]
       }
     }
+  },
+
+  transformHead({ pageData }) {
+    const page = findContentPageByOutputPath(pageData.relativePath)
+    if (!page) return []
+    return [
+      [
+        'meta',
+        {
+          name: 'description',
+          content: pageData.description || page.description || SITE.description
+        }
+      ]
+    ]
   },
 
   // В папках лекций/дополнений публикуется только vitepress.md;
