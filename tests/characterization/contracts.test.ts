@@ -25,8 +25,10 @@ describe('stable public contracts', () => {
     const source = readFileSync(join(root, 'scripts/export-pdf.mjs'), 'utf8')
     const routeBlock = source.match(/const PDF_ROUTES = \[([\s\S]*?)\n\]/)?.[1]
     expect(routeBlock).toBeTruthy()
-    const routes = [...(routeBlock ?? '').matchAll(/\['([^']*)',\s*'([^']+)'\]/g)]
-      .map((match) => ({ route: match[1], file: match[2] }))
+    const routes = [...(routeBlock ?? '').matchAll(/\['([^']*)',\s*'([^']+)'\]/g)].map((match) => ({
+      route: match[1],
+      file: match[2]
+    }))
     expect(routes).toMatchSnapshot()
   })
 
@@ -37,22 +39,26 @@ describe('stable public contracts', () => {
     const fixtureEntry = entries.find((entry) => entry.routeKey === 'lectures/10')
     expect(fixtureEntry).toBeDefined()
     const context = buildAskAiPageContext(fixtureEntry!, course)
-    expect(context.blocks.map(({ id, kind, language, lineStart, lineEnd }) => ({
-      id,
-      kind,
-      language: language ?? null,
-      lineStart,
-      lineEnd
-    }))).toMatchSnapshot('lecture 10 block IDs')
+    expect(
+      context.blocks.map(({ id, kind, language, lineStart, lineEnd }) => ({
+        id,
+        kind,
+        language: language ?? null,
+        lineStart,
+        lineEnd
+      }))
+    ).toMatchSnapshot('lecture 10 block IDs')
 
     const target = context.blocks.find((block) => block.markdown.includes('RESTful API'))
     expect(target).toBeDefined()
-    expect(buildAskAiPrompt({
-      pageContext: context,
-      selectedText: 'RESTful API',
-      blockIds: [target!.id],
-      maxChars: 12_000
-    })).toMatchSnapshot('representative Ask AI prompt')
+    expect(
+      buildAskAiPrompt({
+        pageContext: context,
+        selectedText: 'RESTful API',
+        blockIds: [target!.id],
+        maxChars: 12_000
+      })
+    ).toMatchSnapshot('representative Ask AI prompt')
   })
 
   test('storage keys and literal values remain stable', () => {

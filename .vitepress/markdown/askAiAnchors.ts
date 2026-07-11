@@ -31,7 +31,11 @@ export function askAiAnchorsPlugin(md: MarkdownIt): void {
       } else if (token.type === 'heading_open') {
         assignBlockId(token, 'heading', lines)
       } else if (token.type === 'paragraph_open') {
-        assignBlockId(token, isImageOnlyParagraph(state.tokens, index) ? 'image' : 'paragraph', lines)
+        assignBlockId(
+          token,
+          isImageOnlyParagraph(state.tokens, index) ? 'image' : 'paragraph',
+          lines
+        )
       } else if (token.type === 'bullet_list_open' || token.type === 'ordered_list_open') {
         assignBlockId(token, 'list', lines)
       } else if (token.type === 'blockquote_open') {
@@ -64,4 +68,3 @@ function assignBlockId(token: Token, kind: AskAiBlockKind, lines: string[]): voi
     token.attrSet('data-kpo-ask-block-id', id)
   }
 }
-

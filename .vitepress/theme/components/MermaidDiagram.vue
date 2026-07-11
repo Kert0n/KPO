@@ -49,7 +49,12 @@ const userScrolledViewport = ref(false)
 const hovered = ref(false)
 const focusWithin = ref(false)
 const textRisk = ref(false)
-const scaleConfig = ref({
+const scaleConfig = ref<{
+  desktopMinScale: number
+  mobileMinScale: number
+  wideDiagramMinWidth: number
+  minHeight: number
+}>({
   desktopMinScale: CONTENT_LAYOUT_TOKENS.mermaidDesktopMinScale,
   mobileMinScale: CONTENT_LAYOUT_TOKENS.mermaidMobileMinScale,
   wideDiagramMinWidth: CONTENT_LAYOUT_TOKENS.mermaidWideDiagramMinWidth,
@@ -87,9 +92,10 @@ const autoScale = computed(() => {
     viewBoxWidth: viewBoxWidth.value,
     viewBoxHeight: viewBoxHeight.value,
     availableWidth: availableWidth.value,
-    minScale: viewportMode.value === 'mobile'
-      ? scaleConfig.value.mobileMinScale
-      : scaleConfig.value.desktopMinScale,
+    minScale:
+      viewportMode.value === 'mobile'
+        ? scaleConfig.value.mobileMinScale
+        : scaleConfig.value.desktopMinScale,
     minHeight: scaleConfig.value.minHeight,
     wideDiagramMinWidth: scaleConfig.value.wideDiagramMinWidth
   })
@@ -198,11 +204,7 @@ function updateMeasurements(): void {
       '--kpo-mermaid-wide-diagram-min-width',
       CONTENT_LAYOUT_TOKENS.mermaidWideDiagramMinWidth
     ),
-    minHeight: cssNumber(
-      style,
-      '--kpo-mermaid-min-height',
-      CONTENT_LAYOUT_TOKENS.mermaidMinHeight
-    )
+    minHeight: cssNumber(style, '--kpo-mermaid-min-height', CONTENT_LAYOUT_TOKENS.mermaidMinHeight)
   }
 }
 
@@ -216,10 +218,12 @@ async function updateManualScale(delta: number): Promise<void> {
   await syncViewportLayout({ centerRatio })
 }
 
-async function syncViewportLayout(options: {
-  forceCenter?: boolean
-  centerRatio?: number | null
-} = {}): Promise<void> {
+async function syncViewportLayout(
+  options: {
+    forceCenter?: boolean
+    centerRatio?: number | null
+  } = {}
+): Promise<void> {
   await nextTick()
   await waitAnimationFrames(2)
   updateMeasurements()
@@ -257,21 +261,25 @@ function centerViewportIfNeeded(force: boolean): void {
     return
   }
 
-  setViewportScrollLeft(resolveCenteredScrollLeft({
-    clientWidth: element.clientWidth,
-    scrollWidth: element.scrollWidth
-  }))
+  setViewportScrollLeft(
+    resolveCenteredScrollLeft({
+      clientWidth: element.clientWidth,
+      scrollWidth: element.scrollWidth
+    })
+  )
 }
 
 function restoreViewportCenterRatio(centerRatio: number): void {
   const element = viewport.value
   if (!element) return
 
-  setViewportScrollLeft(resolveScrollLeftForCenterRatio({
-    centerRatio,
-    clientWidth: element.clientWidth,
-    scrollWidth: element.scrollWidth
-  }))
+  setViewportScrollLeft(
+    resolveScrollLeftForCenterRatio({
+      centerRatio,
+      clientWidth: element.clientWidth,
+      scrollWidth: element.scrollWidth
+    })
+  )
 }
 
 function currentViewportCenterRatio(): number | null {
@@ -375,7 +383,6 @@ function cssNumber(style: CSSStyleDeclaration, property: string, fallback: numbe
   const parsed = Number.parseFloat(style.getPropertyValue(property))
   return Number.isFinite(parsed) ? parsed : fallback
 }
-
 </script>
 
 <template>
@@ -422,12 +429,7 @@ function cssNumber(style: CSSStyleDeclaration, property: string, fallback: numbe
         +
       </button>
     </div>
-    <div
-      v-if="svg"
-      ref="viewport"
-      class="kpo-mermaid__viewport"
-      @scroll.passive="onViewportScroll"
-    >
+    <div v-if="svg" ref="viewport" class="kpo-mermaid__viewport" @scroll.passive="onViewportScroll">
       <div class="kpo-mermaid__canvas" :style="canvasStyle" v-html="svg" />
     </div>
     <div v-else-if="failed" class="kpo-mermaid__error">

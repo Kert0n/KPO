@@ -1,8 +1,5 @@
 import type { Ref } from 'vue'
-import {
-  isAskAiProviderId,
-  type AskAiProviderId
-} from '../lib/askAiModel'
+import { isAskAiProviderId, type AskAiProviderId } from '../lib/askAiModel'
 import { createPersistentState } from './persistentState'
 
 const provider = createPersistentState<AskAiProviderId>({

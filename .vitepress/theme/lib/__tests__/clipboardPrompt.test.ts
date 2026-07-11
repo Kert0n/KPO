@@ -18,14 +18,13 @@ describe('clipboardPrompt', () => {
     expect(writeText).toHaveBeenCalledWith('prompt')
     expect(result).toEqual({
       ok: true,
-      attempts: [
-        { method: 'clipboard-api', ok: true }
-      ]
+      attempts: [{ method: 'clipboard-api', ok: true }]
     })
   })
 
   it('falls back to textarea after Clipboard API failure', async () => {
-    const writeText = vi.fn<(text: string) => Promise<void>>()
+    const writeText = vi
+      .fn<(text: string) => Promise<void>>()
       .mockRejectedValue(new DOMException('blocked', 'NotAllowedError'))
     const documentMock = createDocumentMock(true)
     vi.stubGlobal('navigator', {
@@ -48,7 +47,8 @@ describe('clipboardPrompt', () => {
   })
 
   it('reports failure after both methods fail', async () => {
-    const writeText = vi.fn<(text: string) => Promise<void>>()
+    const writeText = vi
+      .fn<(text: string) => Promise<void>>()
       .mockRejectedValue(new DOMException('blocked', 'NotAllowedError'))
     const documentMock = createDocumentMock(false)
     vi.stubGlobal('navigator', {

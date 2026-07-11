@@ -66,10 +66,10 @@ export type CanUsePlaygroundInput = {
 
 export function canUsePlayground(input: CanUsePlaygroundInput): boolean {
   return Boolean(
-    input.allowPlayground
-    && input.displayLanguage === 'kotlin'
-    && !input.playgroundFailed
-    && input.hasKotlinCode
+    input.allowPlayground &&
+    input.displayLanguage === 'kotlin' &&
+    !input.playgroundFailed &&
+    input.hasKotlinCode
   )
 }
 

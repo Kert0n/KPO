@@ -151,21 +151,6 @@ describe('askAiModel', () => {
   })
 })
 
-const grpcContext: AskAiPageContext = {
-  courseTitle: 'Конструирование ПО',
-  courseDescription: 'Конспект лекций по архитектуре приложений и инженерным практикам',
-  pageTitle: 'Лекция 10. Семантика клиент-серверного и межсервисного обмена',
-  pageDescription: 'Клиент серверное приложение редко состоит из одного процесса. Браузер или мобильное приложение обращается к backend, backend ходит в базу данных, один сервис вызывает другой, а часть операций уходит во внешние системы: платежные шлюзы, почтовые провайдеры, склады, сервисы доставки. В такой системе важно не только "по какому протоколу отправить запрос", но и "какие правила общения нужны бизнес процессу".',
-  sourcePath: 'content/lectures/Lec10/vitepress.md',
-  blocks: [
-    block('grpc-before', 'paragraph', 'gRPC - популярная RPC-реализация. В ней контракт обычно описывают в `.proto`-файле, затем генерируют серверные и клиентские stubs для нужных языков. Сообщения сериализуются через Protocol Buffers, а транспорт обычно работает поверх HTTP/2.'),
-    block('grpc-proto', 'code', 'syntax = "proto3";\n\nservice OrderService {\n  rpc GetOrder(GetOrderRequest) returns (OrderResponse);\n}\n\nmessage GetOrderRequest {\n  string id = 1;\n}\n\nmessage OrderResponse {\n  string id = 1;\n  string status = 2;\n}', 'proto'),
-    block('grpc-mermaid', 'mermaid', 'flowchart TD\n    Proto["order_service.proto"] --> Generator["protoc / plugin"]\n    Generator --> ClientStub["Client stub"]\n    Generator --> ServerBase["Server base"]\n    ClientCode["Код клиента"] --> ClientStub\n    ClientStub -->|"binary messages"| ServerBase\n    ServerImpl["Реализация сервиса"] --> ServerBase'),
-    block('grpc-list-intro', 'paragraph', 'gRPC часто удобен между микросервисами:'),
-    block('grpc-list', 'list', '- schema-first контракт;\n- генерация client/server stubs;\n- бинарный формат;\n- streaming.')
-  ]
-}
-
 const reportContext: AskAiPageContext = {
   courseTitle: 'Конструирование ПО',
   courseDescription: 'Курс',
@@ -173,9 +158,18 @@ const reportContext: AskAiPageContext = {
   pageDescription: '',
   sourcePath: 'content/lectures/Lec10/vitepress.md',
   blocks: [
-    block('report-table', 'table', '| Шаг | Endpoint | Метод | Успешный статус | Смысл |\n|-----|----------|-------|-----------------|-------|\n| Запустить отчет | `/api/v1/reports` | `POST` | `202` | задача принята |\n| Проверить задачу | `/api/v1/reports/jobs/{jobId}` | `GET` | `200` | текущий статус |\n| Скачать отчет | `/api/v1/reports/{reportId}` | `GET` | `200` | готовый результат |\n| Отменить задачу | `/api/v1/reports/jobs/{jobId}` | `DELETE` | `204` | отмена, если еще можно |'),
+    block(
+      'report-table',
+      'table',
+      '| Шаг | Endpoint | Метод | Успешный статус | Смысл |\n|-----|----------|-------|-----------------|-------|\n| Запустить отчет | `/api/v1/reports` | `POST` | `202` | задача принята |\n| Проверить задачу | `/api/v1/reports/jobs/{jobId}` | `GET` | `200` | текущий статус |\n| Скачать отчет | `/api/v1/reports/{reportId}` | `GET` | `200` | готовый результат |\n| Отменить задачу | `/api/v1/reports/jobs/{jobId}` | `DELETE` | `204` | отмена, если еще можно |'
+    ),
     block('report-bridge', 'paragraph', 'Ответ на запуск может выглядеть так:'),
-    block('report-response', 'code', 'HTTP/1.1 202 Accepted\nLocation: /api/v1/reports/jobs/job-7\nContent-Type: application/json\n\n{\n  "jobId": "job-7",\n  "status": "pending"\n}', 'http')
+    block(
+      'report-response',
+      'code',
+      'HTTP/1.1 202 Accepted\nLocation: /api/v1/reports/jobs/job-7\nContent-Type: application/json\n\n{\n  "jobId": "job-7",\n  "status": "pending"\n}',
+      'http'
+    )
   ]
 }
 

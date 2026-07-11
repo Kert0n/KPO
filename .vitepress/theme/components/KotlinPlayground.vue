@@ -21,14 +21,17 @@ import {
  * классом .dark. Поэтому смена темы сайта не требует пере-инициализации.
  */
 
-const props = withDefaults(defineProps<{
-  code: string
-  platform?: string
-  askBlockId?: string
-}>(), {
-  platform: 'java',
-  askBlockId: ''
-})
+const props = withDefaults(
+  defineProps<{
+    code: string
+    platform?: string
+    askBlockId?: string
+  }>(),
+  {
+    platform: 'java',
+    askBlockId: ''
+  }
+)
 
 const emit = defineEmits<{ failed: [] }>()
 
@@ -67,7 +70,8 @@ onMounted(async () => {
 })
 
 onBeforeUnmount(() => {
-  const instance = (targetElement as { KotlinPlayground?: { destroy: () => void } } | undefined)?.KotlinPlayground
+  const instance = (targetElement as { KotlinPlayground?: { destroy: () => void } } | undefined)
+    ?.KotlinPlayground
   instance?.destroy()
   unregisterPlayground(props.askBlockId)
   targetElement = undefined

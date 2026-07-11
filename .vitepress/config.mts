@@ -36,7 +36,11 @@ export default defineConfig({
     ['style', {}, paletteCss()],
     // Выбранный язык применяется до отрисовки, чтобы секции ::: only /
     // <LangOnly> не мигали (приём тёмной темы VitePress)
-    ['script', {}, ';(function(){try{var l=localStorage.getItem("kpo:code-language");if(!/^(kotlin|csharp|java|go)$/.test(l||""))l="kotlin";document.documentElement.dataset.kpoLang=l}catch(e){document.documentElement.dataset.kpoLang="kotlin"}})()']
+    [
+      'script',
+      {},
+      ';(function(){try{var l=localStorage.getItem("kpo:code-language");if(!/^(kotlin|csharp|java|go)$/.test(l||""))l="kotlin";document.documentElement.dataset.kpoLang=l}catch(e){document.documentElement.dataset.kpoLang="kotlin"}})()'
+    ]
   ],
 
   markdown: {

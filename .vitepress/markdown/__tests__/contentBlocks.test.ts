@@ -23,20 +23,22 @@ describe('contentBlocksPlugin', () => {
   })
 
   it('wraps standalone fences without wrapping multi-code fences', () => {
-    const html = render([
-      '```ts',
-      'const value = 1',
-      '```',
-      '',
-      '::: multi-code "Example"',
-      '```kotlin',
-      'val value = 1',
-      '```',
-      '```go',
-      'value := 1',
-      '```',
-      ':::'
-    ].join('\n'))
+    const html = render(
+      [
+        '```ts',
+        'const value = 1',
+        '```',
+        '',
+        '::: multi-code "Example"',
+        '```kotlin',
+        'val value = 1',
+        '```',
+        '```go',
+        'value := 1',
+        '```',
+        ':::'
+      ].join('\n')
+    )
 
     expect(html.match(/kpo-content-block--code/g)).toHaveLength(1)
     expect(html).toContain('kpo-content-block--multi-code')

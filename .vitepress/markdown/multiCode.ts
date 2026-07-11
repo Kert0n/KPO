@@ -57,7 +57,12 @@ export function langOnlyPlugin(md: MarkdownIt): void {
       const token = tokens[index]
       if (token.nesting === -1) return '</div>\n'
 
-      const raw = token.info.trim().replace(/^only\s*/, '').trim().split(/\s+/)[0] ?? ''
+      const raw =
+        token.info
+          .trim()
+          .replace(/^only\s*/, '')
+          .trim()
+          .split(/\s+/)[0] ?? ''
       const lang = normalizeLanguage(raw)
 
       if (!lang) {
@@ -84,8 +89,10 @@ export function multiCodePlugin(md: MarkdownIt): void {
 
       if (meta.languages.length === 0) {
         console.warn('[multi-code] контейнер без блоков кода:', token.info)
-        return `<div class="kpo-content-block kpo-content-block--multi-code kpo-content-block--wide kpo-wide-block kpo-wide-block--code"${askAiBlockAttribute(token)}>\n`
-          + `<CodeSwitcher title="${escapeAttribute(info.title)}" langs="" ask-block-id="${escapeAttribute(askAiBlockId(token))}">\n`
+        return (
+          `<div class="kpo-content-block kpo-content-block--multi-code kpo-content-block--wide kpo-wide-block kpo-wide-block--code"${askAiBlockAttribute(token)}>\n` +
+          `<CodeSwitcher title="${escapeAttribute(info.title)}" langs="" ask-block-id="${escapeAttribute(askAiBlockId(token))}">\n`
+        )
       }
 
       markInitialFenceActive(fences, meta.initialLang)
@@ -97,15 +104,17 @@ export function multiCodePlugin(md: MarkdownIt): void {
         ? ` playground-code="${encodeURIComponent(meta.playgroundCode)}"`
         : ''
 
-      return `<div class="kpo-content-block kpo-content-block--multi-code kpo-content-block--wide kpo-wide-block kpo-wide-block--code"${askAiBlockAttribute(token)}>\n`
-        + `<CodeSwitcher title="${escapeAttribute(info.title)}"`
-        + ` langs="${meta.languages.join(',')}"`
-        + ` labels="${escapeAttribute(meta.labels.join(','))}"`
-        + ` initial-lang="${meta.initialLang}"`
-        + ` ask-block-id="${escapeAttribute(askAiBlockId(token))}"`
-        + authorDefaultAttribute
-        + playgroundCodeAttribute
-        + ` :allow-playground="${meta.allowPlayground}">\n`
+      return (
+        `<div class="kpo-content-block kpo-content-block--multi-code kpo-content-block--wide kpo-wide-block kpo-wide-block--code"${askAiBlockAttribute(token)}>\n` +
+        `<CodeSwitcher title="${escapeAttribute(info.title)}"` +
+        ` langs="${meta.languages.join(',')}"` +
+        ` labels="${escapeAttribute(meta.labels.join(','))}"` +
+        ` initial-lang="${meta.initialLang}"` +
+        ` ask-block-id="${escapeAttribute(askAiBlockId(token))}"` +
+        authorDefaultAttribute +
+        playgroundCodeAttribute +
+        ` :allow-playground="${meta.allowPlayground}">\n`
+      )
     }
   })
 }
@@ -147,7 +156,9 @@ export function collectCodeFences(tokens: Token[], openIndex: number): MultiCode
     const playgroundOnly = isPlaygroundFence(token)
     if (seen.has(language)) {
       if (!playgroundOnly) {
-        console.warn(`[multi-code] повторный блок языка "${language}" — будет показан вместе с первым.`)
+        console.warn(
+          `[multi-code] повторный блок языка "${language}" — будет показан вместе с первым.`
+        )
       }
     } else {
       seen.add(language)
@@ -194,7 +205,9 @@ function uniqueLanguages(fences: MultiCodeFence[]): string[] {
 }
 
 function playgroundFenceCode(fences: MultiCodeFence[]): string {
-  return fences.find((fence) => fence.language === 'kotlin' && fence.playgroundOnly)?.token.content ?? ''
+  return (
+    fences.find((fence) => fence.language === 'kotlin' && fence.playgroundOnly)?.token.content ?? ''
+  )
 }
 
 function hidePlaygroundOnlyFences(fences: MultiCodeFence[]): void {
@@ -214,13 +227,17 @@ function isPlaygroundFence(token: Token): boolean {
   return normalizeLanguage(token.info) === 'kotlin' && parts.includes('playground')
 }
 
-function resolveAuthorDefault(requestedDefault: string, languages: string[], token?: Token): string {
+function resolveAuthorDefault(
+  requestedDefault: string,
+  languages: string[],
+  token?: Token
+): string {
   if (!requestedDefault) return ''
   if (languages.includes(requestedDefault)) return requestedDefault
 
   console.warn(
-    `[multi-code] default="${requestedDefault}" не найден среди языков блока`
-      + (token ? `: ${token.info}` : '')
+    `[multi-code] default="${requestedDefault}" не найден среди языков блока` +
+      (token ? `: ${token.info}` : '')
   )
   return ''
 }
@@ -246,4 +263,3 @@ function markInitialFenceActive(fences: MultiCodeFence[], initialLang: string): 
     }
   }
 }
-

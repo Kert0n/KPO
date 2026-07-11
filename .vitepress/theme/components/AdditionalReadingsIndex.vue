@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { withBase } from 'vitepress'
+// VitePress turns a data loader's default export into this virtual named export at build time.
+// @ts-expect-error vue-tsc does not run the VitePress data-loader transform.
 import { data as lectures } from '../data/additionalReadings.data'
 </script>
 
@@ -28,9 +30,7 @@ import { data as lectures } from '../data/additionalReadings.data'
         <ul>
           <li v-for="item in group.items" :key="`${lecture.lecture}-${group.title}-${item.url}`">
             <a :href="item.url">{{ item.title }}</a>
-            <span v-if="item.note" class="kpo-additional-readings__note">
-              — {{ item.note }}
-            </span>
+            <span v-if="item.note" class="kpo-additional-readings__note"> — {{ item.note }} </span>
           </li>
         </ul>
       </div>

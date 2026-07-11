@@ -48,11 +48,7 @@ export async function preserveViewportAnchor(
 }
 
 export function resolveAnchoredScrollTop(input: ResolveAnchoredScrollTopInput): number {
-  return clamp(
-    input.newRootTop + input.relativeViewportTop,
-    0,
-    Math.max(0, input.maxScrollY)
-  )
+  return clamp(input.newRootTop + input.relativeViewportTop, 0, Math.max(0, input.maxScrollY))
 }
 
 export function waitAnimationFrames(frames: number): Promise<void> {
@@ -80,4 +76,3 @@ function maxScrollY(): number {
   )
   return Math.max(0, documentHeight - window.innerHeight)
 }
-

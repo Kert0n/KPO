@@ -1,0 +1,12 @@
+content/
+.vitepress/cache/
+.vitepress/dist/
+coverage/
+node_modules/
+output/
+playwright-report/
+test-results/
+tests/characterization/__screenshots__/
+tests/characterization/__snapshots__/
+*.css
+package-lock.json

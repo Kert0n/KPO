@@ -27,14 +27,18 @@ export default defineConfig({
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure'
   },
-  webServer: usesExternalServer ? undefined : {
-    command: 'npm run preview:host -- --port 4174',
-    url: baseURL,
-    reuseExistingServer: !process.env.CI,
-    timeout: 120_000
-  },
-  projects: [{
-    name: 'linux-chromium',
-    use: { ...devices['Desktop Chrome'] }
-  }]
+  webServer: usesExternalServer
+    ? undefined
+    : {
+        command: 'npm run preview:host -- --port 4174',
+        url: baseURL,
+        reuseExistingServer: !process.env.CI,
+        timeout: 120_000
+      },
+  projects: [
+    {
+      name: 'linux-chromium',
+      use: { ...devices['Desktop Chrome'] }
+    }
+  ]
 })
