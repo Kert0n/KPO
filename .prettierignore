@@ -1,8 +1,10 @@
 /content/
-.vitepress/cache/
-.vitepress/dist/
+.claude/worktrees/
+.worktrees/
+**/.vitepress/cache/
+**/.vitepress/dist/
+**/node_modules/
 coverage/
-node_modules/
 output/
 playwright-report/
 test-results/

@@ -178,6 +178,8 @@ TypeScript, security audit, unit-тесты и сборка объединены
 
 ```sh
 npm run verify
+npm run verify:full
+npm run format:check:tracked
 ```
 
 Browser-регрессии Playwright проверяют реальные страницы:

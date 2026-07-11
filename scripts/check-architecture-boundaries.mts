@@ -46,7 +46,9 @@ function importsLayer(specifier: string, layers: string[]): boolean {
 function walk(directory: string): string[] {
   return readdirSync(directory).flatMap((name) => {
     const path = resolve(directory, name)
-    return statSync(path).isDirectory() ? walk(path) : [path]
+    if (!statSync(path).isDirectory()) return [path]
+    if (['cache', 'dist', 'node_modules'].includes(name)) return []
+    return walk(path)
   })
 }
 
