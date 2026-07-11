@@ -58,8 +58,7 @@ test.describe('Linux Chromium golden master', () => {
 
   for (const fixture of [
     { name: 'multi-code', selector: '.kpo-switcher' },
-    { name: 'mermaid', selector: '.kpo-mermaid' },
-    { name: 'playground', selector: '.kpo-switcher:has(.kpo-switcher__playground-toggle)' }
+    { name: 'mermaid', selector: '.kpo-mermaid' }
   ] as const) {
     test(fixture.name, async ({ page }) => {
       await page.setViewportSize({ width: 1280, height: 900 })
@@ -69,6 +68,17 @@ test.describe('Linux Chromium golden master', () => {
       await expect(page.locator(fixture.selector).first()).toHaveScreenshot(`${fixture.name}.png`)
     })
   }
+
+  test('Playground', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 900 })
+    await page.goto(UI_FIXTURE_ROUTE)
+    await waitForStableUi(page)
+    const switcher = page.locator('.kpo-switcher').filter({ hasText: 'Fixture Kotlin Playground' })
+    await switcher.locator('.kpo-switcher__playground-toggle').click()
+    await expect(switcher.locator('.kpo-playground')).toBeVisible()
+    await normalizeForScreenshot(page)
+    await expect(switcher).toHaveScreenshot('playground.png')
+  })
 
   test('Ask AI selection menu', async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 900 })
