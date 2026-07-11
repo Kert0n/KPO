@@ -1,4 +1,4 @@
-import { clamp } from '../../lib/math'
+import { clamp } from '../../shared/core/math'
 
 export type ViewportAnchor = {
   root: HTMLElement

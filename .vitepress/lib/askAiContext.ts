@@ -4,10 +4,10 @@ import MarkdownIt from 'markdown-it'
 import type Token from 'markdown-it/lib/token.mjs'
 import container from 'markdown-it-container'
 import matter from 'gray-matter'
-import { isImageOnlyParagraph } from '../markdown/tokenUtils'
 import { contentPagesFor } from '../shared/content/contentCatalog'
-import { createAskAiBlockId, type AskAiBlockKind } from './askAiIds'
-import type { AskAiBlock, AskAiPageContext } from '../theme/lib/askAiModel'
+import { createAskAiBlockId, type AskAiBlockKind } from '../shared/core/askAiIds'
+import type { AskAiBlock, AskAiPageContext } from '../shared/core/askAiModel'
+import { classifyMarkdownToken, findMatchingMultiCodeClose } from '../shared/core/markdownStructure'
 
 export type AskAiContextEntry = {
   routeKey: string
@@ -59,9 +59,8 @@ export function buildAskAiPageContext(
   const root = options.root ?? process.cwd()
   const absolutePath = resolve(root, entry.sourcePath)
   const stat = statSync(absolutePath)
-  const cacheKey = `${absolutePath}:${stat.mtimeMs}`
-  const cached = cache.get(cacheKey)
-  if (cached) return cached.context
+  const cached = cache.get(absolutePath)
+  if (cached?.mtimeMs === stat.mtimeMs) return cached.context
 
   const source = readFileSync(absolutePath, 'utf8')
   const parsed = matter(source)
@@ -78,7 +77,7 @@ export function buildAskAiPageContext(
     blocks: collectBlocks(tokens, lines)
   }
 
-  cache.set(cacheKey, { mtimeMs: stat.mtimeMs, context })
+  cache.set(absolutePath, { mtimeMs: stat.mtimeMs, context })
   return context
 }
 
@@ -108,51 +107,27 @@ function collectBlocks(tokens: Token[], lines: string[]): AskAiBlock[] {
     const token = tokens[index]
     if (token.level !== 0 && token.type !== 'fence') continue
 
-    if (token.type === 'container_multi-code_open') {
-      const closeIndex = findMatchingClose(tokens, index)
+    const classification = classifyMarkdownToken(tokens, index)
+    if (!classification) continue
+
+    if (classification.kind === 'multi-code') {
+      const closeIndex = findMatchingMultiCodeClose(tokens, index)
       const block = createBlock('multi-code', token, lines)
       if (block) blocks.push(block)
       skipUntil = closeIndex === -1 ? index + 1 : closeIndex + 1
       continue
     }
 
-    if (token.type === 'fence') {
-      const info = token.info.trim().split(/\s+/)[0] ?? ''
-      const kind: AskAiBlockKind = info === 'mermaid' ? 'mermaid' : 'code'
-      const block = createBlock(kind, token, lines, { language: info })
+    if (classification.kind === 'code' || classification.kind === 'mermaid') {
+      const block = createBlock(classification.kind, token, lines, {
+        language: classification.language
+      })
       if (block) blocks.push(block)
       continue
     }
 
-    if (token.type === 'heading_open') {
-      const block = createBlock('heading', token, lines)
-      if (block) blocks.push(block)
-      continue
-    }
-
-    if (token.type === 'paragraph_open') {
-      const kind: AskAiBlockKind = isImageOnlyParagraph(tokens, index) ? 'image' : 'paragraph'
-      const block = createBlock(kind, token, lines)
-      if (block) blocks.push(block)
-      continue
-    }
-
-    if (token.type === 'bullet_list_open' || token.type === 'ordered_list_open') {
-      const block = createBlock('list', token, lines)
-      if (block) blocks.push(block)
-      continue
-    }
-
-    if (token.type === 'blockquote_open') {
-      const block = createBlock('blockquote', token, lines)
-      if (block) blocks.push(block)
-      continue
-    }
-
-    if (token.type === 'table_open') {
-      const block = createBlock('table', token, lines)
-      if (block) blocks.push(block)
-    }
+    const block = createBlock(classification.kind, token, lines)
+    if (block) blocks.push(block)
   }
 
   return blocks
@@ -198,15 +173,6 @@ function pageDescription(data: Record<string, unknown>, content: string): string
     .find((part) => part.length > 20)
 
   return paragraph ?? ''
-}
-
-function findMatchingClose(tokens: Token[], openIndex: number): number {
-  const open = tokens[openIndex]
-  for (let index = openIndex + 1; index < tokens.length; index += 1) {
-    const token = tokens[index]
-    if (token.type === 'container_multi-code_close' && token.level === open.level) return index
-  }
-  return -1
 }
 
 function plainText(value: string): string {

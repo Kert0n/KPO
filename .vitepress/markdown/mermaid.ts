@@ -1,5 +1,6 @@
 import type MarkdownIt from 'markdown-it'
-import { stableHash } from '../lib/hash'
+import { stableHash } from '../shared/core/hash'
+import { classifyMarkdownToken } from '../shared/core/markdownStructure'
 import { askAiBlockAttribute } from './askAiAnchors'
 
 export type MermaidLintDiagnostic = {
@@ -27,7 +28,7 @@ export function mermaidPlugin(md: MarkdownIt): void {
   md.renderer.rules.fence = (tokens, index, options, env, self) => {
     const token = tokens[index]
 
-    if (token.info.trim() === 'mermaid') {
+    if (classifyMarkdownToken(tokens, index)?.kind === 'mermaid') {
       const lineOffset = token.map?.[0] ?? 0
 
       assertValidMermaidCode(token.content, {

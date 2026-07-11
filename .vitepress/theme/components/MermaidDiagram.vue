@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { useData } from 'vitepress'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { stableHash } from '../../lib/hash'
-import { clamp } from '../../lib/math'
+import { stableHash } from '../../shared/core/hash'
+import { clamp } from '../../shared/core/math'
 import { CONTENT_LAYOUT_TOKENS } from '../lib/contentLayoutTokens'
 import {
   readSvgViewBox,
