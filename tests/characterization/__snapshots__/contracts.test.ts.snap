@@ -1920,7 +1920,7 @@ exports[`stable public contracts > content catalog channels and metadata remain 
     "order": 9,
     "route": "/lectures/09",
     "sourcePath": "content/lectures/Lec9/vitepress.md",
-    "title": "Лекция 9. Виртуализация и эволюция баз данных",
+    "title": "Лекция 9. Сравнительный анализ СУБД в системном дизайне",
   },
   {
     "inclusion": {
@@ -2194,7 +2194,7 @@ exports[`stable public contracts > routes, nav, sidebar and rewrites remain stab
         },
         {
           "link": "/lectures/09",
-          "text": "Лекция 9. Виртуализация и эволюция баз данных",
+          "text": "Лекция 9. Сравнительный анализ СУБД в системном дизайне",
         },
         {
           "link": "/lectures/10",

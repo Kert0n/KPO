@@ -5,9 +5,9 @@ const root = resolve('.vitepress/dist')
 const files = walk(root)
 const sizes = files.map((file) => ({ file, bytes: statSync(file).size }))
 const limits = {
-  js: 900 * 1024,
+  js: 1024 * 1024,
   css: 160 * 1024,
-  context: 225 * 1024,
+  context: 350 * 1024,
   contextsTotal: 2.6 * 1024 * 1024,
   html: 450 * 1024,
   dist: 22 * 1024 * 1024

@@ -36,5 +36,5 @@ path-plus-time cache records.
 Only `kotlin playground` fences in public catalog pages are runnable Kotlin.
 Ordinary Kotlin fences are illustrative, and `{playground=off}` is a hard
 exclusion. `npm run kotlin:extract` records the source line and generated file
-for all 62 runnable snippets; Gradle 9.5.0 compiles them with JDK 21 and the same
+for all 64 runnable snippets; Gradle 9.5.0 compiles them with JDK 21 and the same
 Kotlin 2.4.0 version used by the browser Playground.

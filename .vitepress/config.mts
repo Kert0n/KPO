@@ -109,7 +109,7 @@ export default defineConfig({
       // lazy Mermaid/Kotlin Playground chunks are larger than Vite's default
       // 500 KiB raw threshold, but the limit stays below 1 MiB so real
       // regressions remain visible.
-      chunkSizeWarningLimit: 900
+      chunkSizeWarningLimit: 1024
     },
     plugins: [
       askAiContextPlugin({

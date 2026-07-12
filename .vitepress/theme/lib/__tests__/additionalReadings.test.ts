@@ -44,6 +44,7 @@ describe('additional readings parser', () => {
 
 - [Без заметки](https://example.com/a)
 - [С заметкой](https://example.com/b) — короткое пояснение
+- [С ASCII дефисом](https://example.com/c) - еще одно пояснение
 
 ### Видео
 
@@ -54,7 +55,12 @@ describe('additional readings parser', () => {
         title: 'Теория',
         items: [
           { title: 'Без заметки', url: 'https://example.com/a' },
-          { title: 'С заметкой', url: 'https://example.com/b', note: 'короткое пояснение' }
+          { title: 'С заметкой', url: 'https://example.com/b', note: 'короткое пояснение' },
+          {
+            title: 'С ASCII дефисом',
+            url: 'https://example.com/c',
+            note: 'еще одно пояснение'
+          }
         ]
       },
       {

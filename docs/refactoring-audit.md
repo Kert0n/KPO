@@ -10,7 +10,7 @@
 | F-02 | blocker  | Перекрывающиеся anchor transactions писали stale scroll                   | Не было generation/AbortController на экземпляр                                                       | #34 / `8c460444111fb3635b50d233a5b1e85e9d842249` | rapid switch, route/unmount, user intent                   | none                         | `git revert -m 1 8c460444111fb3635b50d233a5b1e85e9d842249` |
 | F-03 | high     | Readiness зависел от фиксированных RAF/timeout                            | Кадры использовались как lifecycle signal                                                             | #34, #35, #38                                    | grep contract, unit, production browser                    | none                         | откат соответствующего merge                               |
 | F-04 | blocker  | UI запускал 7 illustrative Kotlin fences, отсутствующих в compile gate    | Обычный Kotlin fence считался runnable fallback                                                       | #34 / `8c460444111fb3635b50d233a5b1e85e9d842249` | manifest 62, Gradle 9.5/JDK 21/Kotlin 2.4                  | disabled semantic state only | `git revert -m 1 8c460444111fb3635b50d233a5b1e85e9d842249` |
-| F-05 | high     | Ask AI ID зависел от source line и presentation metadata                  | Hash строился из raw Markdown/header                                                                  | #33 / `23abd4bd7ef4d45d5e44c92c0d7e3c6a764d63a2` | 2818 published IDs, duplicate/presentation tests           | none                         | `git revert -m 1 23abd4bd7ef4d45d5e44c92c0d7e3c6a764d63a2` |
+| F-05 | high     | Ask AI ID зависел от source line и presentation metadata                  | Hash строился из raw Markdown/header                                                                  | #33 / `23abd4bd7ef4d45d5e44c92c0d7e3c6a764d63a2` | 2990 published IDs, duplicate/presentation tests           | none                         | `git revert -m 1 23abd4bd7ef4d45d5e44c92c0d7e3c6a764d63a2` |
 | F-06 | high     | Selection boundary терял последний абзац и порядок multi-range            | Проверялся common ancestor, а не clipped intersection                                                 | #32 / `de6bf612bdb433f17e8e7f1cb802e8d025af7e15` | boundary/reverse/mobile/browser stress                     | none                         | `git revert -m 1 de6bf612bdb433f17e8e7f1cb802e8d025af7e15` |
 | F-07 | high     | Старый Mermaid layout мог записать scrollLeft после нового zoom/render    | Viewport не имел generation ownership                                                                 | #35 / `33ba9045d74e686438c1f3acac886f6e8cbf7db8` | 18 Mermaid + transition stress + full Chromium             | none                         | `git revert -m 1 33ba9045d74e686438c1f3acac886f6e8cbf7db8` |
 | F-08 | high     | Browser suite был монолитом и фактически использовал один worker          | 3330 строк и public-content traversal в одном spec                                                    | #38 / `32f1fa0f38db1755cf344bb906e44a65731c4e72` | 80 tests, 4 workers, service-only routes                   | none                         | `git revert -m 1 32f1fa0f38db1755cf344bb906e44a65731c4e72` |
@@ -34,13 +34,14 @@
 - Deploy раньше проверял только conclusion; теперь дополнительно требуются upstream event `push` и head branch `master`.
 - Superseded test compensations `3b54e9c`, `ebd1289`, `71be462`, часть `3b0bb87` и `e0b7036` сохранены в истории для аудита, но их readiness-модель удалена из итогового кода.
 - `LayoutShift.sources` указывает сдвинутый DOM node, а не владельца причины. На breakpoint 768 responsive reflow VitePress ложно атрибутировался CodeSwitcher; final gate сравнивает его SSR/hydrated geometry напрямую.
-- Visual characterization получила отдельный component fixture: functional context больше не меняе golden-master prompt, а illustrative Kotlin не подменяет runnable visual contract.
-- PR #22 и #24 не входят в ancestry или diff интеграционной ветки.
+- Visual characterization получила отдельный component fixture: functional context больше не меняет golden-master prompt, а illustrative Kotlin не подменяет runnable visual contract.
+- После внешнего merge PR #22 в `master` Lec9 выросла до 340556 bytes Ask AI context и подняла searchable local-index chunk до 974402 bytes. Per-file capacity увеличена до 350 KiB/1 MiB; total contexts 2.6 MiB и dist 22 MiB остались без изменений.
+- PR #22 вошёл в ancestry только как уже опубликованная база `master`; интеграция не тащит его как свой patch. PR #24 отсутствует в ancestry и diff.
 
 ## Итоговые инварианты
 
-- Published Ask AI manifest содержит 2818 совместимых блоков; presentation metadata и source line не меняют ID.
-- Runnable Kotlin определяется только `kotlin playground`; manifest и UI описывают один набор из 62 snippets.
+- Published Ask AI manifest содержит 2990 совместимых блоков после синхронизации с опубликованной Lec9; presentation metadata и source line не меняют ID.
+- Runnable Kotlin определяется только `kotlin playground`; manifest и UI описывают один набор из 64 snippets после двух новых runnable-примеров опубликованной Lec9.
 - Mermaid сохраняет singleton queue, committed theme snapshot, horizontal-only overflow и auto-height.
 - Component browser tests используют только service fixtures; публичный контент проверяется catalog/Markdown/generated contracts.
 - CSS partition сохраняет фактический cascade; normal-mode palette, geometry и responsive layout не изменены.

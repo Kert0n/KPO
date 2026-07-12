@@ -13,7 +13,7 @@ import { buildAskAiPageContext, listAskAiContextEntries } from '../../../lib/ask
 describe('Ask AI semantic IDs', () => {
   it('keeps the published compatibility manifest complete', () => {
     const entries = publishedAskAiCompatibilityEntries()
-    expect(entries).toHaveLength(2818)
+    expect(entries).toHaveLength(2990)
     expect(new Set(entries.map((entry) => entry.key)).size).toBe(entries.length)
 
     const sourceScopedIds = entries.map((entry) => {
