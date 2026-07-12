@@ -268,6 +268,14 @@ type MermaidLabelContrast = {
   contrast: number
 }
 
+type MermaidThemeSyncIssue = {
+  diagramIndex: number
+  selector: string
+  property: string
+  actual: string
+  expected: string
+}
+
 async function getMermaidLabelContrasts(page: Page): Promise<MermaidLabelContrast[]> {
   return page.evaluate(() => {
     function parseRgb(value: string): [number, number, number] | null {
@@ -309,6 +317,173 @@ async function getMermaidLabelContrasts(page: Page): Promise<MermaidLabelContras
       }
     })
   })
+}
+
+async function expectMermaidThemeSynchronized(page: Page): Promise<void> {
+  await expect
+    .poll(async () => {
+      const issues = await page.evaluate(() => {
+        function normalizeColor(value: string): string {
+          const probe = document.createElement('span')
+          probe.style.color = value.trim()
+          document.body.append(probe)
+          const normalized = getComputedStyle(probe).color
+          probe.remove()
+          return normalized
+        }
+
+        function cssColor(style: CSSStyleDeclaration, property: string): string {
+          return normalizeColor(style.getPropertyValue(property))
+        }
+
+        function computedColor(element: Element, property: 'backgroundColor' | 'color'): string {
+          return normalizeColor(getComputedStyle(element)[property])
+        }
+
+        function computedSvgColor(element: Element, property: 'fill' | 'stroke'): string {
+          return normalizeColor(getComputedStyle(element)[property])
+        }
+
+        function addIssue(
+          list: MermaidThemeSyncIssue[],
+          diagramIndex: number,
+          selector: string,
+          property: string,
+          actual: string,
+          expected: string
+        ): void {
+          if (actual === expected) return
+          list.push({ diagramIndex, selector, property, actual, expected })
+        }
+
+        const rootStyle = getComputedStyle(document.documentElement)
+        const tokens = {
+          background: cssColor(rootStyle, '--vp-c-bg'),
+          softBackground: cssColor(rootStyle, '--vp-c-bg-soft'),
+          text: cssColor(rootStyle, '--vp-c-text-1'),
+          mutedText: cssColor(rootStyle, '--vp-c-text-2'),
+          border: cssColor(rootStyle, '--vp-c-border')
+        }
+        const issues: MermaidThemeSyncIssue[] = []
+        const diagrams = [...document.querySelectorAll('.kpo-mermaid svg')]
+
+        if (diagrams.length === 0) {
+          issues.push({
+            diagramIndex: -1,
+            selector: '.kpo-mermaid svg',
+            property: 'count',
+            actual: '0',
+            expected: '>0'
+          })
+          return issues
+        }
+
+        for (const [diagramIndex, svg] of diagrams.entries()) {
+          const edgeLabel = svg.querySelector('.edgeLabel span')
+          const nodeLabel = svg.querySelector('.nodeLabel')
+          const nodeShape = svg.querySelector(
+            '.node rect, .node polygon, .node circle, .node ellipse'
+          )
+          const line = svg.querySelector('.edgePath path, .flowchart-link')
+
+          if (!edgeLabel) {
+            issues.push({
+              diagramIndex,
+              selector: '.edgeLabel span',
+              property: 'presence',
+              actual: 'missing',
+              expected: 'present'
+            })
+          } else {
+            addIssue(
+              issues,
+              diagramIndex,
+              '.edgeLabel span',
+              'background-color',
+              computedColor(edgeLabel, 'backgroundColor'),
+              tokens.background
+            )
+            addIssue(
+              issues,
+              diagramIndex,
+              '.edgeLabel span',
+              'color',
+              computedColor(edgeLabel, 'color'),
+              tokens.text
+            )
+          }
+
+          if (!nodeLabel) {
+            issues.push({
+              diagramIndex,
+              selector: '.nodeLabel',
+              property: 'presence',
+              actual: 'missing',
+              expected: 'present'
+            })
+          } else {
+            addIssue(
+              issues,
+              diagramIndex,
+              '.nodeLabel',
+              'color',
+              computedColor(nodeLabel, 'color'),
+              tokens.text
+            )
+          }
+
+          if (!nodeShape) {
+            issues.push({
+              diagramIndex,
+              selector: '.node rect, .node polygon, .node circle, .node ellipse',
+              property: 'presence',
+              actual: 'missing',
+              expected: 'present'
+            })
+          } else {
+            addIssue(
+              issues,
+              diagramIndex,
+              '.node shape',
+              'fill',
+              computedSvgColor(nodeShape, 'fill'),
+              tokens.background
+            )
+            addIssue(
+              issues,
+              diagramIndex,
+              '.node shape',
+              'stroke',
+              computedSvgColor(nodeShape, 'stroke'),
+              tokens.border
+            )
+          }
+
+          if (!line) {
+            issues.push({
+              diagramIndex,
+              selector: '.edgePath path, .flowchart-link',
+              property: 'presence',
+              actual: 'missing',
+              expected: 'present'
+            })
+          } else {
+            addIssue(
+              issues,
+              diagramIndex,
+              '.edgePath path, .flowchart-link',
+              'stroke',
+              computedSvgColor(line, 'stroke'),
+              tokens.mutedText
+            )
+          }
+        }
+
+        return issues
+      })
+      return JSON.stringify(issues)
+    })
+    .toBe('[]')
 }
 
 type MermaidClipIssue = {
@@ -2247,6 +2422,50 @@ test('fixture mermaid dark theme keeps label colors readable and token-based', a
     expect(label.color).not.toBe('rgb(0, 0, 0)')
   }
   await expectNoPageOverflowFromVpDoc(page)
+})
+
+test('fixture mermaid theme transitions keep SVG tokens synchronized with site theme', async ({
+  page
+}) => {
+  const pageErrors: string[] = []
+  const consoleErrors: string[] = []
+  page.on('pageerror', (error) => pageErrors.push(error.message))
+  page.on('console', (message) => {
+    if (message.type() === 'error') {
+      const location = message.location()
+      consoleErrors.push(`${message.text()} ${location.url}`)
+    }
+  })
+
+  await page.setViewportSize(LAYOUT_VIEWPORTS.desktop)
+  await setStorage(page, { 'vitepress-theme-appearance': 'light' })
+  await stubUiServiceAskAiContext(page)
+  await page.goto(UI_FIXTURE_ROUTE)
+  await waitForMermaid(page, { requireDiagrams: true })
+  await expect(page.locator('html')).not.toHaveClass(/\bdark\b/)
+  await expectMermaidThemeSynchronized(page)
+
+  await page.locator('.VPSwitchAppearance').first().click()
+  await expect(page.locator('html')).toHaveClass(/\bdark\b/)
+  await expectMermaidThemeSynchronized(page)
+
+  await page.locator('.VPSwitchAppearance').first().click()
+  await expect(page.locator('html')).not.toHaveClass(/\bdark\b/)
+  await expectMermaidThemeSynchronized(page)
+
+  await page.locator('.VPSwitchAppearance').first().click()
+  await expect(page.locator('html')).toHaveClass(/\bdark\b/)
+  await expectMermaidThemeSynchronized(page)
+
+  await page.locator('.VPSwitchAppearance').first().click()
+  await page.locator('.VPSwitchAppearance').first().click()
+  await page.locator('.VPSwitchAppearance').first().click()
+  await expect(page.locator('html')).not.toHaveClass(/\bdark\b/)
+  await expectMermaidThemeSynchronized(page)
+  await expectNoPageOverflowFromVpDoc(page)
+
+  expect(pageErrors).toEqual([])
+  expect(consoleErrors).toEqual([])
 })
 
 test('public mermaid dark theme labels are readable when present', async ({ page }) => {
