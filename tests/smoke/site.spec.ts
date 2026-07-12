@@ -1,14 +1,19 @@
 import { expect, test } from '@playwright/test'
+import { stubUiServiceAskAiContext } from '../helpers/serviceFixtures'
 
 test('published application shell and fixture components mount without browser errors', async ({
   page
 }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem('kpo:playground-mode', '0')
+    localStorage.setItem('kpo:code-language', 'kotlin')
+    localStorage.setItem('kpo:ask-ai-provider', 'chatgpt')
+  })
+  await stubUiServiceAskAiContext(page)
   const issues: string[] = []
   page.on('pageerror', (error) => issues.push(error.message))
   page.on('console', (message) => {
-    if (message.type() === 'error' && !message.text().includes('status of 404')) {
-      issues.push(message.text())
-    }
+    if (message.type() === 'error') issues.push(message.text())
   })
 
   await page.goto('service-pages/ui-contract')

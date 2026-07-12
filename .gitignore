@@ -6,6 +6,8 @@ build/
 .vitepress/cache/
 .vitepress/dist/
 test-results/
+coverage/
+.ci-artifacts/
 analysis-results/
 analysis/
 \#/
