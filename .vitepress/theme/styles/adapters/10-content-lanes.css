@@ -1,0 +1,14 @@
+/**
+ * Content lanes define how authored Markdown participates in the document
+ * layout. Prose stays readable; wide blocks get a page-centered lane and own
+ * any necessary local scrolling.
+ */
+
+.vp-doc {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.vp-doc > * {
+  max-width: 100%;
+}

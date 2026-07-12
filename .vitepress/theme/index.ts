@@ -14,15 +14,7 @@ import { installAdaptiveTables } from './lib/adaptiveTables'
 import '@fontsource-variable/inter'
 import '@fontsource-variable/jetbrains-mono'
 
-import './styles/vars.css'
-import './styles/layout.css'
-import './styles/vitepress-adapter.css'
-import './styles/content-lanes.css'
-import './styles/additional-readings.css'
-import './styles/code.css'
-import './styles/playground.css'
-import './styles/ask-ai.css'
-import './styles/print.css'
+import './styles/index.css'
 
 export default {
   extends: DefaultTheme,

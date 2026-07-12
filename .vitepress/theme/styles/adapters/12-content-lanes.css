@@ -1,39 +1,4 @@
-/**
- * Content lanes define how authored Markdown participates in the document
- * layout. Prose stays readable; wide blocks get a page-centered lane and own
- * any necessary local scrolling.
- */
 
-.vp-doc {
-  min-width: 0;
-  max-width: 100%;
-}
-
-.vp-doc > * {
-  max-width: 100%;
-}
-
-.kpo-content-block,
-.kpo-wide-block {
-  box-sizing: border-box;
-  max-width: 100%;
-  min-width: 0;
-}
-
-.kpo-content-block--wide,
-.kpo-wide-block {
-  width: 100%;
-  margin-left: auto;
-  margin-right: auto;
-}
-
-.kpo-content-block--table {
-  display: block;
-  max-width: 100%;
-  margin: 20px auto;
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
-}
 
 .vp-doc .kpo-content-block--table > table {
   display: table;
@@ -168,11 +133,5 @@
     max-width: 100%;
     margin-left: auto;
     margin-right: auto;
-  }
-}
-
-@media (max-width: 639px) {
-  .kpo-content-block--table {
-    width: 100%;
   }
 }

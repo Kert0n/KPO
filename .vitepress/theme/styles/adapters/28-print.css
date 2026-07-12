@@ -1,0 +1,29 @@
+
+
+@media print {
+
+  .vp-doc div[class*='language-'],
+  .kpo-switcher,
+  .kpo-playground {
+    border-color: #d3d5db !important;
+    box-shadow: none !important;
+  }
+
+  .vp-doc div[class*='language-'],
+  .vp-doc pre,
+  .vp-doc pre code {
+    white-space: pre-wrap !important;
+    overflow-wrap: anywhere;
+  }
+
+  .kpo-content-block--table,
+  .vp-doc > table {
+    overflow: visible !important;
+  }
+
+  .vp-doc table {
+    width: 100% !important;
+    max-width: 100% !important;
+    font-size: 9pt;
+  }
+}

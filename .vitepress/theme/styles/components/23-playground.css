@@ -24,6 +24,7 @@
 
 /* Убираем собственные рамки и отступы плейграунда: внешнюю «карточку»
    даёт .kpo-switcher, метрики совпадают со статическими блоками */
+
 .kpo-playground .executable-fragment-wrapper {
   margin: 0;
   border: 0;
@@ -46,6 +47,7 @@
 }
 
 /* Вертикальные отступы как у статических блоков VitePress (20px) */
+
 .kpo-playground .CodeMirror-lines {
   padding: 20px 0;
 }
@@ -137,6 +139,7 @@
 
 /* Пустой контейнер вывода рисует светлую линию под редактором — убираем;
    при появлении вывода разделитель даёт .output-wrapper */
+
 .kpo-playground .js-code-output-executor {
   border-top: 0;
 }
@@ -144,6 +147,7 @@
 /* Инфо-строка компилятора у плагина позиционирована абсолютно и вылезает
    за карточку (обрезается overflow). Ставим её в поток — аккуратный
    футер со ссылкой «Open in Playground» внутри блока */
+
 .kpo-playground .compiler-info {
   position: static;
   display: flex;
@@ -177,6 +181,7 @@
 /* Плагин красит текст вывода фиксированными цветами своей темы
    (.standard-output.default — чёрный), что нечитаемо на тёмном фоне.
    Перекрываем переменными палитры. */
+
 .kpo-playground .output-wrapper .standard-output {
   color: var(--vp-c-text-1);
 }

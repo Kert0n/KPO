@@ -1,12 +1,20 @@
 import { readFileSync } from 'node:fs'
-import { resolve } from 'node:path'
+import { dirname, resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 const root = resolve(import.meta.dirname, '../../../..')
 
+function readThemeCss(): string {
+  const indexPath = resolve(root, '.vitepress/theme/styles/index.css')
+  const index = readFileSync(indexPath, 'utf8')
+  return [...index.matchAll(/@import\s+['"](.+?)['"];/g)]
+    .map((match) => readFileSync(resolve(dirname(indexPath), match[1]), 'utf8'))
+    .join('\n')
+}
+
 describe('Mermaid horizontal-only contract', () => {
   it('declares horizontal scrolling, visible vertical overflow and no height cap', () => {
-    const css = readFileSync(resolve(root, '.vitepress/theme/styles/code.css'), 'utf8')
+    const css = readThemeCss()
     const viewportRule = css.match(/\.kpo-mermaid__viewport\s*\{([^}]+)\}/)?.[1] ?? ''
 
     expect(viewportRule).toContain('overflow-x: auto;')

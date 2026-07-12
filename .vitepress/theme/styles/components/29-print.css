@@ -1,0 +1,14 @@
+
+
+@media print {
+
+  .kpo-mermaid__viewport {
+    overflow: visible !important;
+    max-height: none !important;
+  }
+
+  .kpo-mermaid__canvas,
+  .kpo-mermaid__canvas svg {
+    max-width: 100% !important;
+  }
+}
