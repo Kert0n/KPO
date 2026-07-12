@@ -87,7 +87,6 @@ const playground = usePlaygroundController({
 })
 const {
   everShown: playgroundEverShown,
-  anchorPending,
   usable: playgroundUsable,
   active: playgroundActive,
   title: playgroundTitle
@@ -116,12 +115,7 @@ function onTabsKeydown(event: KeyboardEvent): void {
 </script>
 
 <template>
-  <section
-    ref="root"
-    class="kpo-switcher"
-    :data-kpo-ask-block-id="askBlockId || undefined"
-    :data-kpo-anchor-pending="anchorPending || undefined"
-  >
+  <section ref="root" class="kpo-switcher" :data-kpo-ask-block-id="askBlockId || undefined">
     <header class="kpo-switcher__header">
       <span v-if="title" class="kpo-switcher__title">{{ title }}</span>
 
