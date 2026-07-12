@@ -61,6 +61,22 @@ fun main() {}
     expect(html).toContain(':allow-playground="false"')
   })
 
+  it('keeps an illustrative Kotlin action visible but does not provide runnable code', () => {
+    const html = render(`
+::: multi-code "Illustrative"
+\`\`\`kotlin
+class ExternalFrameworkType
+\`\`\`
+\`\`\`java
+class ExternalFrameworkType {}
+\`\`\`
+:::
+`)
+
+    expect(html).toContain(':allow-playground="true"')
+    expect(html).not.toContain('playground-code=')
+  })
+
   it('warns about duplicate language blocks', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
 

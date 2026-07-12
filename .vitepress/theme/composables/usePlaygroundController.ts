@@ -1,13 +1,12 @@
-import { computed, nextTick, ref, watch, type Ref } from 'vue'
+import { useRoute } from 'vitepress'
+import { computed, nextTick, onBeforeUnmount, ref, watch, type Ref } from 'vue'
 import { canUsePlayground } from '../lib/codeBlockModel'
-import { waitForPlaygroundInitializations } from '../lib/playgroundLifecycle'
+import type { PlaygroundLifecycle } from '../lib/playgroundLifecycle'
 import { preserveViewportAnchor } from '../lib/viewportAnchor'
-
-type PlaygroundSettlement = 'ready' | 'failed' | 'disposed'
 
 export function usePlaygroundController(options: {
   root: Ref<HTMLElement | null>
-  playground: Ref<{ whenSettled: () => Promise<PlaygroundSettlement> } | null>
+  playground: Ref<{ lifecycle: PlaygroundLifecycle } | null>
   mounted: Ref<boolean>
   displayLanguage: Ref<string>
   allowPlayground: () => boolean
@@ -16,9 +15,11 @@ export function usePlaygroundController(options: {
   mode: Ref<boolean>
   setMode: (value: boolean) => void
 }) {
+  const route = useRoute()
   const failed = ref(false)
   const everShown = ref(false)
-  const anchorPending = ref(false)
+  let transaction: AbortController | null = null
+  let applyingOwnedMutation = false
   const usable = computed(() => {
     return (
       options.mounted.value &&
@@ -51,40 +52,85 @@ export function usePlaygroundController(options: {
 
   async function runAnchored(
     mutate: () => void,
-    frames = 2,
     initiatingKeyEvent?: KeyboardEvent
   ): Promise<void> {
-    anchorPending.value = true
+    cancelTransaction('new code-switcher action')
+    const controller = new AbortController()
+    transaction = controller
     await nextTick()
     try {
-      await preserveViewportAnchor(options.root.value, mutate, {
-        frames,
-        settle: waitForActivePlayground,
-        initiatingKeyEvent
-      })
+      await preserveViewportAnchor(
+        options.root.value,
+        () => {
+          applyingOwnedMutation = true
+          try {
+            mutate()
+          } finally {
+            applyingOwnedMutation = false
+          }
+        },
+        {
+          settle: (signal) => waitForActivePlayground(signal, controller),
+          signal: controller.signal,
+          initiatingKeyEvent
+        }
+      )
     } finally {
-      anchorPending.value = false
+      if (transaction === controller) {
+        transaction = null
+      }
     }
   }
 
   async function toggle(): Promise<void> {
-    await runAnchored(() => options.setMode(!options.mode.value), 3)
+    await runAnchored(() => options.setMode(!options.mode.value))
   }
 
   function markFailed(): void {
     failed.value = true
+    cancelTransaction('playground error')
   }
 
-  async function waitForActivePlayground(): Promise<void> {
+  async function waitForActivePlayground(
+    signal: AbortSignal,
+    controller: AbortController
+  ): Promise<void> {
     await nextTick()
-    await waitForPlaygroundInitializations()
-    if (active.value) await options.playground.value?.whenSettled()
+    if (!active.value || signal.aborted) return
+    const lifecycle = options.playground.value?.lifecycle
+    if (!lifecycle) {
+      controller.abort('missing scoped Playground lifecycle')
+      return
+    }
+    const settlement = await lifecycle.whenSettled(signal)
+    if (settlement === 'ready') return
+    if (settlement === 'error') failed.value = true
+    controller.abort(`playground ${settlement}`)
   }
+
+  function cancelTransaction(reason: string): void {
+    transaction?.abort(reason)
+    transaction = null
+  }
+
+  watch(
+    () => route.path,
+    () => cancelTransaction('route change')
+  )
+
+  watch(
+    [options.displayLanguage, options.mode],
+    () => {
+      if (!applyingOwnedMutation) cancelTransaction('external code-switcher state change')
+    },
+    { flush: 'sync' }
+  )
+
+  onBeforeUnmount(() => cancelTransaction('code switcher unmount'))
 
   return {
     failed,
     everShown,
-    anchorPending,
     usable,
     active,
     title,

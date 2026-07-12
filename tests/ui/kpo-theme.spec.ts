@@ -1999,6 +1999,22 @@ test('playground toggle keeps stable geometry and availability follows the activ
   await expect(playgroundOff.locator('.kpo-switcher__playground-toggle')).toHaveCount(0)
 })
 
+test('illustrative Kotlin remains visible but cannot start Playground', async ({ page }) => {
+  await setStorage(page, {
+    'kpo:code-language': 'kotlin',
+    'kpo:playground-mode': '0'
+  })
+  await page.goto(UI_FIXTURE_ROUTE)
+
+  const illustrative = page.locator('.kpo-switcher').filter({ hasText: 'Fixture switcher one' })
+  await expectActiveTab(illustrative, 'Kotlin')
+  await expect(illustrative.locator('.language-kotlin')).toBeVisible()
+  await expect(illustrative.getByRole('button', { name: /Playground/ })).toBeDisabled()
+
+  const runnable = page.locator('.kpo-switcher').filter({ hasText: 'Fixture Kotlin Playground' })
+  await expect(runnable.getByRole('button', { name: /Playground/ })).toBeEnabled()
+})
+
 test('real clean storage keeps the product Playground default enabled', async ({ page }) => {
   await useRealCleanStorage(page)
   await page.goto(UI_FIXTURE_ROUTE)
@@ -2579,14 +2595,16 @@ test('persisted language hydration stays stable across responsive breakpoints', 
     await page.goto(UI_FIXTURE_ROUTE)
 
     const switcher = page.locator('.kpo-switcher').first()
+    const runnable = page.locator('.kpo-switcher').filter({ hasText: 'Fixture Kotlin Playground' })
     await expectActiveTab(
       switcher,
       scenario.language === 'kotlin' ? 'Kotlin' : scenario.language === 'java' ? 'Java' : 'Go'
     )
     if (scenario.language === 'kotlin' && scenario.playgroundMode === '1') {
-      await waitForScopedPlayground(switcher)
+      await expect(switcher.locator('.kpo-switcher__playground-toggle')).toBeDisabled()
+      await waitForScopedPlayground(runnable)
     } else {
-      await expect(switcher.locator('.kpo-playground:visible')).toHaveCount(0)
+      await expect(page.locator('.kpo-playground:visible')).toHaveCount(0)
       const toggle = switcher.locator('.kpo-switcher__playground-toggle')
       await expect(toggle).toBeVisible()
       await expect(toggle).toBeDisabled()

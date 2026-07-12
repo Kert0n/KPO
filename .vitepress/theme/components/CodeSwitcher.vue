@@ -7,6 +7,7 @@ import { useCodeTabs } from '../composables/useCodeTabs'
 import { usePlaygroundMode } from '../composables/usePlaygroundMode'
 import { usePlaygroundController } from '../composables/usePlaygroundController'
 import { useShikiBlocks } from '../composables/useShikiBlocks'
+import type { PlaygroundLifecycle } from '../lib/playgroundLifecycle'
 
 /**
  * Переключатель языка для примера кода.
@@ -52,9 +53,7 @@ const { playgroundMode, setPlaygroundMode } = usePlaygroundMode()
 
 const rootElement = useTemplateRef('root')
 const blocksElement = useTemplateRef('blocks')
-const playgroundElement = useTemplateRef<{
-  whenSettled: () => Promise<'ready' | 'failed' | 'disposed'>
-}>('playground')
+const playgroundElement = useTemplateRef<{ lifecycle: PlaygroundLifecycle }>('playground')
 const mounted = ref(false)
 const tabs = useCodeTabs({ langs: () => props.langs, labels: () => props.labels })
 const { languages: langList } = tabs
@@ -102,7 +101,7 @@ onMounted(() => {
 watch([displayLang, mounted], shiki.syncActiveBlock)
 
 async function selectLanguage(lang: string, initiatingKeyEvent?: KeyboardEvent): Promise<void> {
-  await playground.runAnchored(() => language.select(lang), 2, initiatingKeyEvent)
+  await playground.runAnchored(() => language.select(lang), initiatingKeyEvent)
 }
 
 function onTabsKeydown(event: KeyboardEvent): void {

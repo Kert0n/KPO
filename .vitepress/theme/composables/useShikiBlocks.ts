@@ -11,7 +11,7 @@ export function useShikiBlocks(options: {
 
   function initialize(hasKotlin: boolean): void {
     if (!hasKotlin) return
-    kotlinCode.value = decodePlaygroundCode() || extractKotlinCode()
+    kotlinCode.value = decodePlaygroundCode()
     syncActiveBlock()
   }
 
@@ -20,11 +20,6 @@ export function useShikiBlocks(options: {
     for (const block of blocks) {
       block.classList.toggle('active', blockLanguage(block) === options.displayLanguage.value)
     }
-  }
-
-  function extractKotlinCode(): string {
-    const code = options.blocks.value?.querySelector(':scope > .language-kotlin pre code')
-    return code?.textContent?.replace(/\n$/, '') ?? ''
   }
 
   function decodePlaygroundCode(): string {
