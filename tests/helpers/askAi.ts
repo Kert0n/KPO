@@ -23,7 +23,9 @@ export async function openAskAiMenuWhenReady(
   const onConsole = (message: { type(): string; text(): string }) => {
     if (
       message.type() === 'error' &&
-      !message.text().startsWith('Failed to load resource: the server responded with a status of 404')
+      !message
+        .text()
+        .startsWith('Failed to load resource: the server responded with a status of 404')
     ) {
       issues.push({ kind: 'console', message: message.text() })
     }
