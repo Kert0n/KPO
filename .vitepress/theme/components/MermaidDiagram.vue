@@ -3,9 +3,10 @@ import { useData } from 'vitepress'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { stableHash } from '../../shared/core/hash'
 import { clamp } from '../../shared/core/math'
+import { useMermaidRenderer } from '../composables/useMermaidRenderer'
+import { readMermaidThemeTokens } from '../composables/useMermaidTheme'
 import { CONTENT_LAYOUT_TOKENS } from '../lib/contentLayoutTokens'
 import {
-  readSvgViewBox,
   resolveCenteredScrollLeft,
   resolveMermaidAutoScale,
   resolveMermaidManualScale,
@@ -16,7 +17,6 @@ import {
   shouldShowMermaidToolbar,
   type MermaidViewportMode
 } from '../lib/mermaidLayoutModel'
-import { createMermaidConfig } from '../lib/mermaidThemeModel'
 import { waitAnimationFrames } from '../lib/viewportAnchor'
 
 /**
@@ -34,15 +34,17 @@ const props = defineProps<{
 const { isDark } = useData()
 
 const decodedCode = computed(() => decodeURIComponent(props.code))
+const instanceId = props.diagramId ?? `kpo-mermaid-${stableHash(decodedCode.value)}`
+const renderer = useMermaidRenderer({
+  code: decodedCode,
+  instanceId,
+  themeTokens: readMermaidThemeTokens
+})
+const { svg, failed, errorMessage, viewBoxWidth, viewBoxHeight } = renderer
 const root = ref<HTMLElement | null>(null)
 const viewport = ref<HTMLElement | null>(null)
-const svg = ref('')
-const failed = ref(false)
-const errorMessage = ref('')
 const availableWidth = ref<number | null>(null)
 const manualScale = ref<number | null>(null)
-const viewBoxWidth = ref<number | null>(null)
-const viewBoxHeight = ref<number | null>(null)
 const viewportMode = ref<MermaidViewportMode>('desktop')
 const hasOverflowX = ref(false)
 const userScrolledViewport = ref(false)
@@ -61,11 +63,9 @@ const scaleConfig = ref<{
   minHeight: CONTENT_LAYOUT_TOKENS.mermaidMinHeight
 })
 
-let renderCounter = 0
 let resizeObserver: ResizeObserver | null = null
 let isProgrammaticScroll = false
 let programmaticScrollLeft: number | null = null
-const instanceId = props.diagramId ?? `kpo-mermaid-${stableHash(decodedCode.value)}`
 
 onMounted(() => {
   updateMeasurements()
@@ -79,6 +79,7 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+  renderer.dispose()
   resizeObserver?.disconnect()
   window.removeEventListener('resize', onWindowResize)
 })
@@ -131,37 +132,19 @@ const canvasStyle = computed(() => {
 })
 
 async function render(): Promise<void> {
-  failed.value = false
-  errorMessage.value = ''
-  svg.value = ''
   textRisk.value = false
   userScrolledViewport.value = false
 
-  try {
-    const { default: mermaid } = await import('mermaid')
-
-    mermaid.initialize(createMermaidConfig(mermaidThemeTokens()))
-
-    renderCounter += 1
-    const { svg: rendered } = await mermaid.render(
-      `${instanceId}-${renderCounter}`,
-      decodedCode.value
-    )
-    const size = readSvgViewBox(rendered)
-    viewBoxWidth.value = size.width
-    viewBoxHeight.value = size.height
-    svg.value = rendered
+  const result = await renderer.render()
+  if (result === 'rendered') {
     await syncViewportLayout()
     updateTextRisk()
-  } catch (error) {
-    console.warn('[mermaid] не удалось отрисовать диаграмму:', error)
-    errorMessage.value = error instanceof Error ? error.message : String(error)
-    svg.value = ''
-    viewBoxWidth.value = null
-    viewBoxHeight.value = null
+    return
+  }
+
+  if (result === 'failed') {
     hasOverflowX.value = false
     textRisk.value = false
-    failed.value = true
   }
 }
 
@@ -327,33 +310,6 @@ function onFocusOut(): void {
 function onWindowResize(): void {
   updateMeasurements()
   void syncViewportLayout()
-}
-
-function mermaidThemeTokens() {
-  const style = getComputedStyle(document.documentElement)
-
-  return {
-    fontFamily: mermaidFontFamily(),
-    background: cssVariable(style, '--vp-c-bg'),
-    softBackground: cssVariable(style, '--vp-c-bg-soft'),
-    text: cssVariable(style, '--vp-c-text-1'),
-    mutedText: cssVariable(style, '--vp-c-text-2'),
-    border: cssVariable(style, '--vp-c-border')
-  }
-}
-
-function mermaidFontFamily(): string {
-  if (typeof window === 'undefined') return 'Inter Variable, Inter, sans-serif'
-
-  return cssVariable(
-    getComputedStyle(document.documentElement),
-    '--vp-font-family-base',
-    'Inter Variable, Inter, sans-serif'
-  )
-}
-
-function cssVariable(style: CSSStyleDeclaration, property: string, fallback = ''): string {
-  return style.getPropertyValue(property).trim() || fallback
 }
 
 function updateTextRisk(): void {
