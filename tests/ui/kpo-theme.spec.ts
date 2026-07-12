@@ -670,6 +670,7 @@ type SelectionBoundaryScenario =
   | 'terminal-after-content'
   | 'terminal-reverse'
   | 'before-content-to-first'
+  | 'first-through-terminal'
   | 'terminal-through-footer'
   | 'pager-only'
   | 'collapsed-terminal'
@@ -743,6 +744,12 @@ async function dispatchAskAiBoundarySelection(
         const node = textNodeContaining(first, firstText)
         range.setStartBefore(content)
         range.setEnd(node, node.length)
+        target = first
+      } else if (scenario === 'first-through-terminal') {
+        const firstNode = textNodeContaining(first, firstText)
+        const terminalNode = textNodeContaining(terminal, terminalText)
+        range.setStart(firstNode, 0)
+        range.setEnd(terminalNode, terminalNode.length)
         target = first
       } else if (scenario === 'terminal-through-footer') {
         if (!footer) throw new Error('Missing footer')
@@ -1330,6 +1337,7 @@ test('ask ai opens for content selections with browser boundary endpoints', asyn
     'terminal-after-content',
     'terminal-reverse',
     'before-content-to-first',
+    'first-through-terminal',
     'terminal-through-footer',
     'nested-inline'
   ] satisfies SelectionBoundaryScenario[]) {
@@ -1401,6 +1409,48 @@ test('ask ai prompt clips selection to vp-doc and excludes pager text', async ({
   expect(selectedSection).not.toContain('Pager')
   expect(selectedSection).not.toContain('Следующая')
   expect(selectedSection).not.toContain('Введение')
+})
+
+test('ask ai keeps intersected boundary blocks in document order', async ({ page }) => {
+  await setStorage(page, { 'kpo:ask-ai-provider': 'clipboard' })
+  await stubAskAiSideEffects(page)
+  await stubSelectionBoundaryAskAiContext(page)
+  await page.goto(UI_FIXTURE_ROUTE)
+  await waitForAskAiBoundaryFixture(page)
+  await mountAskAiBoundaryFixture(page)
+  await selectAskAiProviderDesktop(page, 'Копировать промпт')
+
+  await dispatchAskAiBoundarySelection(page, 'first-through-terminal')
+  const menuItem = page.locator('.kpo-ai-menu__item')
+  await expect(menuItem).toBeEnabled()
+  await menuItem.click()
+
+  let prompt = ''
+  await expect
+    .poll(async () => {
+      prompt = await page.evaluate(() => {
+        return (
+          (window as unknown as { __kpoCopiedPrompts?: string[] }).__kpoCopiedPrompts?.at(-1) ?? ''
+        )
+      })
+      return prompt.length
+    })
+    .toBeGreaterThan(0)
+
+  const selectedSection = prompt.split('[Выделенный фрагмент]\n')[1] ?? ''
+  const selectedTexts = [
+    SELECTION_FIRST_TEXT,
+    SELECTION_MIDDLE_TEXT,
+    SELECTION_NESTED_TEXT,
+    SELECTION_TERMINAL_TEXT
+  ]
+  const positions = selectedTexts.map((text) => selectedSection.indexOf(text))
+  expect(
+    positions.every((position) => position >= 0),
+    selectedSection
+  ).toBe(true)
+  expect(positions).toEqual([...positions].sort((left, right) => left - right))
+  expect(selectedSection).not.toContain('Pager')
 })
 
 test('ask ai boundary menu closes on route change', async ({ page }) => {

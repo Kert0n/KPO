@@ -84,16 +84,20 @@ function collectSelectionWithinContent(
 
   if (ranges.length === 0) return null
 
-  const selectedText = ranges
+  const orderedRanges = ranges.sort((left, right) => {
+    return left.compareBoundaryPoints(Range.START_TO_START, right)
+  })
+
+  const selectedText = orderedRanges
     .map((range) => range.toString())
     .join('\n')
     .trim()
   if (!selectedText) return null
 
-  const blockIds = selectedBlockIds(ranges, content)
+  const blockIds = selectedBlockIds(orderedRanges, content)
   if (blockIds.length === 0) return null
 
-  return { selectedText, blockIds, ranges }
+  return { selectedText, blockIds, ranges: orderedRanges }
 }
 
 function selectedBlockIds(ranges: Range[], content: Element): string[] {
@@ -101,12 +105,13 @@ function selectedBlockIds(ranges: Range[], content: Element): string[] {
   const seen = new Set<string>()
   const blocks = [...content.querySelectorAll<HTMLElement>('[data-kpo-ask-block-id]')]
 
-  for (const range of ranges) {
-    for (const block of blocks) {
+  for (const block of blocks) {
+    for (const range of ranges) {
       const intersection = intersectElement(range, block)
       if (!intersection?.toString().trim()) continue
       const id = block.dataset.kpoAskBlockId
       if (id) addId(ids, seen, id)
+      break
     }
   }
   return ids
