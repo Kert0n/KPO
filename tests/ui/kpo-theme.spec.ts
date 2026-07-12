@@ -14,6 +14,11 @@ const MERMAID_FOREIGN_OBJECT_TOLERANCE_PX = 2
 const MERMAID_VIEWBOX_TOLERANCE_PX = 8
 const MIN_READABLE_MERMAID_HEIGHT_PX = CONTENT_LAYOUT_TOKENS.mermaidMinHeight
 const UI_FIXTURE_ROUTE = 'service-pages/ui-contract'
+const COMPONENT_STORAGE_BASELINE = {
+  'kpo:playground-mode': '0',
+  'kpo:code-language': 'kotlin',
+  'kpo:ask-ai-provider': 'chatgpt'
+} as const
 const PUBLIC_CONTENT_ROUTES = contentPagesFor('uiSweep')
   .filter((page) => page.kind !== 'home' && page.kind !== 'service')
   .map((page) => page.route.replace(/^\//, ''))
@@ -21,17 +26,43 @@ const PUBLIC_CONTENT_ROUTES = contentPagesFor('uiSweep')
 type AdaptiveTableMode = 'fit' | 'wrap' | 'scroll'
 
 async function clearStorage(page: Page): Promise<void> {
-  await page.addInitScript(() => {
+  await page.addInitScript((baseline) => {
     localStorage.clear()
-  })
+    for (const [key, value] of Object.entries(baseline)) localStorage.setItem(key, value)
+  }, COMPONENT_STORAGE_BASELINE)
+}
+
+async function useRealCleanStorage(page: Page): Promise<void> {
+  await page.addInitScript(() => localStorage.clear())
 }
 
 async function setStorage(page: Page, entries: Record<string, string>): Promise<void> {
-  await page.addInitScript((values) => {
-    for (const [key, value] of Object.entries(values)) {
-      localStorage.setItem(key, value)
-    }
-  }, entries)
+  await page.addInitScript(
+    ({ baseline, values }) => {
+      localStorage.clear()
+      for (const [key, value] of Object.entries(baseline)) localStorage.setItem(key, value)
+      for (const [key, value] of Object.entries(values)) {
+        localStorage.setItem(key, value)
+      }
+    },
+    { baseline: COMPONENT_STORAGE_BASELINE, values: entries }
+  )
+}
+
+async function stubUiAskAiContext(page: Page): Promise<void> {
+  await page.route('**/__ask-ai-context/service-pages/ui-contract.json', async (route) => {
+    await route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({
+        courseTitle: 'KPO',
+        courseDescription: 'UI contract fixture',
+        pageTitle: 'UI contract',
+        pageDescription: '',
+        sourcePath: 'service-pages/ui-contract/vitepress.md',
+        blocks: []
+      })
+    })
+  })
 }
 
 async function expectActiveTab(switcher: Locator, language: string): Promise<void> {
@@ -422,49 +453,15 @@ async function expectViewportAnchorStable(
   ).toBeLessThanOrEqual(tolerance)
 }
 
-async function waitForScopedPlayground(
-  page: Page,
-  switcher: Locator,
-  options: { transaction?: boolean } = {}
-): Promise<void> {
-  if (options.transaction ?? true) {
-    await expect(switcher).toHaveAttribute('data-kpo-anchor-pending', 'true')
-  }
+async function waitForScopedPlayground(switcher: Locator): Promise<void> {
   const playground = switcher.locator('.kpo-playground:visible')
   await expect(playground).toHaveClass(/kpo-playground--ready/, { timeout: 12_000 })
-  await page.evaluate(() => {
-    return new Promise<void>((resolve) => {
-      let frames = 4
-      const next = () => {
-        frames -= 1
-        if (frames === 0) resolve()
-        else requestAnimationFrame(next)
-      }
-      requestAnimationFrame(next)
-    })
-  })
-  if (options.transaction ?? true) {
-    await expect(switcher).not.toHaveAttribute('data-kpo-anchor-pending', 'true')
-  }
 }
 
-async function waitForAnchorTransaction(switcher: Locator): Promise<void> {
-  await expect(switcher).toHaveAttribute('data-kpo-anchor-pending', 'true')
-  await expect(switcher).not.toHaveAttribute('data-kpo-anchor-pending', 'true')
-}
-
-async function waitForInitialPlaygrounds(page: Page): Promise<void> {
+async function expectViewportAnchorRestored(before: number, locator: Locator): Promise<void> {
   await expect
-    .poll(() => {
-      return page.locator('.kpo-playground').evaluateAll((playgrounds) => {
-        return (
-          playgrounds.length > 0 &&
-          playgrounds.every((playground) => playground.classList.contains('kpo-playground--ready'))
-        )
-      })
-    })
-    .toBe(true)
-  await waitForPageLayoutReady(page)
+    .poll(async () => Math.abs((await measureViewportRelativeTo(locator)) - before))
+    .toBeLessThanOrEqual(ANCHOR_TOLERANCE_PX)
 }
 
 async function expectCenteredAgainstPage(page: Page, locator: Locator): Promise<void> {
@@ -927,6 +924,7 @@ test('local search result navigates to the matched section', async ({ page }) =>
 
 test('ask ai context menu appears for selected document text', async ({ page }) => {
   await clearStorage(page)
+  await stubUiAskAiContext(page)
   await page.goto(UI_FIXTURE_ROUTE)
 
   await selectTextAndOpenAskAiMenu(page, 'This page is intentionally hidden from navigation.')
@@ -937,6 +935,7 @@ test('ask ai context menu appears for selected document text', async ({ page }) 
 
 test('ask ai menu ignores programmatic viewport stabilization', async ({ page }) => {
   await setStorage(page, { 'kpo:playground-mode': '0' })
+  await stubUiAskAiContext(page)
   await page.goto(UI_FIXTURE_ROUTE)
   await waitForPageLayoutReady(page)
   await selectTextAndOpenAskAiMenu(page, 'This page is intentionally hidden from navigation.')
@@ -948,6 +947,7 @@ test('ask ai menu ignores programmatic viewport stabilization', async ({ page })
 
 test('ask ai menu closes on wheel scroll intent', async ({ page }) => {
   await setStorage(page, { 'kpo:playground-mode': '0' })
+  await stubUiAskAiContext(page)
   await page.goto(UI_FIXTURE_ROUTE)
   await waitForPageLayoutReady(page)
   await selectTextAndOpenAskAiMenu(page, 'This page is intentionally hidden from navigation.')
@@ -959,6 +959,7 @@ test('ask ai menu closes on wheel scroll intent', async ({ page }) => {
 
 test('ask ai menu closes on touch and keyboard scroll intent', async ({ page }) => {
   await setStorage(page, { 'kpo:playground-mode': '0' })
+  await stubUiAskAiContext(page)
   await page.goto(UI_FIXTURE_ROUTE)
   await waitForPageLayoutReady(page)
   const selectedText = 'This page is intentionally hidden from navigation.'
@@ -970,6 +971,27 @@ test('ask ai menu closes on touch and keyboard scroll intent', async ({ page }) 
   await selectTextAndOpenAskAiMenu(page, selectedText)
   await page.keyboard.press('PageDown')
   await expect(page.locator('.kpo-ai-menu')).toHaveCount(0)
+})
+
+test('delayed Playground completion does not close an open ask ai menu', async ({ page }) => {
+  await setStorage(page, { 'kpo:playground-mode': '1' })
+  await stubUiAskAiContext(page)
+  let releasePlayground!: () => void
+  const playgroundGate = new Promise<void>((resolve) => {
+    releasePlayground = resolve
+  })
+  await page.route('**/*kotlin-playground*', async (route) => {
+    await playgroundGate
+    await route.continue()
+  })
+  await page.goto(UI_FIXTURE_ROUTE)
+
+  await selectTextAndOpenAskAiMenu(page, 'This page is intentionally hidden from navigation.')
+  await expect(page.locator('.kpo-ai-menu')).toBeVisible()
+
+  releasePlayground()
+  await expect(page.locator('.kpo-playground').first()).toHaveClass(/kpo-playground--ready/)
+  await expect(page.locator('.kpo-ai-menu')).toBeVisible()
 })
 
 test('ask ai waits for prompt preparation before first clipboard copy', async ({ page }) => {
@@ -1192,8 +1214,10 @@ test('ask ai keeps clipboard fallback when page context is unavailable', async (
   await clearStorage(page)
 
   await stubAskAiSideEffects(page)
+  let unavailableContextResponses = 0
 
   await page.route('**/__ask-ai-context/**', async (route) => {
+    unavailableContextResponses += 1
     await route.fulfill({
       status: 404,
       contentType: 'text/plain',
@@ -1206,9 +1230,13 @@ test('ask ai keeps clipboard fallback when page context is unavailable', async (
 
   const selectedText =
     'idempotency: повтор некоторых запросов должен быть безопасен для итогового состояния;'
-  await selectTextAndClickAskAiMenuItem(page, selectedText)
+  await openAskAiMenuWhenReady(page, selectedText, {
+    activate: true,
+    expectedConsoleErrors: [/Failed to load resource: the server responded with a status of 404/]
+  })
 
   await expect(page.locator('.kpo-ai-toast')).toHaveText('Prompt copied without page context')
+  expect(unavailableContextResponses).toBeGreaterThan(0)
 
   const copiedPrompt = await page.evaluate(() => {
     return (window as unknown as { __kpoCopiedPrompts?: string[] }).__kpoCopiedPrompts?.at(-1) ?? ''
@@ -1503,6 +1531,18 @@ test('playground toggle keeps stable geometry and availability follows the activ
 
   const playgroundOff = page.locator('.kpo-switcher').filter({ hasText: 'Fixture playground off' })
   await expect(playgroundOff.locator('.kpo-switcher__playground-toggle')).toHaveCount(0)
+})
+
+test('real clean storage keeps the product Playground default enabled', async ({ page }) => {
+  await useRealCleanStorage(page)
+  await page.goto(UI_FIXTURE_ROUTE)
+
+  const switcher = page.locator('.kpo-switcher').filter({ hasText: 'Fixture Kotlin Playground' })
+  await expect(switcher.getByRole('button', { name: /Playground/ })).toHaveAttribute(
+    'aria-pressed',
+    'true'
+  )
+  await expect(switcher.locator('.kpo-playground')).toHaveCount(1)
 })
 
 test('fixture renders mermaid and keeps playground disabled for marked blocks', async ({
@@ -1882,7 +1922,6 @@ test('language click preserves viewport position inside the interacted code bloc
   await clearStorage(page)
   await page.goto(UI_FIXTURE_ROUTE)
   await waitForMermaid(page, { requireDiagrams: true })
-  await waitForInitialPlaygrounds(page)
 
   const switcher = page.locator('.kpo-switcher').nth(1)
   await waitForPageLayoutReady(page)
@@ -1890,7 +1929,7 @@ test('language click preserves viewport position inside the interacted code bloc
 
   const before = await measureViewportRelativeTo(switcher)
   await switcher.getByRole('tab', { name: 'Java' }).click()
-  await waitForAnchorTransaction(switcher)
+  await expectViewportAnchorRestored(before, switcher)
   const after = await measureViewportRelativeTo(switcher)
 
   await expectViewportAnchorStable(before, after)
@@ -1904,7 +1943,6 @@ test('keyboard language switch preserves viewport position inside the interacted
   await clearStorage(page)
   await page.goto(UI_FIXTURE_ROUTE)
   await waitForMermaid(page, { requireDiagrams: true })
-  await waitForInitialPlaygrounds(page)
 
   const switcher = page.locator('.kpo-switcher').nth(1)
   await waitForPageLayoutReady(page)
@@ -1913,7 +1951,7 @@ test('keyboard language switch preserves viewport position inside the interacted
   const before = await measureViewportRelativeTo(switcher)
   await switcher.getByRole('tab', { name: 'Kotlin' }).focus()
   await page.keyboard.press('ArrowRight')
-  await waitForAnchorTransaction(switcher)
+  await expectViewportAnchorRestored(before, switcher)
   const after = await measureViewportRelativeTo(switcher)
 
   await expectViewportAnchorStable(before, after)
@@ -1927,7 +1965,6 @@ test('playground toggle preserves viewport position inside the interacted code b
   await clearStorage(page)
   await page.goto(UI_FIXTURE_ROUTE)
   await waitForMermaid(page, { requireDiagrams: true })
-  await waitForInitialPlaygrounds(page)
 
   const switcher = page.locator('.kpo-switcher').nth(4)
   await switcher.scrollIntoViewIfNeeded()
@@ -1935,7 +1972,8 @@ test('playground toggle preserves viewport position inside the interacted code b
 
   const before = await measureViewportRelativeTo(switcher)
   await switcher.getByRole('button', { name: /Playground/ }).click()
-  await waitForAnchorTransaction(switcher)
+  await waitForScopedPlayground(switcher)
+  await expectViewportAnchorRestored(before, switcher)
   const after = await measureViewportRelativeTo(switcher)
 
   await expectViewportAnchorStable(before, after)
@@ -1961,7 +1999,8 @@ test('enabling a fixture playground preserves its viewport anchor through initia
 
   const before = await measureViewportRelativeTo(switcher)
   await toggle.click()
-  await waitForScopedPlayground(page, switcher)
+  await waitForScopedPlayground(switcher)
+  await expectViewportAnchorRestored(before, switcher)
   const after = await measureViewportRelativeTo(switcher)
 
   await expectViewportAnchorStable(before, after)
@@ -1986,13 +2025,16 @@ test('Home and End language navigation preserves the anchor around async playgro
 
   const beforeHome = await measureViewportRelativeTo(switcher)
   await page.keyboard.press('Home')
-  await waitForScopedPlayground(page, switcher)
+  await waitForScopedPlayground(switcher)
+  await expectViewportAnchorRestored(beforeHome, switcher)
   const afterHome = await measureViewportRelativeTo(switcher)
   await expectViewportAnchorStable(beforeHome, afterHome)
 
   const beforeEnd = await measureViewportRelativeTo(switcher)
   await page.keyboard.press('End')
   await expectActiveTab(switcher, 'Go')
+  await expect(switcher.locator('.kpo-playground:visible')).toHaveCount(0)
+  await expectViewportAnchorRestored(beforeEnd, switcher)
   const afterEnd = await measureViewportRelativeTo(switcher)
   await expectViewportAnchorStable(beforeEnd, afterEnd)
   await expectNoPageOverflowFromVpDoc(page)
@@ -2023,7 +2065,7 @@ test('user scroll takes ownership while a delayed playground is initializing', a
   await page.mouse.wheel(0, 360)
   const userOwnedScroll = await page.evaluate(() => window.scrollY)
 
-  await waitForScopedPlayground(page, switcher, { transaction: false })
+  await waitForScopedPlayground(switcher)
   const settledScroll = await page.evaluate(() => window.scrollY)
   expect(settledScroll).toBeGreaterThanOrEqual(userOwnedScroll - ANCHOR_TOLERANCE_PX)
 })
@@ -2076,7 +2118,7 @@ test('persisted language hydration stays stable across responsive breakpoints', 
       scenario.language === 'kotlin' ? 'Kotlin' : scenario.language === 'java' ? 'Java' : 'Go'
     )
     if (scenario.language === 'kotlin' && scenario.playgroundMode === '1') {
-      await waitForScopedPlayground(page, switcher, { transaction: false })
+      await waitForScopedPlayground(switcher)
     } else {
       await expect(switcher.locator('.kpo-playground:visible')).toHaveCount(0)
       const toggle = switcher.locator('.kpo-switcher__playground-toggle')
