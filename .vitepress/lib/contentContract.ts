@@ -5,6 +5,7 @@ const publicSiteFiles = new Set([
   'content/intro/vitepress.md',
   'content/conclusion/vitepress.md',
   'content/extras/index/vitepress.md',
+  'content/service-pages/ask-ai-contract/vitepress.md',
   'content/service-pages/ui-contract/vitepress.md'
 ])
 

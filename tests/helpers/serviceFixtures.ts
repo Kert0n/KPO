@@ -1,18 +1,47 @@
 import type { Page } from '@playwright/test'
 
-export const UI_SERVICE_ASK_AI_CONTEXT_ROUTE = '**/__ask-ai-context/service-pages/ui-contract.json'
+export const UI_SERVICE_ASK_AI_CONTEXT_ROUTE = '**/__ask-ai-context/service-pages/*.json'
 
 export async function stubUiServiceAskAiContext(page: Page): Promise<void> {
   await page.route(UI_SERVICE_ASK_AI_CONTEXT_ROUTE, async (route) => {
+    const askAiFixture = route.request().url().includes('/ask-ai-contract.json')
     await route.fulfill({
       contentType: 'application/json',
       body: JSON.stringify({
         courseTitle: 'Конструирование ПО',
         courseDescription: 'Конспект лекций по архитектуре приложений и инженерным практикам',
-        pageTitle: 'UI Contract Fixtures',
+        pageTitle: askAiFixture ? 'Ask AI Contract Fixture' : 'UI Contract Fixtures',
         pageDescription: '',
-        sourcePath: 'service-pages/ui-contract.md',
-        blocks: []
+        sourcePath: askAiFixture
+          ? 'service-pages/ask-ai-contract.md'
+          : 'service-pages/ui-contract.md',
+        blocks: [
+          {
+            id: 'fixture-context-before',
+            kind: 'paragraph',
+            markdown: 'Stable context before the selected fixture paragraph.',
+            plainText: 'Stable context before the selected fixture paragraph.',
+            lineStart: 1,
+            lineEnd: 1
+          },
+          {
+            id: askAiFixture ? 'kpo-ai-4-paragraph-14n0dzi' : 'kpo-ai-4-paragraph-1o4j04g',
+            kind: 'paragraph',
+            markdown: 'This page is intentionally hidden from navigation.',
+            plainText: 'This page is intentionally hidden from navigation.',
+            lineStart: 2,
+            lineEnd: 2
+          },
+          {
+            id: 'fixture-context-after',
+            kind: 'code',
+            markdown: '```text\nfixture context after selection\n```',
+            plainText: 'fixture context after selection',
+            lineStart: 3,
+            lineEnd: 5,
+            language: 'text'
+          }
+        ]
       })
     })
   })
