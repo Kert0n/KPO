@@ -5,7 +5,7 @@ import type Token from 'markdown-it/lib/token.mjs'
 import container from 'markdown-it-container'
 import matter from 'gray-matter'
 import { contentPagesFor } from '../shared/content/contentCatalog'
-import { createAskAiBlockId, type AskAiBlockKind } from '../shared/core/askAiIds'
+import { createAskAiBlockIdAllocator, type AskAiBlockKind } from '../shared/core/askAiIds'
 import type { AskAiBlock, AskAiPageContext } from '../shared/core/askAiModel'
 import { classifyMarkdownToken, findMatchingMultiCodeClose } from '../shared/core/markdownStructure'
 
@@ -99,6 +99,7 @@ export function findAskAiContextEntry(
 
 function collectBlocks(tokens: Token[], lines: string[], sourcePath: string): AskAiBlock[] {
   const blocks: AskAiBlock[] = []
+  const ids = createAskAiBlockIdAllocator(sourcePath)
   let skipUntil = -1
 
   for (let index = 0; index < tokens.length; index += 1) {
@@ -112,21 +113,21 @@ function collectBlocks(tokens: Token[], lines: string[], sourcePath: string): As
 
     if (classification.kind === 'multi-code') {
       const closeIndex = findMatchingMultiCodeClose(tokens, index)
-      const block = createBlock('multi-code', token, lines, sourcePath)
+      const block = createBlock('multi-code', token, lines, sourcePath, ids)
       if (block) blocks.push(block)
       skipUntil = closeIndex === -1 ? index + 1 : closeIndex + 1
       continue
     }
 
     if (classification.kind === 'code' || classification.kind === 'mermaid') {
-      const block = createBlock(classification.kind, token, lines, sourcePath, {
+      const block = createBlock(classification.kind, token, lines, sourcePath, ids, {
         language: classification.language
       })
       if (block) blocks.push(block)
       continue
     }
 
-    const block = createBlock(classification.kind, token, lines, sourcePath)
+    const block = createBlock(classification.kind, token, lines, sourcePath, ids)
     if (block) blocks.push(block)
   }
 
@@ -138,6 +139,7 @@ function createBlock(
   token: Token,
   lines: string[],
   sourcePath: string,
+  ids: ReturnType<typeof createAskAiBlockIdAllocator>,
   extra: Partial<Pick<AskAiBlock, 'language' | 'title'>> = {}
 ): AskAiBlock | null {
   if (!token.map) return null
@@ -147,7 +149,7 @@ function createBlock(
   if (!markdownText) return null
 
   return {
-    id: createAskAiBlockId(kind, markdownText, start + 1, sourcePath),
+    id: ids.next(kind, markdownText, start + 1),
     kind,
     markdown: markdownText,
     plainText: plainText(markdownText),

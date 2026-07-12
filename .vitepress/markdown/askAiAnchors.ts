@@ -1,6 +1,7 @@
 import type MarkdownIt from 'markdown-it'
 import type Token from 'markdown-it/lib/token.mjs'
-import { createAskAiBlockId, type AskAiBlockKind } from '../shared/core/askAiIds'
+import { createAskAiBlockIdAllocator, type AskAiBlockKind } from '../shared/core/askAiIds'
+import { findContentPageByOutputPath } from '../shared/content/contentCatalog'
 import {
   classifyMarkdownToken,
   isMultiCodeClose,
@@ -12,6 +13,7 @@ export function askAiAnchorsPlugin(md: MarkdownIt): void {
   md.core.ruler.push('kpo_ask_ai_anchors', (state) => {
     const lines = state.src.replace(/\r\n?/g, '\n').split('\n')
     const sourcePath = markdownSourcePath(state.env)
+    const ids = createAskAiBlockIdAllocator(sourcePath)
     let multiCodeDepth = 0
 
     for (let index = 0; index < state.tokens.length; index += 1) {
@@ -19,7 +21,7 @@ export function askAiAnchorsPlugin(md: MarkdownIt): void {
 
       if (isMultiCodeOpen(token)) {
         multiCodeDepth += 1
-        assignBlockId(token, 'multi-code', lines, sourcePath)
+        assignBlockId(token, 'multi-code', lines, ids)
         continue
       }
 
@@ -31,7 +33,7 @@ export function askAiAnchorsPlugin(md: MarkdownIt): void {
       if (multiCodeDepth > 0 && token.type === 'fence') continue
 
       const classification = classifyMarkdownToken(state.tokens, index)
-      if (classification) assignBlockId(token, classification.kind, lines, sourcePath)
+      if (classification) assignBlockId(token, classification.kind, lines, ids)
     }
   })
 }
@@ -49,14 +51,14 @@ function assignBlockId(
   token: Token,
   kind: AskAiBlockKind,
   lines: string[],
-  sourcePath?: string
+  ids: ReturnType<typeof createAskAiBlockIdAllocator>
 ): void {
   if (!token.map) return
   const [start, end] = token.map
   const markdown = lines.slice(start, end).join('\n').trim()
   if (!markdown) return
 
-  const id = createAskAiBlockId(kind, markdown, start + 1, sourcePath)
+  const id = ids.next(kind, markdown, start + 1)
   token.meta = { ...token.meta, kpoAskAiBlockId: id }
   if (token.nesting !== -1 && token.type !== 'fence' && !token.type.startsWith('container_')) {
     token.attrSet('data-kpo-ask-block-id', id)
@@ -66,6 +68,17 @@ function assignBlockId(
 function markdownSourcePath(environment: unknown): string | undefined {
   if (!environment || typeof environment !== 'object') return undefined
   const value = environment as { path?: unknown; relativePath?: unknown }
-  if (typeof value.path === 'string') return value.path
-  return typeof value.relativePath === 'string' ? value.relativePath : undefined
+  const candidates = [value.path, value.relativePath].filter(
+    (candidate): candidate is string => typeof candidate === 'string'
+  )
+  for (const candidate of candidates) {
+    const normalized = candidate.replace(/\\/g, '/')
+    const contentIndex = normalized.lastIndexOf('/content/')
+    const relative =
+      contentIndex >= 0 ? normalized.slice(contentIndex + '/content/'.length) : normalized
+    const page = findContentPageByOutputPath(relative)
+    if (page) return page.sourcePath
+    if (contentIndex >= 0) return normalized.slice(contentIndex + 1)
+  }
+  return candidates[0]
 }

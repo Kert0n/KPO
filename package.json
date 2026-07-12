@@ -27,6 +27,7 @@
     "typecheck": "npm run typecheck:vue && npm run typecheck:node && npm run typecheck:test",
     "architecture:check": "node --experimental-strip-types scripts/check-architecture-boundaries.mts",
     "content:check": "node --experimental-strip-types scripts/check-content-links.mts",
+    "ask-ai:ids:accept": "node --experimental-strip-types scripts/generate-ask-ai-published-ids.mts",
     "kotlin:extract": "node --experimental-strip-types scripts/extract-kotlin-snippets.mts",
     "kotlin:check": "npm run kotlin:extract && ./gradlew compileKotlin --no-daemon",
     "lint": "eslint . --max-warnings=0 && npm run architecture:check",
