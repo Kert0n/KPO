@@ -2,7 +2,8 @@ import { mkdtempSync, mkdirSync, rmSync, utimesSync, writeFileSync } from 'node:
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { buildAskAiPageContext } from '../askAiContext'
+import { buildAskAiPageContext, listAskAiContextEntries } from '../askAiContext'
+import { getContentCatalog } from '../../shared/content/contentCatalog'
 
 const temporaryRoots: string[] = []
 
@@ -11,6 +12,17 @@ afterEach(() => {
 })
 
 describe('askAiContext', () => {
+  it('keeps the UI service fixture out of production Ask AI context generation', () => {
+    const servicePage = getContentCatalog({ fresh: true }).find(
+      (page) => page.routeKey === 'service-pages/ui-contract'
+    )
+    expect(servicePage?.kind).toBe('service')
+    expect(servicePage?.inclusion.askAi).toBe(false)
+    expect(listAskAiContextEntries().map((entry) => entry.routeKey)).not.toContain(
+      'service-pages/ui-contract'
+    )
+  })
+
   it('extracts stable markdown blocks for code, mermaid, table and multi-code', () => {
     const context = buildAskAiPageContext(
       {
