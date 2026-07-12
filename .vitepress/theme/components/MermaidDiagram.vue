@@ -24,11 +24,7 @@ const { isDark } = useData()
 
 const decodedCode = computed(() => decodeURIComponent(props.code))
 const instanceId = props.diagramId ?? `kpo-mermaid-${stableHash(decodedCode.value)}`
-const renderer = useMermaidRenderer({
-  code: decodedCode,
-  instanceId,
-  themeTokens: readMermaidThemeTokens
-})
+const renderer = useMermaidRenderer({ instanceId })
 const { svg, failed, errorMessage, viewBoxWidth, viewBoxHeight } = renderer
 const root = ref<HTMLElement | null>(null)
 const viewport = ref<HTMLElement | null>(null)
@@ -41,7 +37,7 @@ const focusWithin = ref(false)
 const textRisk = ref(false)
 onMounted(() => {
   viewportController.start()
-  void render()
+  void render(isDark.value)
 })
 
 onBeforeUnmount(() => {
@@ -49,9 +45,7 @@ onBeforeUnmount(() => {
   viewportController.dispose()
 })
 
-watch(isDark, () => {
-  void render()
-})
+watch(isDark, (value) => void render(value), { flush: 'post' })
 
 const controlsVisible = computed(() => {
   return shouldShowMermaidToolbar({
@@ -62,11 +56,17 @@ const controlsVisible = computed(() => {
   })
 })
 
-async function render(): Promise<void> {
+async function render(expectedIsDark: boolean): Promise<void> {
+  await nextTick()
+  if (isDark.value !== expectedIsDark) return
+
   textRisk.value = false
   viewportController.resetUserScroll()
 
-  const result = await renderer.render()
+  const result = await renderer.render({
+    code: decodedCode.value,
+    theme: readMermaidThemeTokens()
+  })
   if (result === 'rendered') {
     await viewportController.syncLayout()
     updateTextRisk()
