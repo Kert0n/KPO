@@ -2082,6 +2082,22 @@ exports[`stable public contracts > content catalog channels and metadata remain 
     "sourcePath": "content/service-pages/ui-contract/vitepress.md",
     "title": "UI Contract Fixtures",
   },
+  {
+    "inclusion": {
+      "askAi": false,
+      "nav": false,
+      "pdf": false,
+      "search": false,
+      "sidebar": false,
+      "sitemap": false,
+      "uiSweep": false,
+    },
+    "kind": "service",
+    "order": 1,
+    "route": "/service-pages/ask-ai-contract",
+    "sourcePath": "content/service-pages/ask-ai-contract/vitepress.md",
+    "title": "Ask AI Contract Fixture",
+  },
 ]
 `;
 
@@ -2128,6 +2144,7 @@ exports[`stable public contracts > routes, nav, sidebar and rewrites remain stab
     "lectures/Lec7/vitepress.md": "lectures/07.md",
     "lectures/Lec8/vitepress.md": "lectures/08.md",
     "lectures/Lec9/vitepress.md": "lectures/09.md",
+    "service-pages/ask-ai-contract/vitepress.md": "service-pages/ask-ai-contract.md",
     "service-pages/ui-contract/vitepress.md": "service-pages/ui-contract.md",
   },
   "sidebar": [

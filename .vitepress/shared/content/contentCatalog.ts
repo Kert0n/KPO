@@ -14,6 +14,7 @@ const staticPages: Array<{
   order: number
   fallbackTitle: string
   navigationTitle?: string
+  uiSweep?: boolean
 }> = [
   {
     kind: 'home',
@@ -65,6 +66,17 @@ const staticPages: Array<{
     routeKey: 'service-pages/ui-contract',
     order: 0,
     fallbackTitle: 'UI Contract Fixtures'
+  },
+  {
+    kind: 'service',
+    section: 'service',
+    sourcePath: 'content/service-pages/ask-ai-contract/vitepress.md',
+    outputPath: 'service-pages/ask-ai-contract.md',
+    route: '/service-pages/ask-ai-contract',
+    routeKey: 'service-pages/ask-ai-contract',
+    order: 1,
+    fallbackTitle: 'Ask AI Contract Fixture',
+    uiSweep: false
   }
 ]
 
@@ -156,7 +168,10 @@ function toStaticPage(
     navigationTitle: definition.navigationTitle,
     description: parsed.description,
     order: parsed.order,
-    inclusion: inclusionForKind(definition.kind)
+    inclusion: {
+      ...inclusionForKind(definition.kind),
+      ...(definition.uiSweep === undefined ? {} : { uiSweep: definition.uiSweep })
+    }
   }
 }
 
