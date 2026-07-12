@@ -60,15 +60,21 @@ async function render(expectedIsDark: boolean): Promise<void> {
   await nextTick()
   if (isDark.value !== expectedIsDark) return
 
+  const userCenterRatio = viewportController.userScrolledViewport.value
+    ? viewportController.currentCenterRatio()
+    : null
   textRisk.value = false
-  viewportController.resetUserScroll()
 
   const result = await renderer.render({
     code: decodedCode.value,
     theme: readMermaidThemeTokens()
   })
   if (result === 'rendered') {
-    await viewportController.syncLayout()
+    const layout = await viewportController.syncLayout({
+      centerRatio: userCenterRatio,
+      forceCenter: userCenterRatio === null
+    })
+    if (layout !== 'applied') return
     updateTextRisk()
     return
   }
