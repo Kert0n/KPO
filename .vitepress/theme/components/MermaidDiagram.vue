@@ -158,11 +158,14 @@ function updateTextRisk(): void {
       v-if="svg"
       ref="viewport"
       class="kpo-mermaid__viewport"
+      role="img"
+      aria-label="Диаграмма Mermaid"
+      :tabindex="hasOverflowX ? 0 : undefined"
       @scroll.passive="viewportController.onScroll"
     >
       <div class="kpo-mermaid__canvas" :style="canvasStyle" v-html="svg" />
     </div>
-    <div v-else-if="failed" class="kpo-mermaid__error">
+    <div v-else-if="failed" class="kpo-mermaid__error" role="alert">
       <p class="kpo-mermaid__error-title">Диаграмма не отрисовалась</p>
       <p class="kpo-mermaid__error-message">{{ errorMessage }}</p>
       <details class="kpo-mermaid__source">
@@ -170,6 +173,6 @@ function updateTextRisk(): void {
         <pre class="kpo-mermaid__fallback">{{ decodedCode }}</pre>
       </details>
     </div>
-    <div v-else class="kpo-mermaid__loading">Загрузка диаграммы…</div>
+    <div v-else class="kpo-mermaid__loading" aria-live="polite">Загрузка диаграммы…</div>
   </div>
 </template>

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useData, useRoute, withBase } from 'vitepress'
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, useTemplateRef, watch } from 'vue'
 import { useAskAiActionPreparation } from '../composables/useAskAiActionPreparation'
 import { useAskAiContextLoader } from '../composables/useAskAiContextLoader'
 import { useAskAiProvider } from '../composables/useAskAiProvider'
@@ -30,8 +30,10 @@ const { preparedAction, preparing } = actionPreparation
 
 const snapshot = ref<SelectionSnapshot | null>(null)
 const toast = ref('')
+const menuElement = useTemplateRef<HTMLElement>('menuElement')
 let toastTimer: number | null = null
 let mobileSelectionTimer: number | null = null
+let keyboardMenuInitiator: HTMLElement | null = null
 
 const menuLabel = computed(() => {
   return (
@@ -53,7 +55,7 @@ onMounted(() => {
   document.addEventListener('pointerup', onPointerUp)
   document.addEventListener('wheel', onScrollIntent, { passive: true })
   document.addEventListener('touchmove', onScrollIntent, { passive: true })
-  window.addEventListener('resize', hideMenu)
+  window.addEventListener('resize', closeMenuWithoutRestore)
   contextLoader.queuePrefetch()
 })
 
@@ -65,7 +67,7 @@ onBeforeUnmount(() => {
   document.removeEventListener('pointerup', onPointerUp)
   document.removeEventListener('wheel', onScrollIntent)
   document.removeEventListener('touchmove', onScrollIntent)
-  window.removeEventListener('resize', hideMenu)
+  window.removeEventListener('resize', closeMenuWithoutRestore)
   clearToast()
   clearMobileSelectionTimer()
   actionPreparation.clear()
@@ -76,7 +78,7 @@ onBeforeUnmount(() => {
 watch(
   () => route.path,
   () => {
-    hideMenu()
+    closeMenuWithoutRestore()
     snapshot.value = null
     clearMobileSelectionTimer()
     clipboardFallback.dispose()
@@ -99,8 +101,10 @@ function onContextMenu(event: MouseEvent): void {
   event.preventDefault()
   snapshot.value = nextSnapshot
   menu.mode = 'desktop'
+  keyboardMenuInitiator = event.button === 2 ? null : activeFocusTarget()
   void actionPreparation.prepare(nextSnapshot)
   showMenu(event.clientX, event.clientY)
+  if (keyboardMenuInitiator) void nextTick(() => menuElement.value?.focus())
 }
 
 function onSelectionChange(): void {
@@ -127,16 +131,20 @@ function onPointerUp(): void {
 function onDocumentClick(event: MouseEvent): void {
   const target = event.target
   if (target instanceof Element && target.closest('.kpo-ai-menu, .kpo-ai-manual')) return
-  hideMenu()
+  closeMenu(true)
 }
 
 function onKeydown(event: KeyboardEvent): void {
   if (handleDialogKeydown(event)) return
-  if (event.key === 'Escape' || isScrollIntentKey(event)) hideMenu()
+  if (event.key === 'Escape') {
+    closeMenu(true)
+    return
+  }
+  if (isScrollIntentKey(event)) closeMenuWithoutRestore()
 }
 
 function onScrollIntent(): void {
-  hideMenu()
+  closeMenuWithoutRestore()
 }
 
 function isScrollIntentKey(event: KeyboardEvent): boolean {
@@ -153,9 +161,11 @@ function isScrollIntentKey(event: KeyboardEvent): boolean {
 
 async function askAi(): Promise<void> {
   const prepared = preparedAction.value
+  const restoreFocusTarget = keyboardMenuInitiator ?? visibleProviderControl()
   hideMenu()
+  keyboardMenuInitiator = null
   if (!prepared) return
-  clipboardFallback.setRestoreFocusTarget(visibleProviderControl())
+  clipboardFallback.setRestoreFocusTarget(restoreFocusTarget)
 
   const { action, contextUnavailable } = prepared
   let openedWindow: Window | null = null
@@ -227,6 +237,21 @@ function visibleProviderControl(): HTMLElement | null {
   return null
 }
 
+function activeFocusTarget(): HTMLElement | null {
+  return document.activeElement instanceof HTMLElement ? document.activeElement : null
+}
+
+function closeMenu(restoreFocus: boolean): void {
+  const target = keyboardMenuInitiator
+  hideMenu()
+  keyboardMenuInitiator = null
+  if (restoreFocus && target?.isConnected) target.focus()
+}
+
+function closeMenuWithoutRestore(): void {
+  closeMenu(false)
+}
+
 function openBlankWindow(): Window | null {
   const opened = window.open('', '_blank')
   if (opened) opened.opener = null
@@ -270,10 +295,12 @@ function clearMobileSelectionTimer(): void {
   <Teleport to="body">
     <div
       v-if="menu.visible"
+      ref="menuElement"
       class="kpo-ai-menu"
       :class="{ 'kpo-ai-menu--mobile': menu.mode === 'mobile' }"
       :style="{ left: `${menu.x}px`, top: `${menu.y}px` }"
       role="menu"
+      tabindex="-1"
     >
       <button
         type="button"
