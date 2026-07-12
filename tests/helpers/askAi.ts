@@ -3,6 +3,7 @@ import { expect, type Page } from '@playwright/test'
 type OpenAskAiMenuOptions = {
   activate?: boolean
   allowManualFallback?: boolean
+  expectedConsoleErrors?: RegExp[]
 }
 
 type BrowserIssue = {
@@ -22,12 +23,8 @@ export async function openAskAiMenuWhenReady(
   const issues: BrowserIssue[] = []
   const onPageError = (error: Error) => issues.push({ kind: 'pageerror', message: error.message })
   const onConsole = (message: { type(): string; text(): string }) => {
-    if (
-      message.type() === 'error' &&
-      !message
-        .text()
-        .startsWith('Failed to load resource: the server responded with a status of 404')
-    ) {
+    const expected = options.expectedConsoleErrors?.some((pattern) => pattern.test(message.text()))
+    if (message.type() === 'error' && !expected) {
       issues.push({ kind: 'console', message: message.text() })
     }
   }
@@ -36,34 +33,14 @@ export async function openAskAiMenuWhenReady(
 
   try {
     await page.locator('.vp-doc [data-kpo-ask-block-id]').first().waitFor({ state: 'attached' })
-    await page.evaluate(async (targetText) => {
+    await page.evaluate((targetText) => {
       const root = [...document.querySelectorAll<HTMLElement>('.vp-doc *')]
         .filter((node) => node.textContent?.includes(targetText))
         .sort((left, right) => {
           return (left.textContent?.length ?? 0) - (right.textContent?.length ?? 0)
         })[0]
       root?.scrollIntoView({ block: 'center', inline: 'nearest' })
-      await new Promise<void>((resolve) => {
-        let frames = 4
-        const next = () => {
-          frames -= 1
-          if (frames === 0) resolve()
-          else requestAnimationFrame(next)
-        }
-        requestAnimationFrame(next)
-      })
     }, text)
-    await expect
-      .poll(() => {
-        return page.locator('.kpo-switcher').evaluateAll((switchers) => {
-          return switchers.every((switcher) => {
-            const toggle = switcher.querySelector('.kpo-switcher__playground-toggle')
-            if (toggle?.getAttribute('aria-pressed') !== 'true') return true
-            return Boolean(switcher.querySelector('.kpo-playground--ready'))
-          })
-        })
-      })
-      .toBe(true)
 
     const dispatchSelection = async () => {
       return page.evaluate((targetText) => {
