@@ -47,6 +47,27 @@ export async function stubUiServiceAskAiContext(page: Page): Promise<void> {
   })
 }
 
+/**
+ * Keeps characterization on the successful service-fixture path without
+ * changing the published golden-master prompt, which historically has no
+ * generated context for this non-public page.
+ */
+export async function stubEmptyUiServiceAskAiContext(page: Page): Promise<void> {
+  await page.route(UI_SERVICE_ASK_AI_CONTEXT_ROUTE, async (route) => {
+    await route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({
+        courseTitle: 'Конструирование ПО',
+        courseDescription: '',
+        pageTitle: 'UI Contract Fixtures',
+        pageDescription: '',
+        sourcePath: 'service-pages/ui-contract.md',
+        blocks: []
+      })
+    })
+  })
+}
+
 export async function stubSelectionBoundaryAskAiContext(page: Page): Promise<void> {
   await page.route(UI_SERVICE_ASK_AI_CONTEXT_ROUTE, async (route) => {
     await route.fulfill({

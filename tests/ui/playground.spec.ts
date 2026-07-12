@@ -250,33 +250,11 @@ test('playground toggle keeps stable geometry and availability follows the activ
   await expect(playgroundOff.locator('.kpo-switcher__playground-toggle')).toHaveCount(0)
 })
 
-test('persisted language hydration stays stable across responsive breakpoints', async ({
+test('persisted language hydration keeps switcher controls geometrically stable', async ({
+  browser,
   page
-}) => {
-  await page.addInitScript(() => {
-    ;(window as unknown as { __kpoSwitcherLayoutShift: number }).__kpoSwitcherLayoutShift = 0
-    const observer = new PerformanceObserver((list) => {
-      for (const rawEntry of list.getEntries()) {
-        const entry = rawEntry as PerformanceEntry & {
-          value: number
-          hadRecentInput: boolean
-          sources?: Array<{ node?: Node }>
-        }
-        if (entry.hadRecentInput) continue
-        const affectsSwitcher = entry.sources?.some(({ node }) => {
-          const element = node instanceof Element ? node : node?.parentElement
-          return Boolean(element?.closest('.kpo-switcher'))
-        })
-        if (affectsSwitcher) {
-          ;(window as unknown as { __kpoSwitcherLayoutShift: number }).__kpoSwitcherLayoutShift +=
-            entry.value
-        }
-      }
-    })
-    observer.observe({ type: 'layout-shift', buffered: true })
-  })
+}, testInfo) => {
   await page.goto(UI_FIXTURE_ROUTE)
-
   const scenarios = [
     { viewport: { width: 390, height: 844 }, language: 'java', playgroundMode: '1' },
     { viewport: { width: 768, height: 900 }, language: 'go', playgroundMode: '0' },
@@ -285,6 +263,17 @@ test('persisted language hydration stays stable across responsive breakpoints', 
   ] as const
 
   for (const scenario of scenarios) {
+    const ssrContext = await browser.newContext({
+      javaScriptEnabled: false,
+      viewport: scenario.viewport
+    })
+    const ssrPage = await ssrContext.newPage()
+    await ssrPage.goto(new URL(UI_FIXTURE_ROUTE, String(testInfo.project.use.baseURL)).href)
+    const ssrGeometry = await measureSwitcherControlGeometry(
+      ssrPage.locator('.kpo-switcher').first()
+    )
+    await ssrContext.close()
+
     await page.setViewportSize(scenario.viewport)
     await page.evaluate(({ language, playgroundMode }) => {
       localStorage.setItem('kpo:code-language', language)
@@ -309,9 +298,24 @@ test('persisted language hydration stays stable across responsive breakpoints', 
     }
 
     await expectNoPageOverflowFromVpDoc(page)
-    const layoutShift = await page.evaluate(() => {
-      return (window as unknown as { __kpoSwitcherLayoutShift: number }).__kpoSwitcherLayoutShift
-    })
-    expect(layoutShift, JSON.stringify(scenario)).toBeLessThanOrEqual(0.001)
+    const hydratedGeometry = await measureSwitcherControlGeometry(switcher)
+    expect(hydratedGeometry, JSON.stringify(scenario)).toEqual(ssrGeometry)
   }
 })
+
+async function measureSwitcherControlGeometry(switcher: import('@playwright/test').Locator) {
+  return switcher.evaluate((node) => {
+    const header = node.querySelector('.kpo-switcher__header')?.getBoundingClientRect()
+    const controls = node.querySelector('.kpo-switcher__controls')?.getBoundingClientRect()
+    const toggle = node.querySelector('.kpo-switcher__playground-toggle')?.getBoundingClientRect()
+    const dimensions = (rect: DOMRect | undefined) => ({
+      width: Math.round(rect?.width ?? 0),
+      height: Math.round(rect?.height ?? 0)
+    })
+    return {
+      header: dimensions(header),
+      controls: dimensions(controls),
+      toggle: dimensions(toggle)
+    }
+  })
+}

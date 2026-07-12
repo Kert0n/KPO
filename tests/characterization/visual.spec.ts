@@ -7,7 +7,12 @@ import {
   UI_FIXTURE_ROUTE,
   waitForStableUi
 } from './helpers'
-import { stubUiServiceAskAiContext } from '../helpers/serviceFixtures'
+import {
+  stubEmptyUiServiceAskAiContext,
+  stubUiServiceAskAiContext
+} from '../helpers/serviceFixtures'
+
+const VISUAL_COMPONENT_FIXTURE_ROUTE = 'service-pages/visual-components/vitepress'
 
 test.describe('Linux Chromium golden master', () => {
   test.beforeEach(async ({ page }) => {
@@ -74,12 +79,12 @@ test.describe('Linux Chromium golden master', () => {
   }
 
   for (const fixture of [
-    { name: 'multi-code', selector: '.kpo-switcher' },
-    { name: 'mermaid', selector: '.kpo-mermaid' }
+    { name: 'multi-code', selector: '.kpo-switcher', route: VISUAL_COMPONENT_FIXTURE_ROUTE },
+    { name: 'mermaid', selector: '.kpo-mermaid', route: UI_FIXTURE_ROUTE }
   ] as const) {
     test(fixture.name, async ({ page }) => {
       await page.setViewportSize({ width: 1280, height: 900 })
-      await page.goto(UI_FIXTURE_ROUTE)
+      await page.goto(fixture.route)
       await waitForStableUi(page)
       await normalizeForScreenshot(page)
       await expect(page.locator(fixture.selector).first()).toHaveScreenshot(`${fixture.name}.png`)
@@ -88,7 +93,7 @@ test.describe('Linux Chromium golden master', () => {
 
   test('Playground', async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 900 })
-    await page.goto(UI_FIXTURE_ROUTE)
+    await page.goto(VISUAL_COMPONENT_FIXTURE_ROUTE)
     await waitForStableUi(page)
     const switcher = page.locator('.kpo-switcher').filter({ hasText: 'Fixture Kotlin Playground' })
     await switcher.locator('.kpo-switcher__playground-toggle').click()
@@ -126,7 +131,7 @@ test.describe('Linux Chromium golden master', () => {
       document.execCommand = (() => false) as typeof document.execCommand
     })
     await page.setViewportSize({ width: 1280, height: 900 })
-    await stubUiServiceAskAiContext(page)
+    await stubEmptyUiServiceAskAiContext(page)
     await page.goto(UI_FIXTURE_ROUTE)
     await waitForStableUi(page)
     await selectText(page, 'This page is intentionally hidden from navigation.')
