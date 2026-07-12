@@ -5,6 +5,7 @@ const root = resolve(import.meta.dirname, '..')
 const sourceRoot = resolve(root, '.vitepress')
 const sourceExtensions = /\.(?:ts|mts|vue)$/
 const importPattern = /(?:import|export)\s+(?:type\s+)?(?:[^'";]+?\s+from\s+)?['"]([^'"]+)['"]/g
+const vitePressSelectorPattern = /(?:\.VP[A-Za-z0-9_-]*|\.vp-doc\b|\.DocSearch-[A-Za-z0-9_-]*)/
 
 const violations: string[] = []
 
@@ -27,6 +28,16 @@ for (const file of walk(sourceRoot)) {
         `${projectPath}: build code must not import UI components/composables (${specifier})`
       )
     }
+  }
+}
+
+const componentStylesRoot = resolve(sourceRoot, 'theme/styles/components')
+for (const file of walk(componentStylesRoot)) {
+  if (!file.endsWith('.css')) continue
+  if (vitePressSelectorPattern.test(readFileSync(file, 'utf8'))) {
+    violations.push(
+      `${normalize(relative(root, file))}: VitePress selectors belong to styles/adapters`
+    )
   }
 }
 

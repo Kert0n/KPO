@@ -1,0 +1,24 @@
+
+
+/* ---------- Кнопка скрытия сайдбара ----------
+
+   Неподвижный якорь ровно над границей сайдбара: позиционируется
+   абсолютно от контейнера навбара через переменные и не зависит ни от
+   ширины логотипа, ни от состояния сайдбара. Существует только на
+   десктопе и только на страницах с сайдбаром (на главной её нет,
+   на мобильных у VitePress своё меню). Живёт в content-слоте навбара,
+   а не внутри ссылки-логотипа — клик не может превратиться в переход. */
+
+.kpo-sidebar-toggle {
+  display: none;
+  box-sizing: border-box;
+  width: var(--kpo-toggle-size);
+  height: var(--kpo-toggle-size);
+  padding: 4px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--vp-c-text-2);
+  cursor: pointer;
+  transition: color 0.15s, background-color 0.15s;
+}

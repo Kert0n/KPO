@@ -1,0 +1,23 @@
+
+
+.kpo-content-block,
+.kpo-wide-block {
+  box-sizing: border-box;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.kpo-content-block--wide,
+.kpo-wide-block {
+  width: 100%;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.kpo-content-block--table {
+  display: block;
+  max-width: 100%;
+  margin: 20px auto;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
