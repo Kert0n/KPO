@@ -53,6 +53,17 @@ export async function openAskAiMenuWhenReady(
         requestAnimationFrame(next)
       })
     }, text)
+    await expect
+      .poll(() => {
+        return page.locator('.kpo-switcher').evaluateAll((switchers) => {
+          return switchers.every((switcher) => {
+            const toggle = switcher.querySelector('.kpo-switcher__playground-toggle')
+            if (toggle?.getAttribute('aria-pressed') !== 'true') return true
+            return Boolean(switcher.querySelector('.kpo-playground--ready'))
+          })
+        })
+      })
+      .toBe(true)
 
     const dispatchSelection = async () => {
       return page.evaluate((targetText) => {
