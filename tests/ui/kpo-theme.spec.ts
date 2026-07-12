@@ -401,6 +401,15 @@ async function measureViewportRelativeTo(locator: Locator): Promise<number> {
   })
 }
 
+async function waitForPageLayoutReady(page: Page): Promise<void> {
+  await page.evaluate(async () => {
+    await document.fonts.ready
+    await new Promise<void>((resolve) => {
+      requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+    })
+  })
+}
+
 async function expectViewportAnchorStable(
   before: number,
   after: number,
@@ -1275,27 +1284,12 @@ test('ask ai copies and opens Claude without showing manual prompt', async ({ pa
 
 test('ask ai mobile bubble appears after text selection', async ({ page }) => {
   await clearStorage(page)
-  await page.addInitScript(() => {
-    const originalAddEventListener = document.addEventListener.bind(document)
-    document.addEventListener = ((
-      type: string,
-      listener: EventListenerOrEventListenerObject,
-      options?: boolean | AddEventListenerOptions
-    ) => {
-      if (type === 'selectionchange') {
-        ;(
-          window as unknown as { __kpoSelectionListenerReady: boolean }
-        ).__kpoSelectionListenerReady = true
-      }
-      originalAddEventListener(type, listener, options)
-    }) as typeof document.addEventListener
-  })
   await page.setViewportSize({ width: 390, height: 844 })
   await page.goto(UI_FIXTURE_ROUTE)
-  await page.waitForFunction(() => {
-    return (window as unknown as { __kpoSelectionListenerReady?: boolean })
-      .__kpoSelectionListenerReady
-  })
+  await page.locator('.KpoAskAiProvider').waitFor({ state: 'attached' })
+  await waitForMermaid(page, { requireDiagrams: true })
+  await waitForAdaptiveTables(page)
+  await waitForPageLayoutReady(page)
 
   await page
     .locator('.vp-doc p')
@@ -1738,12 +1732,12 @@ test('language click preserves viewport position inside the interacted code bloc
   await waitForMermaid(page, { requireDiagrams: true })
 
   const switcher = page.locator('.kpo-switcher').nth(1)
-  await switcher.scrollIntoViewIfNeeded()
-  await page.evaluate(() => window.scrollBy(0, 260))
+  await waitForPageLayoutReady(page)
+  await switcher.evaluate((node) => node.scrollIntoView({ block: 'center' }))
 
   const before = await measureViewportRelativeTo(switcher)
   await switcher.getByRole('tab', { name: 'Java' }).click()
-  await page.waitForTimeout(150)
+  await waitForPageLayoutReady(page)
   const after = await measureViewportRelativeTo(switcher)
 
   await expectViewportAnchorStable(before, after)
