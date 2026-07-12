@@ -53,7 +53,7 @@ const { playgroundMode, setPlaygroundMode } = usePlaygroundMode()
 
 const rootElement = useTemplateRef('root')
 const blocksElement = useTemplateRef('blocks')
-const playgroundElement = useTemplateRef<{ lifecycle: PlaygroundLifecycle }>('playground')
+const playgroundElement = useTemplateRef<{ lifecycle: PlaygroundLifecycle }>('playgroundElement')
 const accessibilityId = `kpo-code-${props.askBlockId || useId()}`
 const mounted = ref(false)
 const tabs = useCodeTabs({ langs: () => props.langs, labels: () => props.labels })
@@ -182,7 +182,7 @@ function controlledPanelId(lang: string): string {
 
     <KotlinPlayground
       v-if="playgroundEverShown"
-      ref="playground"
+      ref="playgroundElement"
       v-show="playgroundActive"
       :code="kotlinCode"
       :ask-block-id="askBlockId"
