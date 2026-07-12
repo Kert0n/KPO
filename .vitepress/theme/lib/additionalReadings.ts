@@ -85,7 +85,7 @@ export function parseLectureAdditionalReadings(
 }
 
 function parseReadingItem(line: string): AdditionalReadingItem | null {
-  const match = line.match(/^\s*-\s+\[([^\]]+)\]\((https?:\/\/[^)]+)\)(?:\s+—\s+(.+?))?\s*$/)
+  const match = line.match(/^\s*-\s+\[([^\]]+)\]\((https?:\/\/[^)]+)\)(?:\s+(?:—|-)\s+(.+?))?\s*$/)
   if (!match) return null
 
   const [, title, url, note] = match
