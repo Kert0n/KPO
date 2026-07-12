@@ -453,6 +453,20 @@ async function waitForAnchorTransaction(switcher: Locator): Promise<void> {
   await expect(switcher).not.toHaveAttribute('data-kpo-anchor-pending', 'true')
 }
 
+async function waitForInitialPlaygrounds(page: Page): Promise<void> {
+  await expect
+    .poll(() => {
+      return page.locator('.kpo-playground').evaluateAll((playgrounds) => {
+        return (
+          playgrounds.length > 0 &&
+          playgrounds.every((playground) => playground.classList.contains('kpo-playground--ready'))
+        )
+      })
+    })
+    .toBe(true)
+  await waitForPageLayoutReady(page)
+}
+
 async function expectCenteredAgainstPage(page: Page, locator: Locator): Promise<void> {
   const result = await locator.evaluate((node) => {
     const rect = node.getBoundingClientRect()
@@ -1818,6 +1832,7 @@ test('language click preserves viewport position inside the interacted code bloc
   await clearStorage(page)
   await page.goto(UI_FIXTURE_ROUTE)
   await waitForMermaid(page, { requireDiagrams: true })
+  await waitForInitialPlaygrounds(page)
 
   const switcher = page.locator('.kpo-switcher').nth(1)
   await waitForPageLayoutReady(page)
@@ -1839,6 +1854,7 @@ test('keyboard language switch preserves viewport position inside the interacted
   await clearStorage(page)
   await page.goto(UI_FIXTURE_ROUTE)
   await waitForMermaid(page, { requireDiagrams: true })
+  await waitForInitialPlaygrounds(page)
 
   const switcher = page.locator('.kpo-switcher').nth(1)
   await waitForPageLayoutReady(page)
@@ -1861,6 +1877,7 @@ test('playground toggle preserves viewport position inside the interacted code b
   await clearStorage(page)
   await page.goto(UI_FIXTURE_ROUTE)
   await waitForMermaid(page, { requireDiagrams: true })
+  await waitForInitialPlaygrounds(page)
 
   const switcher = page.locator('.kpo-switcher').nth(4)
   await switcher.scrollIntoViewIfNeeded()
