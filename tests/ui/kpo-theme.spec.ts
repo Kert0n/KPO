@@ -2042,7 +2042,9 @@ test('persisted language hydration stays stable across responsive breakpoints', 
       await waitForScopedPlayground(page, switcher, { transaction: false })
     } else {
       await expect(switcher.locator('.kpo-playground:visible')).toHaveCount(0)
-      await expect(switcher.locator('.kpo-switcher__playground-toggle')).toHaveCount(0)
+      const toggle = switcher.locator('.kpo-switcher__playground-toggle')
+      await expect(toggle).toBeVisible()
+      await expect(toggle).toBeDisabled()
     }
 
     await expectNoPageOverflowFromVpDoc(page)
