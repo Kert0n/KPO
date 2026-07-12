@@ -11,6 +11,7 @@
     "dev:host": "vitepress dev --host 0.0.0.0",
     "prebuild": "node .vitepress/scripts/assert-node-version.mjs && node .vitepress/scripts/assert-content-contract.mjs",
     "build": "vitepress build",
+    "budgets:check": "node scripts/check-performance-budgets.mjs",
     "preview": "vitepress preview",
     "preview:host": "vitepress preview --host 0.0.0.0",
     "pretest": "node .vitepress/scripts/assert-node-version.mjs",

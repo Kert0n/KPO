@@ -2,51 +2,148 @@ name: Quality gates
 
 on:
   pull_request:
+  push:
+    branches: [master]
   workflow_dispatch:
 
 concurrency:
-  group: quality-${{ github.event.pull_request.number || github.ref }}
+  group: quality-${{ github.head_ref || github.ref }}
   cancel-in-progress: true
 
 permissions:
   contents: read
 
+env:
+  NODE_VERSION: '24'
+
 jobs:
   quality:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-node@v5
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
         with:
-          node-version: 24
+          node-version: ${{ env.NODE_VERSION }}
           cache: npm
       - run: npm ci
       - run: npm run typecheck
       - run: npm run lint
-      - run: npm run format:check
+      - run: npm run format:check:tracked
       - run: npm test
       - run: npm run content:check
-      - run: npm run build
 
-  browser-chromium:
+  kotlin-playground:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - uses: actions/setup-java@0f481fcb613427c0f801b606911222b5b6f3083a
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: gradle
+      - run: npm ci
+      - run: npm run kotlin:check
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: kotlin-snippet-manifest
+          path: .generated/kotlin-snippets/manifest.json
+
+  build:
     needs: quality
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-node@v5
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
         with:
-          node-version: 24
+          node-version: ${{ env.NODE_VERSION }}
           cache: npm
       - run: npm ci
+      - run: npm run build
+      - run: npm run budgets:check
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: production-dist
+          path: .vitepress/dist
+          retention-days: 1
+
+  browser-chromium:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0
+        with:
+          name: production-dist
+          path: .vitepress/dist
       - run: npx playwright install --with-deps chromium
-      - run: npm run test:ui
-      - name: Upload failure diagnostics
+      - run: npx playwright test --config playwright.prebuilt.config.ts --workers=4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: failure()
-        uses: actions/upload-artifact@v4
         with:
           name: browser-chromium-failure
           path: |
             test-results
             playwright-report
-          if-no-files-found: ignore
           retention-days: 7
+
+  browser-smoke:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0
+        with:
+          name: production-dist
+          path: .vitepress/dist
+      - run: npx playwright install --with-deps firefox webkit
+      - run: npx playwright test --config playwright.smoke.config.ts
+
+  browser-visual:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0
+        with:
+          name: production-dist
+          path: .vitepress/dist
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:characterization:prebuilt
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: failure()
+        with:
+          name: browser-visual-failure
+          path: |
+            test-results
+            playwright-report
+          retention-days: 7
+
+  browser:
+    if: always()
+    needs: [browser-chromium, browser-smoke, browser-visual]
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          test "${{ needs.browser-chromium.result }}" = success
+          test "${{ needs.browser-smoke.result }}" = success
+          test "${{ needs.browser-visual.result }}" = success
