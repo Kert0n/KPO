@@ -54,78 +54,86 @@ export async function openAskAiMenuWhenReady(
       })
     }, text)
 
+    const dispatchSelection = async () => {
+      return page.evaluate((targetText) => {
+        const root = [...document.querySelectorAll<HTMLElement>('.vp-doc *')]
+          .filter((node) => node.textContent?.includes(targetText))
+          .sort((left, right) => {
+            return (left.textContent?.length ?? 0) - (right.textContent?.length ?? 0)
+          })[0]
+        if (!root) return 'text-missing'
+
+        const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT)
+        const nodes: Text[] = []
+        let combined = ''
+        while (walker.nextNode()) {
+          const node = walker.currentNode as Text
+          nodes.push(node)
+          combined += node.nodeValue ?? ''
+        }
+
+        const start = combined.indexOf(targetText)
+        if (start < 0) return 'range-missing'
+        const end = start + targetText.length
+        let cursor = 0
+        let startNode: Text | undefined
+        let endNode: Text | undefined
+        let startOffset = 0
+        let endOffset = 0
+        for (const node of nodes) {
+          const next = cursor + (node.nodeValue?.length ?? 0)
+          if (!startNode && start >= cursor && start <= next) {
+            startNode = node
+            startOffset = start - cursor
+          }
+          if (!endNode && end >= cursor && end <= next) {
+            endNode = node
+            endOffset = end - cursor
+            break
+          }
+          cursor = next
+        }
+        if (!startNode || !endNode) return 'range-missing'
+
+        const range = document.createRange()
+        range.setStart(startNode, startOffset)
+        range.setEnd(endNode, endOffset)
+        const selection = window.getSelection()
+        selection?.removeAllRanges()
+        selection?.addRange(range)
+
+        const rect = range.getBoundingClientRect()
+        ;(startNode.parentElement ?? root).dispatchEvent(
+          new MouseEvent('contextmenu', {
+            bubbles: true,
+            cancelable: true,
+            button: 2,
+            clientX: rect.left + Math.min(12, Math.max(2, rect.width / 2)),
+            clientY: rect.top + Math.min(10, Math.max(2, rect.height / 2))
+          })
+        )
+
+        const menu = document.querySelector<HTMLElement>('.kpo-ai-menu')
+        const manual = document.querySelector<HTMLElement>('.kpo-ai-manual')
+        if (manual && manual.getClientRects().length > 0) return 'manual'
+        if (menu && menu.getClientRects().length > 0) return 'menu'
+        return 'pending'
+      }, text)
+    }
+
     await expect
-      .poll(async () => {
-        return page.evaluate((targetText) => {
-          const root = [...document.querySelectorAll<HTMLElement>('.vp-doc *')]
-            .filter((node) => node.textContent?.includes(targetText))
-            .sort((left, right) => {
-              return (left.textContent?.length ?? 0) - (right.textContent?.length ?? 0)
-            })[0]
-          if (!root) return 'text-missing'
-
-          const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT)
-          const nodes: Text[] = []
-          let combined = ''
-          while (walker.nextNode()) {
-            const node = walker.currentNode as Text
-            nodes.push(node)
-            combined += node.nodeValue ?? ''
-          }
-
-          const start = combined.indexOf(targetText)
-          if (start < 0) return 'range-missing'
-          const end = start + targetText.length
-          let cursor = 0
-          let startNode: Text | undefined
-          let endNode: Text | undefined
-          let startOffset = 0
-          let endOffset = 0
-          for (const node of nodes) {
-            const next = cursor + (node.nodeValue?.length ?? 0)
-            if (!startNode && start >= cursor && start <= next) {
-              startNode = node
-              startOffset = start - cursor
-            }
-            if (!endNode && end >= cursor && end <= next) {
-              endNode = node
-              endOffset = end - cursor
-              break
-            }
-            cursor = next
-          }
-          if (!startNode || !endNode) return 'range-missing'
-
-          const range = document.createRange()
-          range.setStart(startNode, startOffset)
-          range.setEnd(endNode, endOffset)
-          const selection = window.getSelection()
-          selection?.removeAllRanges()
-          selection?.addRange(range)
-
-          const rect = range.getBoundingClientRect()
-          ;(startNode.parentElement ?? root).dispatchEvent(
-            new MouseEvent('contextmenu', {
-              bubbles: true,
-              cancelable: true,
-              button: 2,
-              clientX: rect.left + Math.min(12, Math.max(2, rect.width / 2)),
-              clientY: rect.top + Math.min(10, Math.max(2, rect.height / 2))
-            })
-          )
-
-          const menu = document.querySelector<HTMLElement>('.kpo-ai-menu')
-          const manual = document.querySelector<HTMLElement>('.kpo-ai-manual')
-          if (manual && manual.getClientRects().length > 0) return 'manual'
-          if (menu && menu.getClientRects().length > 0) return 'menu'
-          return 'pending'
-        }, text)
-      })
+      .poll(dispatchSelection)
       .toMatch(options.allowManualFallback ? /^(menu|manual)$/ : /^menu$/)
 
     if (options.activate) {
       const item = page.locator('.kpo-ai-menu__item')
-      await expect(item).toBeEnabled()
+      await expect
+        .poll(async () => {
+          if ((await item.isVisible()) && (await item.isEnabled())) return true
+          await dispatchSelection()
+          return false
+        })
+        .toBe(true)
       await item.click()
     }
 
