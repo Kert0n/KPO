@@ -1,8 +1,18 @@
-import { readdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { format, resolveConfig } from 'prettier'
 
-const contextsDirectory = resolve(process.argv[2] ?? '.vitepress/dist/__ask-ai-context')
+const referenceDirectory = process.argv[2]
+if (!referenceDirectory) {
+  throw new Error(
+    'Usage: generate-ask-ai-published-ids.mts <published-contexts-directory> [output-file]'
+  )
+}
+
+const contextsDirectory = resolve(referenceDirectory)
+if (!statSync(contextsDirectory).isDirectory()) {
+  throw new Error(`Published contexts path is not a directory: ${contextsDirectory}`)
+}
 const output = resolve(process.argv[3] ?? '.vitepress/shared/core/askAiLegacyIds.ts')
 const ids: Record<string, string> = {}
 const occurrences = new Map<string, number>()
@@ -17,7 +27,9 @@ for (const file of contextFiles(contextsDirectory)) {
     const occurrenceKey = `${normalizeSourcePath(context.sourcePath)}\u0000${block.kind}\u0000${canonical}`
     const duplicateIndex = occurrences.get(occurrenceKey) ?? 0
     occurrences.set(occurrenceKey, duplicateIndex + 1)
-    ids[manifestKey(context.sourcePath, block.kind, canonical, duplicateIndex)] = block.id
+    const key = manifestKey(context.sourcePath, block.kind, canonical, duplicateIndex)
+    if (key in ids) throw new Error(`Duplicate published Ask AI identity: ${key}`)
+    ids[key] = block.id
   }
 }
 
@@ -47,20 +59,20 @@ const source =
   `): string {\n` +
   `  return \`\${normalizeSourcePath(sourcePath)}:\${kind}:\${stableHash(canonical)}:\${duplicateIndex}\`\n` +
   `}\n\n` +
-    `function normalizeSourcePath(sourcePath: string): string {\n` +
-    `  const normalized = sourcePath.replace(/\\\\/g, '/')\n` +
-    `  const contentIndex = normalized.lastIndexOf('/content/')\n` +
-    `  const contentPath =\n` +
-    `    contentIndex >= 0\n` +
-    `      ? normalized.slice(contentIndex + 1)\n` +
-    `      : normalized.startsWith('content/')\n` +
-    `        ? normalized\n` +
-    `        : \`content/\${normalized.replace(/^\\//, '')}\`\n` +
-    `  return contentPath.replace(\n` +
-    `    /^(content\\/(?:service-pages|extras)\\/[^/]+)\\.md$/,\n` +
-    `    '$1/vitepress.md'\n` +
-    `  )\n` +
-    `}\n`
+  `function normalizeSourcePath(sourcePath: string): string {\n` +
+  `  const normalized = sourcePath.replace(/\\\\/g, '/')\n` +
+  `  const contentIndex = normalized.lastIndexOf('/content/')\n` +
+  `  const contentPath =\n` +
+  `    contentIndex >= 0\n` +
+  `      ? normalized.slice(contentIndex + 1)\n` +
+  `      : normalized.startsWith('content/')\n` +
+  `        ? normalized\n` +
+  `        : \`content/\${normalized.replace(/^\\//, '')}\`\n` +
+  `  return contentPath.replace(\n` +
+  `    /^(content\\/(?:service-pages|extras)\\/[^/]+)\\.md$/,\n` +
+  `    '$1/vitepress.md'\n` +
+  `  )\n` +
+  `}\n`
 
 writeFileSync(
   output,
@@ -101,7 +113,9 @@ function stableHash(value: string): string {
 }
 
 function canonicalizeAskAiBlockIdentity(kind: string, markdown: string): string {
-  return kind === 'multi-code' ? canonicalizeMultiCodeIdentity(markdown) : normalizeMarkdown(markdown)
+  return kind === 'multi-code'
+    ? canonicalizeMultiCodeIdentity(markdown)
+    : normalizeMarkdown(markdown)
 }
 
 function canonicalizeMultiCodeIdentity(markdown: string): string {

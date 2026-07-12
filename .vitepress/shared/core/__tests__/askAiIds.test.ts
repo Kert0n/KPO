@@ -12,7 +12,15 @@ import { buildAskAiPageContext, listAskAiContextEntries } from '../../../lib/ask
 
 describe('Ask AI semantic IDs', () => {
   it('keeps the published compatibility manifest complete', () => {
-    expect(publishedAskAiCompatibilityEntries()).toHaveLength(2818)
+    const entries = publishedAskAiCompatibilityEntries()
+    expect(entries).toHaveLength(2818)
+    expect(new Set(entries.map((entry) => entry.key)).size).toBe(entries.length)
+
+    const sourceScopedIds = entries.map((entry) => {
+      const sourceIdentity = entry.key.split(':', 1)[0]
+      return `${sourceIdentity}:${entry.legacyId}`
+    })
+    expect(new Set(sourceScopedIds).size).toBe(entries.length)
   })
 
   it('maps every current published block to its published ID', () => {
