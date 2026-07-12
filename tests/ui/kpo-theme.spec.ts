@@ -1364,27 +1364,20 @@ test('code switchers without author defaults follow the latest global language',
   await expectActiveTab(switchers.nth(2), 'Kotlin')
 })
 
-test('public lecture switchers honor persisted global language without boilerplate defaults', async ({
+test('fixture switchers honor persisted global language without author defaults', async ({
   page
 }) => {
   await setStorage(page, {
     'kpo:code-language': 'java',
     'kpo:playground-mode': '0'
   })
-  await page.goto('lectures/02')
+  await page.goto(UI_FIXTURE_ROUTE)
 
   const switchers = page.locator('.kpo-switcher')
   await expect.poll(async () => switchers.count()).toBeGreaterThan(3)
 
-  const compatible = switchers.filter({
-    has: page.getByRole('tab', { name: 'Java' })
-  })
-  const compatibleCount = Math.min(5, await compatible.count())
-
-  expect(compatibleCount).toBeGreaterThan(0)
-
-  for (let index = 0; index < compatibleCount; index += 1) {
-    await expectActiveTab(compatible.nth(index), 'Java')
+  for (let index = 0; index < 3; index += 1) {
+    await expectActiveTab(switchers.nth(index), 'Java')
   }
 
   await expectNoPageOverflowFromVpDoc(page)
@@ -1432,15 +1425,15 @@ test('released author-default block follows subsequent global language changes',
   await expectActiveTab(switchers.nth(0), 'Kotlin')
 })
 
-test('intentional author default remains protected on intro until clicked', async ({ page }) => {
+test('intentional author default remains protected until clicked', async ({ page }) => {
   await setStorage(page, {
     'kpo:code-language': 'kotlin',
     'kpo:playground-mode': '0'
   })
-  await page.goto('intro')
+  await page.goto(UI_FIXTURE_ROUTE)
 
   const authorDefault = page.locator('.kpo-switcher').filter({
-    hasText: 'Авторский default: Go'
+    hasText: 'Fixture author default'
   })
   const firstSwitcher = page.locator('.kpo-switcher').first()
 
@@ -1463,7 +1456,7 @@ test('language-only text follows global language used by ordinary code switchers
     'kpo:code-language': 'java',
     'kpo:playground-mode': '0'
   })
-  await page.goto('intro')
+  await page.goto(UI_FIXTURE_ROUTE)
 
   const firstSwitcher = page.locator('.kpo-switcher').first()
   await expectActiveTab(firstSwitcher, 'Java')
@@ -1471,8 +1464,12 @@ test('language-only text follows global language used by ordinary code switchers
   await expect
     .poll(async () => page.evaluate(() => document.documentElement.dataset.kpoLang ?? ''))
     .toBe('java')
-  await expect(page.locator('.kpo-only--java').filter({ hasText: 'System.exit' })).toBeVisible()
-  await expect(page.locator('.kpo-only--kotlin').filter({ hasText: 'exitProcess' })).toBeHidden()
+  await expect(
+    page.locator('.kpo-only--java').filter({ hasText: 'fixture-java-only' })
+  ).toBeVisible()
+  await expect(
+    page.locator('.kpo-only--kotlin').filter({ hasText: 'fixture-kotlin-only' })
+  ).toBeHidden()
   await expectNoPageOverflowFromVpDoc(page)
 })
 
@@ -1902,13 +1899,13 @@ test('keyboard language switch preserves viewport position inside the interacted
   await waitForMermaid(page, { requireDiagrams: true })
 
   const switcher = page.locator('.kpo-switcher').nth(1)
-  await switcher.scrollIntoViewIfNeeded()
-  await page.evaluate(() => window.scrollBy(0, 260))
+  await waitForPageLayoutReady(page)
+  await switcher.evaluate((node) => node.scrollIntoView({ block: 'center' }))
 
   const before = await measureViewportRelativeTo(switcher)
   await switcher.getByRole('tab', { name: 'Kotlin' }).focus()
   await page.keyboard.press('ArrowRight')
-  await page.waitForTimeout(150)
+  await waitForPageLayoutReady(page)
   const after = await measureViewportRelativeTo(switcher)
 
   await expectViewportAnchorStable(before, after)
@@ -1936,7 +1933,7 @@ test('playground toggle preserves viewport position inside the interacted code b
   await expectNoPageOverflowFromVpDoc(page)
 })
 
-test('enabling a public playground preserves its viewport anchor through initialization', async ({
+test('enabling a fixture playground preserves its viewport anchor through initialization', async ({
   page
 }) => {
   await page.setViewportSize(LAYOUT_VIEWPORTS.desktop)
@@ -1944,10 +1941,12 @@ test('enabling a public playground preserves its viewport anchor through initial
     'kpo:code-language': 'kotlin',
     'kpo:playground-mode': '0'
   })
-  await page.goto('lectures/02')
+  await page.goto(UI_FIXTURE_ROUTE)
   await waitForMermaid(page, { requireDiagrams: true })
 
-  const switcher = page.locator('.kpo-switcher').nth(6)
+  const switcher = page.locator('.kpo-switcher').filter({
+    hasText: 'Fixture Kotlin Playground'
+  })
   const toggle = switcher.getByRole('button', { name: /Playground/ })
   await toggle.evaluate((node) => node.scrollIntoView({ block: 'center' }))
 
@@ -1968,9 +1967,11 @@ test('Home and End language navigation preserves the anchor around async playgro
     'kpo:code-language': 'go',
     'kpo:playground-mode': '1'
   })
-  await page.goto('lectures/02')
+  await page.goto(UI_FIXTURE_ROUTE)
 
-  const switcher = page.locator('.kpo-switcher').nth(6)
+  const switcher = page.locator('.kpo-switcher').filter({
+    hasText: 'Fixture Kotlin Playground'
+  })
   const goTab = switcher.getByRole('tab', { name: 'Go' })
   await goTab.focus()
 
@@ -1998,9 +1999,11 @@ test('user scroll takes ownership while a delayed playground is initializing', a
     'kpo:code-language': 'go',
     'kpo:playground-mode': '1'
   })
-  await page.goto('lectures/02')
+  await page.goto(UI_FIXTURE_ROUTE)
 
-  const switcher = page.locator('.kpo-switcher').nth(6)
+  const switcher = page.locator('.kpo-switcher').filter({
+    hasText: 'Fixture Kotlin Playground'
+  })
   await switcher.scrollIntoViewIfNeeded()
   await page.evaluate(() => window.scrollBy(0, 240))
   await switcher.getByRole('tab', { name: 'Go' }).focus()
@@ -2011,7 +2014,7 @@ test('user scroll takes ownership while a delayed playground is initializing', a
   await page.mouse.wheel(0, 360)
   const userOwnedScroll = await page.evaluate(() => window.scrollY)
 
-  await waitForScopedPlayground(page, switcher)
+  await waitForScopedPlayground(page, switcher, { transaction: false })
   const settledScroll = await page.evaluate(() => window.scrollY)
   expect(settledScroll).toBeGreaterThanOrEqual(userOwnedScroll - ANCHOR_TOLERANCE_PX)
 })
@@ -2041,7 +2044,7 @@ test('persisted language hydration stays stable across responsive breakpoints', 
     })
     observer.observe({ type: 'layout-shift', buffered: true })
   })
-  await page.goto('')
+  await page.goto(UI_FIXTURE_ROUTE)
 
   const scenarios = [
     { viewport: { width: 390, height: 844 }, language: 'java', playgroundMode: '1' },
@@ -2056,7 +2059,7 @@ test('persisted language hydration stays stable across responsive breakpoints', 
       localStorage.setItem('kpo:code-language', language)
       localStorage.setItem('kpo:playground-mode', playgroundMode)
     }, scenario)
-    await page.goto('extras/01')
+    await page.goto(UI_FIXTURE_ROUTE)
 
     const switcher = page.locator('.kpo-switcher').first()
     await expectActiveTab(
