@@ -1,27 +1,30 @@
 import { describe, expect, it } from 'vitest'
-import {
-  beginPlaygroundInitialization,
-  pendingPlaygroundInitializations,
-  waitForPlaygroundInitializations
-} from '../playgroundLifecycle'
+import { waitForPlaygroundSettlement } from '../playgroundLifecycle'
 
-describe('playgroundLifecycle', () => {
-  it('waits for every initialization active in the current lifecycle wave', async () => {
-    const first = beginPlaygroundInitialization()
-    const second = beginPlaygroundInitialization()
-    let completed = false
-    const waiting = waitForPlaygroundInitializations().then(() => {
-      completed = true
-    })
+describe('playground lifecycle', () => {
+  it('releases a scoped waiter when its own transaction is cancelled', async () => {
+    const controller = new AbortController()
+    const settlement = new Promise<'ready'>(() => undefined)
+    const waiting = waitForPlaygroundSettlement(settlement, controller.signal)
 
-    first.settle()
-    await Promise.resolve()
-    expect(completed).toBe(false)
-    expect(pendingPlaygroundInitializations()).toBe(1)
+    controller.abort('new code switcher action')
 
-    second.settle()
-    await waiting
-    expect(completed).toBe(true)
-    expect(pendingPlaygroundInitializations()).toBe(0)
+    await expect(waiting).rejects.toMatchObject({ name: 'AbortError' })
+  })
+
+  it('does not need an unrelated Playground to settle', async () => {
+    const controller = new AbortController()
+    await expect(
+      waitForPlaygroundSettlement(Promise.resolve<'ready'>('ready'), controller.signal)
+    ).resolves.toBe('ready')
+  })
+
+  it('keeps cancellation authoritative after settlement', async () => {
+    const controller = new AbortController()
+    controller.abort('route change')
+
+    await expect(
+      waitForPlaygroundSettlement(Promise.resolve<'ready'>('ready'), controller.signal)
+    ).rejects.toMatchObject({ name: 'AbortError' })
   })
 })

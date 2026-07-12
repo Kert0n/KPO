@@ -1,15 +1,17 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref, useTemplateRef } from 'vue'
+import { onBeforeUnmount, onMounted, readonly, ref, useTemplateRef } from 'vue'
 import { KOTLIN_VERSION } from '../../shared/kotlinTooling'
 import {
   registerPlayground,
   unregisterPlayground,
   updatePlaygroundCode
 } from '../lib/playgroundRegistry'
-import {
-  beginPlaygroundInitialization,
-  type PlaygroundInitialization
+import type {
+  PlaygroundLifecycle,
+  PlaygroundSettlement,
+  PlaygroundState
 } from '../lib/playgroundLifecycle'
+import { waitForPlaygroundSettlement } from '../lib/playgroundLifecycle'
 
 /**
  * Обёртка над официальным kotlin-playground (npm-пакет).
@@ -38,28 +40,27 @@ const props = withDefaults(
   }
 )
 
-type PlaygroundSettlement = 'ready' | 'failed' | 'disposed'
-
 const emit = defineEmits<{ ready: []; failed: [] }>()
 
 const host = useTemplateRef('host')
 const ready = ref(false)
+const state = ref<PlaygroundState>('initializing')
 
 let targetElement: HTMLElement | undefined
 let instanceGeneration = 0
-let initialization: PlaygroundInitialization | null = null
 let settlement: PlaygroundSettlement | null = null
 let resolveSettlement: (value: PlaygroundSettlement) => void = () => undefined
 let settlementPromise = new Promise<PlaygroundSettlement>((resolve) => {
   resolveSettlement = resolve
 })
 
-defineExpose({ whenSettled })
+const lifecycle: PlaygroundLifecycle = { state: readonly(state), whenSettled, measure }
+defineExpose<{ lifecycle: PlaygroundLifecycle }>({ lifecycle })
 
 onMounted(async () => {
   if (!host.value) return
   const generation = ++instanceGeneration
-  initialization = beginPlaygroundInitialization()
+  state.value = 'initializing'
 
   const target = document.createElement('code')
   targetElement = target
@@ -92,17 +93,12 @@ onMounted(async () => {
       return
     }
     ready.value = true
-    await waitForHostLayoutStable(host.value, generation)
-    if (generation !== instanceGeneration || !target.isConnected) {
-      settle('disposed')
-      return
-    }
     settle('ready')
     emit('ready')
   } catch (error) {
     if (generation !== instanceGeneration) return
     console.warn('[kotlin-playground] инициализация не удалась:', error)
-    settle('failed')
+    settle('error')
     emit('failed')
   }
 })
@@ -115,16 +111,23 @@ onBeforeUnmount(() => {
   targetElement = undefined
 })
 
-function whenSettled(): Promise<PlaygroundSettlement> {
-  return settlement ? Promise.resolve(settlement) : settlementPromise
+function whenSettled(signal: AbortSignal): Promise<PlaygroundSettlement> {
+  return waitForPlaygroundSettlement(
+    settlement ? Promise.resolve(settlement) : settlementPromise,
+    signal
+  )
 }
 
 function settle(value: PlaygroundSettlement): void {
   if (settlement) return
   settlement = value
-  initialization?.settle()
-  initialization = null
+  state.value = value
   resolveSettlement(value)
+}
+
+function measure(): { width: number; height: number } {
+  const rect = host.value?.getBoundingClientRect()
+  return { width: rect?.width ?? 0, height: rect?.height ?? 0 }
 }
 
 function destroyInstance(): void {
@@ -133,42 +136,6 @@ function destroyInstance(): void {
 
 function destroyTargetInstance(target: HTMLElement): void {
   ;(target as { KotlinPlayground?: { destroy: () => void } }).KotlinPlayground?.destroy()
-}
-
-async function waitForHostLayoutStable(element: HTMLElement, generation: number): Promise<void> {
-  const stableFramesRequired = 8
-  const emergencyTimeoutMs = 10_000
-  const startedAt = performance.now()
-  let changed = true
-  let stableFrames = 0
-  let previousWidth = element.getBoundingClientRect().width
-  let previousHeight = element.getBoundingClientRect().height
-  const observer = new ResizeObserver(() => {
-    changed = true
-  })
-  observer.observe(element)
-
-  try {
-    while (
-      generation === instanceGeneration &&
-      element.isConnected &&
-      performance.now() - startedAt < emergencyTimeoutMs
-    ) {
-      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
-      const rect = element.getBoundingClientRect()
-      const stable =
-        !changed &&
-        Math.abs(rect.width - previousWidth) <= 1 &&
-        Math.abs(rect.height - previousHeight) <= 1
-      stableFrames = stable ? stableFrames + 1 : 0
-      if (stableFrames >= stableFramesRequired) return
-      changed = false
-      previousWidth = rect.width
-      previousHeight = rect.height
-    }
-  } finally {
-    observer.disconnect()
-  }
 }
 </script>
 

@@ -18,11 +18,8 @@ export type AnchorLayoutMeasurement = {
 }
 
 export type PreserveViewportAnchorOptions = {
-  frames?: number
-  stableFrames?: number
-  epsilon?: number
-  settle?: () => Promise<unknown>
-  emergencyTimeoutMs?: number
+  signal?: AbortSignal
+  settle?: (signal: AbortSignal) => Promise<unknown>
   initiatingKeyEvent?: KeyboardEvent
 }
 
@@ -51,14 +48,19 @@ export async function preserveViewportAnchor(
     return
   }
 
+  const transaction = new AbortController()
+  const propagateAbort = () => transaction.abort(options.signal?.reason)
+  if (options.signal?.aborted) propagateAbort()
+  else options.signal?.addEventListener('abort', propagateAbort, { once: true })
+
   const anchor = captureViewportAnchor(root)
-  let interrupted = false
   let restoreFrame: number | null = null
+  let interruption: { dispose: () => void } | null = null
   const restoreIfOwned = () => {
-    if (!interrupted && anchor.root.isConnected) restoreViewportAnchor(anchor)
+    if (!transaction.signal.aborted && anchor.root.isConnected) restoreViewportAnchor(anchor)
   }
   const queueRestore = () => {
-    if (restoreFrame !== null || interrupted) return
+    if (restoreFrame !== null || transaction.signal.aborted) return
     restoreFrame = window.requestAnimationFrame(() => {
       restoreFrame = null
       restoreIfOwned()
@@ -66,33 +68,34 @@ export async function preserveViewportAnchor(
   }
   const observer = createAnchorObserver(anchor.root, queueRestore)
 
-  await mutate()
-
-  // The initiating click/keydown must finish propagating before Home/End or
-  // pointer events become interruption signals for this transaction.
-  await Promise.resolve()
-  const interruption = createViewportAnchorInterruption(() => {
-    interrupted = true
-    if (restoreFrame !== null) window.cancelAnimationFrame(restoreFrame)
-    restoreFrame = null
-  }, options.initiatingKeyEvent)
-
   try {
-    await waitAnimationFrames(options.frames ?? 2)
+    await mutate()
+    if (transaction.signal.aborted) return
+
+    // The initiating click/keydown must finish propagating before Home/End or
+    // pointer events become interruption signals for this transaction.
+    await Promise.resolve()
+    interruption = createViewportAnchorInterruption(
+      () => transaction.abort('viewport interaction'),
+      options.initiatingKeyEvent
+    )
+
     restoreIfOwned()
 
-    if (options.settle && !interrupted && anchor.root.isConnected) {
-      await settleWithEmergencyLimit(options.settle(), options.emergencyTimeoutMs ?? 10_000)
+    if (options.settle && !transaction.signal.aborted && anchor.root.isConnected) {
+      await options.settle(transaction.signal)
     }
 
-    if (!interrupted && anchor.root.isConnected) {
-      await waitForStableAnchorLayout(anchor, options, () => interrupted)
+    if (!transaction.signal.aborted && anchor.root.isConnected) {
       restoreIfOwned()
     }
+  } catch (error) {
+    if (!transaction.signal.aborted) throw error
   } finally {
     observer?.disconnect()
-    interruption.dispose()
+    interruption?.dispose()
     if (restoreFrame !== null) window.cancelAnimationFrame(restoreFrame)
+    options.signal?.removeEventListener('abort', propagateAbort)
   }
 }
 
@@ -140,34 +143,6 @@ export function waitAnimationFrames(frames: number): Promise<void> {
   })
 }
 
-async function waitForStableAnchorLayout(
-  anchor: ViewportAnchor,
-  options: PreserveViewportAnchorOptions,
-  interrupted: () => boolean
-): Promise<void> {
-  const stableFrames = Math.max(1, Math.floor(options.stableFrames ?? 4))
-  const epsilon = options.epsilon ?? 1
-  const emergencyTimeoutMs = options.emergencyTimeoutMs ?? 10_000
-  const startedAt = performance.now()
-  let stableCount = 0
-  let previous = measureAnchorLayout(anchor.root)
-
-  while (
-    anchor.root.isConnected &&
-    !interrupted() &&
-    performance.now() - startedAt < emergencyTimeoutMs
-  ) {
-    await waitAnimationFrames(1)
-    if (interrupted() || !anchor.root.isConnected) return
-
-    const current = measureAnchorLayout(anchor.root)
-    restoreViewportAnchor(anchor)
-    stableCount = isAnchorLayoutStable(previous, current, epsilon) ? stableCount + 1 : 0
-    if (stableCount >= stableFrames) return
-    previous = current
-  }
-}
-
 function createAnchorObserver(root: HTMLElement, onResize: () => void): ResizeObserver | null {
   if (typeof ResizeObserver === 'undefined') return null
   const observer = new ResizeObserver(onResize)
@@ -186,6 +161,7 @@ function createViewportAnchorInterruption(
   }
   window.addEventListener('wheel', onInterrupt, { passive: true })
   window.addEventListener('touchstart', onInterrupt, { passive: true })
+  window.addEventListener('touchmove', onInterrupt, { passive: true })
   window.addEventListener('pointerdown', onInterrupt, { passive: true })
   window.addEventListener('keydown', onKeydown)
 
@@ -193,26 +169,10 @@ function createViewportAnchorInterruption(
     dispose: () => {
       window.removeEventListener('wheel', onInterrupt)
       window.removeEventListener('touchstart', onInterrupt)
+      window.removeEventListener('touchmove', onInterrupt)
       window.removeEventListener('pointerdown', onInterrupt)
       window.removeEventListener('keydown', onKeydown)
     }
-  }
-}
-
-async function settleWithEmergencyLimit(
-  settle: Promise<unknown>,
-  timeoutMs: number
-): Promise<void> {
-  let timeout: number | null = null
-  try {
-    await Promise.race([
-      settle,
-      new Promise<void>((resolve) => {
-        timeout = window.setTimeout(resolve, Math.max(0, timeoutMs))
-      })
-    ])
-  } finally {
-    if (timeout !== null) window.clearTimeout(timeout)
   }
 }
 
