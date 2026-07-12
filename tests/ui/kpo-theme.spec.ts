@@ -4,6 +4,7 @@ import {
   LAYOUT_VIEWPORTS
 } from '../../.vitepress/theme/lib/contentLayoutTokens'
 import { contentPagesFor } from '../../.vitepress/shared/content/contentCatalog'
+import { openAskAiMenuWhenReady } from '../helpers/askAi'
 
 const CENTER_TOLERANCE_PX = 2
 const SCALE_TOLERANCE = 0.05
@@ -447,6 +448,25 @@ async function waitForScopedPlayground(
   }
 }
 
+async function waitForAnchorTransaction(switcher: Locator): Promise<void> {
+  await expect(switcher).toHaveAttribute('data-kpo-anchor-pending', 'true')
+  await expect(switcher).not.toHaveAttribute('data-kpo-anchor-pending', 'true')
+}
+
+async function waitForInitialPlaygrounds(page: Page): Promise<void> {
+  await expect
+    .poll(() => {
+      return page.locator('.kpo-playground').evaluateAll((playgrounds) => {
+        return (
+          playgrounds.length > 0 &&
+          playgrounds.every((playground) => playground.classList.contains('kpo-playground--ready'))
+        )
+      })
+    })
+    .toBe(true)
+  await waitForPageLayoutReady(page)
+}
+
 async function expectCenteredAgainstPage(page: Page, locator: Locator): Promise<void> {
   const result = await locator.evaluate((node) => {
     const rect = node.getBoundingClientRect()
@@ -470,117 +490,7 @@ async function selectTextAndOpenAskAiMenu(
   text: string,
   activate = false
 ): Promise<void> {
-  await page.locator('.vp-doc [data-kpo-ask-block-id]').first().waitFor({ state: 'attached' })
-  await page.evaluate(
-    async ({ targetText, activateMenuItem }) => {
-      const root = [...document.querySelectorAll('.vp-doc *')]
-        .filter((node) => node.textContent?.includes(targetText))
-        .sort((left, right) => {
-          return (left.textContent?.length ?? 0) - (right.textContent?.length ?? 0)
-        })[0]
-
-      if (!root) throw new Error(`Text not found: ${targetText}`)
-      root.scrollIntoView({ block: 'center', inline: 'nearest' })
-      await new Promise<void>((resolve) => {
-        requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
-      })
-      await new Promise<void>((resolve) => window.setTimeout(resolve, 120))
-
-      const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT)
-      const textNodes: Text[] = []
-      let combinedText = ''
-      while (walker.nextNode()) {
-        const textNode = walker.currentNode as Text
-        textNodes.push(textNode)
-        combinedText += textNode.nodeValue ?? ''
-      }
-
-      const start = combinedText.indexOf(targetText)
-      if (start === -1) throw new Error(`Text node not found: ${targetText}`)
-
-      const end = start + targetText.length
-      let cursor = 0
-      let startNode: Text | null = null
-      let endNode: Text | null = null
-      let startOffset = 0
-      let endOffset = 0
-
-      for (const textNode of textNodes) {
-        const value = textNode.nodeValue ?? ''
-        const nextCursor = cursor + value.length
-        if (!startNode && start >= cursor && start <= nextCursor) {
-          startNode = textNode
-          startOffset = start - cursor
-        }
-        if (!endNode && end >= cursor && end <= nextCursor) {
-          endNode = textNode
-          endOffset = end - cursor
-          break
-        }
-        cursor = nextCursor
-      }
-
-      if (!startNode || !endNode) throw new Error(`Text range not found: ${targetText}`)
-
-      const range = document.createRange()
-      range.setStart(startNode, startOffset)
-      range.setEnd(endNode, endOffset)
-
-      const selection = window.getSelection()
-      selection?.removeAllRanges()
-      selection?.addRange(range)
-
-      const rect = range.getBoundingClientRect()
-      const target = startNode.parentElement ?? root
-      const dispatchContextMenu = () => {
-        target.dispatchEvent(
-          new MouseEvent('contextmenu', {
-            bubbles: true,
-            cancelable: true,
-            button: 2,
-            clientX: rect.left + Math.min(12, Math.max(2, rect.width / 2)),
-            clientY: rect.top + Math.min(10, Math.max(2, rect.height / 2))
-          })
-        )
-      }
-
-      dispatchContextMenu()
-
-      for (let attempt = 0; attempt < 5; attempt += 1) {
-        await new Promise<void>((resolve) => {
-          requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
-        })
-        if (document.querySelector('.kpo-ai-menu__item')) break
-        dispatchContextMenu()
-        await new Promise<void>((resolve) => window.setTimeout(resolve, 80))
-      }
-
-      if (activateMenuItem) {
-        let button: HTMLElement | null = null
-        for (let attempt = 0; attempt < 50; attempt += 1) {
-          await new Promise<void>((resolve) => {
-            requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
-          })
-          button = document.querySelector<HTMLElement>('.kpo-ai-menu__item')
-          if (button && !(button as HTMLButtonElement).disabled) break
-
-          if (!button) {
-            dispatchContextMenu()
-          }
-          await new Promise<void>((resolve) => window.setTimeout(resolve, 80))
-        }
-
-        if (!button || (button as HTMLButtonElement).disabled)
-          throw new Error('Ask AI menu item is not ready')
-        button.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
-      }
-    },
-    { targetText: text, activateMenuItem: activate }
-  )
-
-  if (!activate) {
-    await expect(page.locator('.kpo-ai-menu')).toBeVisible()
-  }
+  await openAskAiMenuWhenReady(page, text, { activate })
 }
 
 async function selectTextAndClickAskAiMenuItem(page: Page, text: string): Promise<void> {
@@ -1922,6 +1832,7 @@ test('language click preserves viewport position inside the interacted code bloc
   await clearStorage(page)
   await page.goto(UI_FIXTURE_ROUTE)
   await waitForMermaid(page, { requireDiagrams: true })
+  await waitForInitialPlaygrounds(page)
 
   const switcher = page.locator('.kpo-switcher').nth(1)
   await waitForPageLayoutReady(page)
@@ -1929,7 +1840,7 @@ test('language click preserves viewport position inside the interacted code bloc
 
   const before = await measureViewportRelativeTo(switcher)
   await switcher.getByRole('tab', { name: 'Java' }).click()
-  await waitForPageLayoutReady(page)
+  await waitForAnchorTransaction(switcher)
   const after = await measureViewportRelativeTo(switcher)
 
   await expectViewportAnchorStable(before, after)
@@ -1943,6 +1854,7 @@ test('keyboard language switch preserves viewport position inside the interacted
   await clearStorage(page)
   await page.goto(UI_FIXTURE_ROUTE)
   await waitForMermaid(page, { requireDiagrams: true })
+  await waitForInitialPlaygrounds(page)
 
   const switcher = page.locator('.kpo-switcher').nth(1)
   await waitForPageLayoutReady(page)
@@ -1951,7 +1863,7 @@ test('keyboard language switch preserves viewport position inside the interacted
   const before = await measureViewportRelativeTo(switcher)
   await switcher.getByRole('tab', { name: 'Kotlin' }).focus()
   await page.keyboard.press('ArrowRight')
-  await waitForPageLayoutReady(page)
+  await waitForAnchorTransaction(switcher)
   const after = await measureViewportRelativeTo(switcher)
 
   await expectViewportAnchorStable(before, after)
@@ -1965,6 +1877,7 @@ test('playground toggle preserves viewport position inside the interacted code b
   await clearStorage(page)
   await page.goto(UI_FIXTURE_ROUTE)
   await waitForMermaid(page, { requireDiagrams: true })
+  await waitForInitialPlaygrounds(page)
 
   const switcher = page.locator('.kpo-switcher').nth(4)
   await switcher.scrollIntoViewIfNeeded()
@@ -1972,7 +1885,7 @@ test('playground toggle preserves viewport position inside the interacted code b
 
   const before = await measureViewportRelativeTo(switcher)
   await switcher.getByRole('button', { name: /Playground/ }).click()
-  await page.waitForTimeout(250)
+  await waitForAnchorTransaction(switcher)
   const after = await measureViewportRelativeTo(switcher)
 
   await expectViewportAnchorStable(before, after)
