@@ -12,15 +12,14 @@ afterEach(() => {
 })
 
 describe('askAiContext', () => {
-  it('keeps the UI service fixture out of production Ask AI context generation', () => {
-    const servicePage = getContentCatalog({ fresh: true }).find(
-      (page) => page.routeKey === 'service-pages/ui-contract'
-    )
+  it('keeps service fixtures out of production Ask AI context generation', () => {
+    const catalog = getContentCatalog({ fresh: true })
+    const contextRouteKeys = listAskAiContextEntries().map((entry) => entry.routeKey)
+
+    const servicePage = catalog.find((page) => page.routeKey === 'service-pages/ui-contract')
     expect(servicePage?.kind).toBe('service')
     expect(servicePage?.inclusion.askAi).toBe(false)
-    expect(listAskAiContextEntries().map((entry) => entry.routeKey)).not.toContain(
-      'service-pages/ui-contract'
-    )
+    expect(contextRouteKeys).not.toContain('service-pages/ui-contract')
   })
 
   it('extracts stable markdown blocks for code, mermaid, table and multi-code', () => {

@@ -5,7 +5,10 @@ import {
 } from '../../.vitepress/theme/lib/contentLayoutTokens'
 import { contentPagesFor } from '../../.vitepress/shared/content/contentCatalog'
 import { openAskAiMenuWhenReady } from '../helpers/askAi'
-import { stubUiServiceAskAiContext } from '../helpers/serviceFixtures'
+import {
+  stubSelectionBoundaryAskAiContext,
+  stubUiServiceAskAiContext
+} from '../helpers/serviceFixtures'
 
 const CENTER_TOLERANCE_PX = 2
 const SCALE_TOLERANCE = 0.05
@@ -15,6 +18,14 @@ const MERMAID_FOREIGN_OBJECT_TOLERANCE_PX = 2
 const MERMAID_VIEWBOX_TOLERANCE_PX = 8
 const MIN_READABLE_MERMAID_HEIGHT_PX = CONTENT_LAYOUT_TOKENS.mermaidMinHeight
 const UI_FIXTURE_ROUTE = 'service-pages/ui-contract'
+const SELECTION_TERMINAL_TEXT =
+  'Terminal boundary paragraph belongs only to the learning content and must open Ask AI when selected fully.'
+const SELECTION_FIRST_TEXT =
+  'First boundary paragraph starts inside the learning content and must survive a range that begins before the document.'
+const SELECTION_NESTED_TEXT =
+  'Nested boundary phrase combines bold boundary text and inline boundary code inside one paragraph.'
+const SELECTION_MIDDLE_TEXT =
+  'Middle boundary paragraph keeps enough ordinary text between the first and terminal paragraphs for block ordering checks.'
 const COMPONENT_STORAGE_BASELINE = {
   'kpo:playground-mode': '0',
   'kpo:code-language': 'kotlin',
@@ -654,6 +665,166 @@ async function selectTextAndClickAskAiMenuItem(page: Page, text: string): Promis
   await selectTextAndOpenAskAiMenu(page, text, true)
 }
 
+type SelectionBoundaryScenario =
+  | 'terminal-inside'
+  | 'terminal-after-content'
+  | 'terminal-reverse'
+  | 'before-content-to-first'
+  | 'first-through-terminal'
+  | 'terminal-through-footer'
+  | 'pager-only'
+  | 'collapsed-terminal'
+  | 'whitespace-only'
+  | 'nested-inline'
+
+async function dispatchAskAiBoundarySelection(
+  page: Page,
+  scenario: SelectionBoundaryScenario,
+  options: { mobile?: boolean } = {}
+): Promise<void> {
+  await page.evaluate(
+    ({ scenario, mobile, terminalText, firstText, nestedText }) => {
+      function elementContaining(selector: string, text: string): HTMLElement {
+        const element = [...document.querySelectorAll<HTMLElement>(selector)].find((node) =>
+          node.textContent?.includes(text)
+        )
+        if (!element) throw new Error(`Missing element for text: ${text}`)
+        return element
+      }
+
+      function textNodeContaining(root: Element, text: string): Text {
+        const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT)
+        while (walker.nextNode()) {
+          const node = walker.currentNode as Text
+          if (node.nodeValue?.includes(text)) return node
+        }
+        throw new Error(`Missing text node for text: ${text}`)
+      }
+
+      function dispatchContextMenu(target: Element, range: Range): void {
+        const rect = range.getClientRects()[0] ?? range.getBoundingClientRect()
+        target.dispatchEvent(
+          new MouseEvent('contextmenu', {
+            bubbles: true,
+            cancelable: true,
+            button: 2,
+            clientX: rect.left + Math.min(12, Math.max(2, rect.width / 2)),
+            clientY: rect.top + Math.min(10, Math.max(2, rect.height / 2))
+          })
+        )
+      }
+
+      const content = document.querySelector<HTMLElement>('.vp-doc')
+      if (!content) throw new Error('Missing .vp-doc')
+      const terminal = elementContaining('.vp-doc p', terminalText)
+      const first = elementContaining('.vp-doc p', firstText)
+      const nested = elementContaining('.vp-doc p', nestedText)
+      const footer = document.querySelector<HTMLElement>('.VPDocFooter')
+      const whitespace = document.querySelector<HTMLElement>('#selection-whitespace')
+      const selection = window.getSelection()
+      if (!selection) throw new Error('Missing Selection API')
+
+      const range = document.createRange()
+      let target: Element = terminal
+
+      if (scenario === 'terminal-inside') {
+        range.selectNodeContents(terminal)
+      } else if (scenario === 'terminal-after-content') {
+        const node = textNodeContaining(terminal, terminalText)
+        range.setStart(node, 0)
+        range.setEndAfter(content)
+      } else if (scenario === 'terminal-reverse') {
+        const node = textNodeContaining(terminal, terminalText)
+        selection.removeAllRanges()
+        selection.setBaseAndExtent(node, node.length, node, 0)
+        if (!mobile) dispatchContextMenu(terminal, selection.getRangeAt(0))
+        else document.dispatchEvent(new Event('selectionchange'))
+        return
+      } else if (scenario === 'before-content-to-first') {
+        const node = textNodeContaining(first, firstText)
+        range.setStartBefore(content)
+        range.setEnd(node, node.length)
+        target = first
+      } else if (scenario === 'first-through-terminal') {
+        const firstNode = textNodeContaining(first, firstText)
+        const terminalNode = textNodeContaining(terminal, terminalText)
+        range.setStart(firstNode, 0)
+        range.setEnd(terminalNode, terminalNode.length)
+        target = first
+      } else if (scenario === 'terminal-through-footer') {
+        if (!footer) throw new Error('Missing footer')
+        const node = textNodeContaining(terminal, terminalText)
+        range.setStart(node, 0)
+        range.setEndAfter(footer)
+      } else if (scenario === 'pager-only') {
+        if (!footer) throw new Error('Missing footer')
+        range.selectNodeContents(footer)
+        target = footer
+      } else if (scenario === 'collapsed-terminal') {
+        const node = textNodeContaining(terminal, terminalText)
+        range.setStart(node, 0)
+        range.collapse(true)
+      } else if (scenario === 'whitespace-only') {
+        if (!whitespace) throw new Error('Missing whitespace fixture')
+        range.selectNodeContents(whitespace)
+        target = whitespace
+      } else {
+        range.selectNodeContents(nested)
+        target = nested
+      }
+
+      selection.removeAllRanges()
+      selection.addRange(range)
+      if (mobile) document.dispatchEvent(new Event('selectionchange'))
+      else dispatchContextMenu(target, range)
+    },
+    {
+      scenario,
+      mobile: options.mobile ?? false,
+      terminalText: SELECTION_TERMINAL_TEXT,
+      firstText: SELECTION_FIRST_TEXT,
+      nestedText: SELECTION_NESTED_TEXT
+    }
+  )
+}
+
+async function waitForAskAiBoundaryFixture(page: Page): Promise<void> {
+  await page.locator('.vp-doc [data-kpo-ask-block-id]').first().waitFor({ state: 'attached' })
+  await page.locator('.KpoAskAiProvider').first().waitFor({ state: 'attached' })
+  await waitForPageLayoutReady(page)
+}
+
+async function mountAskAiBoundaryFixture(page: Page): Promise<void> {
+  await page.evaluate(
+    ({ firstText, middleText, nestedText, terminalText }) => {
+      const content = document.querySelector<HTMLElement>('.vp-doc')
+      if (!content) throw new Error('Missing .vp-doc')
+
+      content.innerHTML = `
+        <h1 data-kpo-ask-block-id="selection-heading">Selection Boundary Contract</h1>
+        <p data-kpo-ask-block-id="selection-first">${firstText}</p>
+        <p data-kpo-ask-block-id="selection-middle">${middleText}</p>
+        <p data-kpo-ask-block-id="selection-nested">Nested boundary phrase combines <strong>bold boundary text</strong> and <code>inline boundary code</code> inside one paragraph.</p>
+        <p data-kpo-ask-block-id="selection-whitespace-block">
+          <span id="selection-whitespace">   </span>
+        </p>
+        <p data-kpo-ask-block-id="selection-terminal">${terminalText}</p>
+      `
+
+      const nested = content.querySelector<HTMLElement>(
+        '[data-kpo-ask-block-id="selection-nested"]'
+      )
+      if (nested) nested.dataset.expectedText = nestedText
+    },
+    {
+      firstText: SELECTION_FIRST_TEXT,
+      middleText: SELECTION_MIDDLE_TEXT,
+      nestedText: SELECTION_NESTED_TEXT,
+      terminalText: SELECTION_TERMINAL_TEXT
+    }
+  )
+}
+
 async function stubAskAiSideEffects(page: Page): Promise<void> {
   await page.addInitScript(() => {
     Object.defineProperty(navigator, 'clipboard', {
@@ -1152,6 +1323,148 @@ test('delayed Playground completion does not close an open ask ai menu', async (
   releasePlayground()
   await expect(page.locator('.kpo-playground').first()).toHaveClass(/kpo-playground--ready/)
   await expect(page.locator('.kpo-ai-menu')).toBeVisible()
+})
+
+test('ask ai opens for content selections with browser boundary endpoints', async ({ page }) => {
+  await clearStorage(page)
+  await stubSelectionBoundaryAskAiContext(page)
+  await page.goto(UI_FIXTURE_ROUTE)
+  await waitForAskAiBoundaryFixture(page)
+  await mountAskAiBoundaryFixture(page)
+
+  for (const scenario of [
+    'terminal-inside',
+    'terminal-after-content',
+    'terminal-reverse',
+    'before-content-to-first',
+    'first-through-terminal',
+    'terminal-through-footer',
+    'nested-inline'
+  ] satisfies SelectionBoundaryScenario[]) {
+    await dispatchAskAiBoundarySelection(page, scenario)
+    await expect(page.locator('.kpo-ai-menu'), scenario).toBeVisible()
+    await page.keyboard.press('Escape')
+    await expect(page.locator('.kpo-ai-menu'), scenario).toHaveCount(0)
+  }
+})
+
+test('ask ai ignores empty and non-content boundary selections', async ({ page }) => {
+  await clearStorage(page)
+  await stubSelectionBoundaryAskAiContext(page)
+  await page.goto(UI_FIXTURE_ROUTE)
+  await waitForAskAiBoundaryFixture(page)
+  await mountAskAiBoundaryFixture(page)
+
+  for (const scenario of [
+    'pager-only',
+    'collapsed-terminal',
+    'whitespace-only'
+  ] satisfies SelectionBoundaryScenario[]) {
+    await dispatchAskAiBoundarySelection(page, scenario)
+    await expect(page.locator('.kpo-ai-menu'), scenario).toHaveCount(0)
+  }
+})
+
+test('ask ai mobile bubble uses the clipped terminal paragraph rect', async ({ page }) => {
+  await clearStorage(page)
+  await stubSelectionBoundaryAskAiContext(page)
+  await page.setViewportSize(LAYOUT_VIEWPORTS.mobilePhone)
+  await page.goto(UI_FIXTURE_ROUTE)
+  await waitForAskAiBoundaryFixture(page)
+  await mountAskAiBoundaryFixture(page)
+
+  await dispatchAskAiBoundarySelection(page, 'terminal-after-content', { mobile: true })
+
+  await expect(page.locator('.kpo-ai-menu')).toBeVisible()
+})
+
+test('ask ai prompt clips selection to vp-doc and excludes pager text', async ({ page }) => {
+  await setStorage(page, { 'kpo:ask-ai-provider': 'clipboard' })
+  await stubAskAiSideEffects(page)
+  await stubSelectionBoundaryAskAiContext(page)
+  await page.goto(UI_FIXTURE_ROUTE)
+  await waitForAskAiBoundaryFixture(page)
+  await mountAskAiBoundaryFixture(page)
+  await selectAskAiProviderDesktop(page, 'Копировать промпт')
+
+  await dispatchAskAiBoundarySelection(page, 'terminal-through-footer')
+  const menuItem = page.locator('.kpo-ai-menu__item')
+  await expect(menuItem).toBeEnabled()
+  await menuItem.click()
+
+  let prompt = ''
+  await expect
+    .poll(async () => {
+      prompt = await page.evaluate(() => {
+        return (
+          (window as unknown as { __kpoCopiedPrompts?: string[] }).__kpoCopiedPrompts?.at(-1) ?? ''
+        )
+      })
+      return prompt.length
+    })
+    .toBeGreaterThan(0)
+
+  const selectedSection = prompt.split('[Выделенный фрагмент]\n')[1] ?? ''
+  expect(selectedSection).toContain(SELECTION_TERMINAL_TEXT)
+  expect(selectedSection).not.toContain('Pager')
+  expect(selectedSection).not.toContain('Следующая')
+  expect(selectedSection).not.toContain('Введение')
+})
+
+test('ask ai keeps intersected boundary blocks in document order', async ({ page }) => {
+  await setStorage(page, { 'kpo:ask-ai-provider': 'clipboard' })
+  await stubAskAiSideEffects(page)
+  await stubSelectionBoundaryAskAiContext(page)
+  await page.goto(UI_FIXTURE_ROUTE)
+  await waitForAskAiBoundaryFixture(page)
+  await mountAskAiBoundaryFixture(page)
+  await selectAskAiProviderDesktop(page, 'Копировать промпт')
+
+  await dispatchAskAiBoundarySelection(page, 'first-through-terminal')
+  const menuItem = page.locator('.kpo-ai-menu__item')
+  await expect(menuItem).toBeEnabled()
+  await menuItem.click()
+
+  let prompt = ''
+  await expect
+    .poll(async () => {
+      prompt = await page.evaluate(() => {
+        return (
+          (window as unknown as { __kpoCopiedPrompts?: string[] }).__kpoCopiedPrompts?.at(-1) ?? ''
+        )
+      })
+      return prompt.length
+    })
+    .toBeGreaterThan(0)
+
+  const selectedSection = prompt.split('[Выделенный фрагмент]\n')[1] ?? ''
+  const selectedTexts = [
+    SELECTION_FIRST_TEXT,
+    SELECTION_MIDDLE_TEXT,
+    SELECTION_NESTED_TEXT,
+    SELECTION_TERMINAL_TEXT
+  ]
+  const positions = selectedTexts.map((text) => selectedSection.indexOf(text))
+  expect(
+    positions.every((position) => position >= 0),
+    selectedSection
+  ).toBe(true)
+  expect(positions).toEqual([...positions].sort((left, right) => left - right))
+  expect(selectedSection).not.toContain('Pager')
+})
+
+test('ask ai boundary menu closes on route change', async ({ page }) => {
+  await clearStorage(page)
+  await stubSelectionBoundaryAskAiContext(page)
+  await page.goto(UI_FIXTURE_ROUTE)
+  await waitForAskAiBoundaryFixture(page)
+  await mountAskAiBoundaryFixture(page)
+  await dispatchAskAiBoundarySelection(page, 'terminal-after-content')
+  await expect(page.locator('.kpo-ai-menu')).toBeVisible()
+
+  await page.goto('intro')
+
+  await expect(page.locator('.kpo-ai-menu')).toHaveCount(0)
 })
 
 test('ask ai waits for prompt preparation before first clipboard copy', async ({ page }) => {
