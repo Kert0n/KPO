@@ -534,6 +534,29 @@ async function stubAskAiSideEffects(page: Page): Promise<void> {
   })
 }
 
+async function stubClipboardFailure(page: Page): Promise<void> {
+  await page.addInitScript(() => {
+    ;(window as unknown as { __kpoCopyAttempts: string[] }).__kpoCopyAttempts = []
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: {
+        writeText: async () => {
+          ;(window as unknown as { __kpoCopyAttempts: string[] }).__kpoCopyAttempts.push(
+            'clipboard-api'
+          )
+          throw new DOMException('blocked', 'NotAllowedError')
+        }
+      }
+    })
+    document.execCommand = ((command: string) => {
+      ;(window as unknown as { __kpoCopyAttempts: string[] }).__kpoCopyAttempts.push(
+        `textarea-${command}`
+      )
+      return false
+    }) as typeof document.execCommand
+  })
+}
+
 async function selectAskAiProviderDesktop(page: Page, providerLabel: string): Promise<void> {
   const flyout = page.locator('.VPNavBar .KpoAskAiProvider')
   await flyout.hover()
@@ -1049,26 +1072,7 @@ test('ask ai starts clipboard copy before opening provider tab', async ({ page }
 
 test('ask ai manual prompt appears only after clipboard methods fail', async ({ page }) => {
   await clearStorage(page)
-  await page.addInitScript(() => {
-    ;(window as unknown as { __kpoCopyAttempts: string[] }).__kpoCopyAttempts = []
-    Object.defineProperty(navigator, 'clipboard', {
-      configurable: true,
-      value: {
-        writeText: async () => {
-          ;(window as unknown as { __kpoCopyAttempts: string[] }).__kpoCopyAttempts.push(
-            'clipboard-api'
-          )
-          throw new DOMException('blocked', 'NotAllowedError')
-        }
-      }
-    })
-    document.execCommand = ((command: string) => {
-      ;(window as unknown as { __kpoCopyAttempts: string[] }).__kpoCopyAttempts.push(
-        `textarea-${command}`
-      )
-      return false
-    }) as typeof document.execCommand
-  })
+  await stubClipboardFailure(page)
 
   await page.goto('lectures/10')
   await selectAskAiProviderDesktop(page, 'Копировать промпт')
@@ -1076,11 +1080,43 @@ test('ask ai manual prompt appears only after clipboard methods fail', async ({ 
 
   await expect(page.locator('.kpo-ai-toast')).toHaveText('Copy prompt manually')
   await expect(page.locator('.kpo-ai-manual')).toBeVisible()
+  const manualTextarea = page.locator('.kpo-ai-manual textarea')
+  const manualClose = page.locator('.kpo-ai-manual button')
+  await expect(manualTextarea).toBeFocused()
+  await page.keyboard.press('Tab')
+  await expect(manualClose).toBeFocused()
+  await page.keyboard.press('Tab')
+  await expect(manualTextarea).toBeFocused()
+  await page.keyboard.press('Shift+Tab')
+  await expect(manualClose).toBeFocused()
+  await page.keyboard.press('Escape')
+  await expect(page.locator('.kpo-ai-manual')).toHaveCount(0)
+  await expect(page.locator('.KpoAskAiProvider > button')).toBeFocused()
 
   const attempts = await page.evaluate(() => {
     return (window as unknown as { __kpoCopyAttempts: string[] }).__kpoCopyAttempts
   })
   expect(attempts).toEqual(['clipboard-api', 'textarea-copy'])
+})
+
+test('ask ai manual prompt restores focus to the visible responsive provider control', async ({
+  page
+}) => {
+  await setStorage(page, { 'kpo:ask-ai-provider': 'clipboard' })
+  await stubClipboardFailure(page)
+
+  for (const scenario of [
+    { viewport: { width: 800, height: 900 }, selector: '.KpoNavBarExtra > button' },
+    { viewport: { width: 390, height: 844 }, selector: '.VPNavBarHamburger' }
+  ]) {
+    await page.setViewportSize(scenario.viewport)
+    await page.goto('lectures/10')
+    await selectTextAndClickAskAiMenuItem(page, 'RESTful API')
+    await expect(page.locator('.kpo-ai-manual')).toBeVisible()
+    await page.keyboard.press('Escape')
+    await expect(page.locator('.kpo-ai-manual')).toHaveCount(0)
+    await expect(page.locator(scenario.selector)).toBeFocused()
+  }
 })
 
 test('ask ai copies full page context without duplicating VitePress base', async ({ page }) => {
