@@ -245,13 +245,3 @@ Inline code with a long token:
 ## Extremely Long Heading Fixture For Mobile Viewport Containment And Overflow Guard
 
 ### Extremely Long Third Level Heading Fixture For Mobile Viewport Containment And Overflow Guard
-
-## Language-only Fixture
-
-::: only kotlin
-fixture-kotlin-only
-:::
-
-::: only java
-fixture-java-only
-:::

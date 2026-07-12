@@ -1461,6 +1461,16 @@ test('language-only text follows global language used by ordinary code switchers
   const firstSwitcher = page.locator('.kpo-switcher').first()
   await expectActiveTab(firstSwitcher, 'Java')
 
+  await page.locator('.vp-doc').evaluate((content) => {
+    const kotlin = document.createElement('div')
+    kotlin.className = 'kpo-only kpo-only--kotlin'
+    kotlin.textContent = 'fixture-kotlin-only'
+    const java = document.createElement('div')
+    java.className = 'kpo-only kpo-only--java'
+    java.textContent = 'fixture-java-only'
+    content.append(kotlin, java)
+  })
+
   await expect
     .poll(async () => page.evaluate(() => document.documentElement.dataset.kpoLang ?? ''))
     .toBe('java')
