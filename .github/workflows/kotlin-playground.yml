@@ -1,0 +1,37 @@
+name: Kotlin Playground
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: kotlin-playground-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  kotlin-playground:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: gradle
+      - run: npm ci
+      - run: npm run kotlin:check
+      - name: Upload extraction manifest
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: kotlin-snippets-manifest
+          path: .generated/kotlin-snippets/manifest.json
+          if-no-files-found: error
+          retention-days: 7

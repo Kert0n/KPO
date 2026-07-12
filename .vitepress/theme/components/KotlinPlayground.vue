@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref, useTemplateRef } from 'vue'
+import { KOTLIN_VERSION } from '../../shared/kotlinTooling'
 import {
   registerPlayground,
   unregisterPlayground,
@@ -73,6 +74,7 @@ onMounted(async () => {
   try {
     const { default: createPlayground } = await import('kotlin-playground')
     await createPlayground(target, {
+      version: KOTLIN_VERSION,
       onChange(code) {
         updatePlaygroundCode(props.askBlockId, code)
       },

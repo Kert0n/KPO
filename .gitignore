@@ -1,5 +1,8 @@
 # Зависимости и артефакты сборки
 node_modules/
+.generated/
+.gradle/
+build/
 .vitepress/cache/
 .vitepress/dist/
 test-results/
