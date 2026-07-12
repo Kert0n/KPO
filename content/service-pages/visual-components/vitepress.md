@@ -7,6 +7,11 @@ lastUpdated: false
 
 # Visual Component Fixtures
 
+This page is intentionally hidden from navigation. It contains stable markup fixtures for layout, markdown extensions,
+language switchers, Mermaid, tables, images and Kotlin Playground behavior.
+
+## Code Switchers Without Author Defaults
+
 :::: multi-code "Fixture switcher one"
 
 ```kotlin
@@ -30,6 +35,70 @@ value := "one"
 ```
 
 ::::
+
+:::: multi-code "Fixture switcher two"
+
+```kotlin
+val value = "two"
+```
+
+```csharp
+var value = "two";
+```
+
+```java
+var value = "two";
+```
+
+```go
+value := "two"
+```
+
+::::
+
+:::: multi-code "Fixture switcher three"
+
+```kotlin
+val value = "three"
+```
+
+```csharp
+var value = "three";
+```
+
+```java
+var value = "three";
+```
+
+```go
+value := "three"
+```
+
+::::
+
+## Author Default
+
+:::: multi-code "Fixture author default" {default=go}
+
+```kotlin
+val selected = "kotlin"
+```
+
+```csharp
+var selected = "csharp";
+```
+
+```java
+var selected = "java";
+```
+
+```go
+selected := "go"
+```
+
+::::
+
+## Playground
 
 :::: multi-code "Fixture Kotlin Playground"
 

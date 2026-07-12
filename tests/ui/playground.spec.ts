@@ -269,6 +269,7 @@ test('persisted language hydration keeps switcher controls geometrically stable'
     })
     const ssrPage = await ssrContext.newPage()
     await ssrPage.goto(new URL(UI_FIXTURE_ROUTE, String(testInfo.project.use.baseURL)).href)
+    await ssrPage.evaluate(() => document.fonts.ready)
     const ssrGeometry = await measureSwitcherControlGeometry(
       ssrPage.locator('.kpo-switcher').first()
     )
