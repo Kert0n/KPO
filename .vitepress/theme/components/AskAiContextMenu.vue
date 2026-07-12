@@ -51,7 +51,8 @@ onMounted(() => {
   document.addEventListener('keydown', onKeydown)
   document.addEventListener('selectionchange', onSelectionChange)
   document.addEventListener('pointerup', onPointerUp)
-  window.addEventListener('scroll', hideMenu, true)
+  document.addEventListener('wheel', onScrollIntent, { passive: true })
+  document.addEventListener('touchmove', onScrollIntent, { passive: true })
   window.addEventListener('resize', hideMenu)
   contextLoader.queuePrefetch()
 })
@@ -62,7 +63,8 @@ onBeforeUnmount(() => {
   document.removeEventListener('keydown', onKeydown)
   document.removeEventListener('selectionchange', onSelectionChange)
   document.removeEventListener('pointerup', onPointerUp)
-  window.removeEventListener('scroll', hideMenu, true)
+  document.removeEventListener('wheel', onScrollIntent)
+  document.removeEventListener('touchmove', onScrollIntent)
   window.removeEventListener('resize', hideMenu)
   clearToast()
   clearMobileSelectionTimer()
@@ -130,7 +132,23 @@ function onDocumentClick(event: MouseEvent): void {
 
 function onKeydown(event: KeyboardEvent): void {
   if (handleDialogKeydown(event)) return
-  if (event.key === 'Escape') hideMenu()
+  if (event.key === 'Escape' || isScrollIntentKey(event)) hideMenu()
+}
+
+function onScrollIntent(): void {
+  hideMenu()
+}
+
+function isScrollIntentKey(event: KeyboardEvent): boolean {
+  if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey) return false
+  const target = event.target
+  if (
+    target instanceof HTMLElement &&
+    (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName))
+  ) {
+    return false
+  }
+  return ['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End', ' '].includes(event.key)
 }
 
 async function askAi(): Promise<void> {

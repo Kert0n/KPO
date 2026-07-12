@@ -935,6 +935,43 @@ test('ask ai context menu appears for selected document text', async ({ page }) 
   await expect(page.locator('.kpo-ai-menu')).toContainText('Ask ChatGPT about this')
 })
 
+test('ask ai menu ignores programmatic viewport stabilization', async ({ page }) => {
+  await setStorage(page, { 'kpo:playground-mode': '0' })
+  await page.goto(UI_FIXTURE_ROUTE)
+  await waitForPageLayoutReady(page)
+  await selectTextAndOpenAskAiMenu(page, 'This page is intentionally hidden from navigation.')
+
+  await page.evaluate(() => window.scrollBy({ top: 120, behavior: 'auto' }))
+
+  await expect(page.locator('.kpo-ai-menu')).toBeVisible()
+})
+
+test('ask ai menu closes on wheel scroll intent', async ({ page }) => {
+  await setStorage(page, { 'kpo:playground-mode': '0' })
+  await page.goto(UI_FIXTURE_ROUTE)
+  await waitForPageLayoutReady(page)
+  await selectTextAndOpenAskAiMenu(page, 'This page is intentionally hidden from navigation.')
+
+  await page.mouse.wheel(0, 120)
+
+  await expect(page.locator('.kpo-ai-menu')).toHaveCount(0)
+})
+
+test('ask ai menu closes on touch and keyboard scroll intent', async ({ page }) => {
+  await setStorage(page, { 'kpo:playground-mode': '0' })
+  await page.goto(UI_FIXTURE_ROUTE)
+  await waitForPageLayoutReady(page)
+  const selectedText = 'This page is intentionally hidden from navigation.'
+  await selectTextAndOpenAskAiMenu(page, selectedText)
+
+  await page.locator('.vp-doc').dispatchEvent('touchmove')
+  await expect(page.locator('.kpo-ai-menu')).toHaveCount(0)
+
+  await selectTextAndOpenAskAiMenu(page, selectedText)
+  await page.keyboard.press('PageDown')
+  await expect(page.locator('.kpo-ai-menu')).toHaveCount(0)
+})
+
 test('ask ai waits for prompt preparation before first clipboard copy', async ({ page }) => {
   await clearStorage(page)
   let releaseContext!: () => void
