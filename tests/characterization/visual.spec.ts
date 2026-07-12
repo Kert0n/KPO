@@ -7,6 +7,7 @@ import {
   UI_FIXTURE_ROUTE,
   waitForStableUi
 } from './helpers'
+import { stubUiServiceAskAiContext } from '../helpers/serviceFixtures'
 
 test.describe('Linux Chromium golden master', () => {
   test.beforeEach(async ({ page }) => {
@@ -104,6 +105,7 @@ test.describe('Linux Chromium golden master', () => {
 
   test('Ask AI selection menu', async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 900 })
+    await stubUiServiceAskAiContext(page)
     await page.goto(UI_FIXTURE_ROUTE)
     await waitForStableUi(page)
     await selectText(page, 'This page is intentionally hidden from navigation.')
@@ -124,6 +126,7 @@ test.describe('Linux Chromium golden master', () => {
       document.execCommand = (() => false) as typeof document.execCommand
     })
     await page.setViewportSize({ width: 1280, height: 900 })
+    await stubUiServiceAskAiContext(page)
     await page.goto(UI_FIXTURE_ROUTE)
     await waitForStableUi(page)
     await selectText(page, 'This page is intentionally hidden from navigation.')

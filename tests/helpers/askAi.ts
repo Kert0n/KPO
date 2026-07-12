@@ -3,7 +3,6 @@ import { expect, type Page } from '@playwright/test'
 type OpenAskAiMenuOptions = {
   activate?: boolean
   allowManualFallback?: boolean
-  expectedConsoleErrors?: RegExp[]
 }
 
 type BrowserIssue = {
@@ -23,8 +22,7 @@ export async function openAskAiMenuWhenReady(
   const issues: BrowserIssue[] = []
   const onPageError = (error: Error) => issues.push({ kind: 'pageerror', message: error.message })
   const onConsole = (message: { type(): string; text(): string }) => {
-    const expected = options.expectedConsoleErrors?.some((pattern) => pattern.test(message.text()))
-    if (message.type() === 'error' && !expected) {
+    if (message.type() === 'error') {
       issues.push({ kind: 'console', message: message.text() })
     }
   }

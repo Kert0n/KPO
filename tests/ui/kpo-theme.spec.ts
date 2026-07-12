@@ -5,6 +5,7 @@ import {
 } from '../../.vitepress/theme/lib/contentLayoutTokens'
 import { contentPagesFor } from '../../.vitepress/shared/content/contentCatalog'
 import { openAskAiMenuWhenReady } from '../helpers/askAi'
+import { stubUiServiceAskAiContext } from '../helpers/serviceFixtures'
 
 const CENTER_TOLERANCE_PX = 2
 const SCALE_TOLERANCE = 0.05
@@ -47,22 +48,6 @@ async function setStorage(page: Page, entries: Record<string, string>): Promise<
     },
     { baseline: COMPONENT_STORAGE_BASELINE, values: entries }
   )
-}
-
-async function stubUiAskAiContext(page: Page): Promise<void> {
-  await page.route('**/__ask-ai-context/service-pages/ui-contract.json', async (route) => {
-    await route.fulfill({
-      contentType: 'application/json',
-      body: JSON.stringify({
-        courseTitle: 'KPO',
-        courseDescription: 'UI contract fixture',
-        pageTitle: 'UI contract',
-        pageDescription: '',
-        sourcePath: 'service-pages/ui-contract/vitepress.md',
-        blocks: []
-      })
-    })
-  })
 }
 
 async function expectActiveTab(switcher: Locator, language: string): Promise<void> {
@@ -924,7 +909,7 @@ test('local search result navigates to the matched section', async ({ page }) =>
 
 test('ask ai context menu appears for selected document text', async ({ page }) => {
   await clearStorage(page)
-  await stubUiAskAiContext(page)
+  await stubUiServiceAskAiContext(page)
   await page.goto(UI_FIXTURE_ROUTE)
 
   await selectTextAndOpenAskAiMenu(page, 'This page is intentionally hidden from navigation.')
@@ -935,7 +920,7 @@ test('ask ai context menu appears for selected document text', async ({ page }) 
 
 test('ask ai menu ignores programmatic viewport stabilization', async ({ page }) => {
   await setStorage(page, { 'kpo:playground-mode': '0' })
-  await stubUiAskAiContext(page)
+  await stubUiServiceAskAiContext(page)
   await page.goto(UI_FIXTURE_ROUTE)
   await waitForPageLayoutReady(page)
   await selectTextAndOpenAskAiMenu(page, 'This page is intentionally hidden from navigation.')
@@ -947,7 +932,7 @@ test('ask ai menu ignores programmatic viewport stabilization', async ({ page })
 
 test('ask ai menu closes on wheel scroll intent', async ({ page }) => {
   await setStorage(page, { 'kpo:playground-mode': '0' })
-  await stubUiAskAiContext(page)
+  await stubUiServiceAskAiContext(page)
   await page.goto(UI_FIXTURE_ROUTE)
   await waitForPageLayoutReady(page)
   await selectTextAndOpenAskAiMenu(page, 'This page is intentionally hidden from navigation.')
@@ -959,7 +944,7 @@ test('ask ai menu closes on wheel scroll intent', async ({ page }) => {
 
 test('ask ai menu closes on touch and keyboard scroll intent', async ({ page }) => {
   await setStorage(page, { 'kpo:playground-mode': '0' })
-  await stubUiAskAiContext(page)
+  await stubUiServiceAskAiContext(page)
   await page.goto(UI_FIXTURE_ROUTE)
   await waitForPageLayoutReady(page)
   const selectedText = 'This page is intentionally hidden from navigation.'
@@ -975,7 +960,7 @@ test('ask ai menu closes on touch and keyboard scroll intent', async ({ page }) 
 
 test('delayed Playground completion does not close an open ask ai menu', async ({ page }) => {
   await setStorage(page, { 'kpo:playground-mode': '1' })
-  await stubUiAskAiContext(page)
+  await stubUiServiceAskAiContext(page)
   let releasePlayground!: () => void
   const playgroundGate = new Promise<void>((resolve) => {
     releasePlayground = resolve
@@ -1218,11 +1203,7 @@ test('ask ai keeps clipboard fallback when page context is unavailable', async (
 
   await page.route('**/__ask-ai-context/**', async (route) => {
     unavailableContextResponses += 1
-    await route.fulfill({
-      status: 404,
-      contentType: 'text/plain',
-      body: 'missing context'
-    })
+    await route.fulfill({ status: 204 })
   })
 
   await page.goto('lectures/10')
@@ -1230,10 +1211,7 @@ test('ask ai keeps clipboard fallback when page context is unavailable', async (
 
   const selectedText =
     'idempotency: повтор некоторых запросов должен быть безопасен для итогового состояния;'
-  await openAskAiMenuWhenReady(page, selectedText, {
-    activate: true,
-    expectedConsoleErrors: [/Failed to load resource: the server responded with a status of 404/]
-  })
+  await openAskAiMenuWhenReady(page, selectedText, { activate: true })
 
   await expect(page.locator('.kpo-ai-toast')).toHaveText('Prompt copied without page context')
   expect(unavailableContextResponses).toBeGreaterThan(0)
