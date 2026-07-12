@@ -187,7 +187,21 @@ function setTableMode(block: HTMLElement, mode: AdaptiveTableMode | null): void 
   if (mode) {
     block.classList.add(`kpo-table--${mode}`)
     block.dataset.kpoTableMode = mode
+    if (mode === 'scroll') {
+      block.tabIndex = 0
+      block.setAttribute('role', 'region')
+      block.setAttribute('aria-label', 'Прокручиваемая таблица')
+    } else {
+      clearScrollableRegion(block)
+    }
   } else {
     delete block.dataset.kpoTableMode
+    clearScrollableRegion(block)
   }
+}
+
+function clearScrollableRegion(block: HTMLElement): void {
+  block.removeAttribute('tabindex')
+  block.removeAttribute('role')
+  block.removeAttribute('aria-label')
 }

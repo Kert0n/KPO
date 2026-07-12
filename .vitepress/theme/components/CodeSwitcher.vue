@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, useTemplateRef, watch } from 'vue'
+import { computed, onMounted, ref, useId, useTemplateRef, watch } from 'vue'
 import KotlinPlayground from './KotlinPlayground.vue'
 import { useActiveCodeLanguage } from '../composables/useActiveCodeLanguage'
 import { useCodeLanguage } from '../composables/useCodeLanguage'
@@ -54,6 +54,7 @@ const { playgroundMode, setPlaygroundMode } = usePlaygroundMode()
 const rootElement = useTemplateRef('root')
 const blocksElement = useTemplateRef('blocks')
 const playgroundElement = useTemplateRef<{ lifecycle: PlaygroundLifecycle }>('playground')
+const accessibilityId = `kpo-code-${props.askBlockId || useId()}`
 const mounted = ref(false)
 const tabs = useCodeTabs({ langs: () => props.langs, labels: () => props.labels })
 const { languages: langList } = tabs
@@ -70,7 +71,9 @@ const { displayLanguage: displayLang } = language
 const shiki = useShikiBlocks({
   blocks: blocksElement,
   displayLanguage: displayLang,
-  encodedPlaygroundCode: () => props.playgroundCode
+  encodedPlaygroundCode: () => props.playgroundCode,
+  tabId: (language) => tabId(language),
+  panelId: (language) => codePanelId(language)
 })
 const { kotlinCode } = shiki
 const playground = usePlaygroundController({
@@ -111,6 +114,20 @@ function onTabsKeydown(event: KeyboardEvent): void {
   event.preventDefault()
   void selectLanguage(next, event)
 }
+
+function tabId(lang: string): string {
+  return `${accessibilityId}-tab-${lang}`
+}
+
+function codePanelId(lang: string): string {
+  return `${accessibilityId}-panel-${lang}`
+}
+
+function controlledPanelId(lang: string): string {
+  return lang === 'kotlin' && playgroundActive.value
+    ? `${accessibilityId}-playground-panel`
+    : codePanelId(lang)
+}
 </script>
 
 <template>
@@ -145,9 +162,11 @@ function onTabsKeydown(event: KeyboardEvent): void {
             :key="lang"
             type="button"
             role="tab"
+            :id="tabId(lang)"
             class="kpo-switcher__tab"
             :class="{ 'kpo-switcher__tab--active': lang === displayLang }"
             :aria-selected="lang === displayLang"
+            :aria-controls="controlledPanelId(lang)"
             :tabindex="lang === displayLang ? 0 : -1"
             @click="void selectLanguage(lang)"
           >
@@ -167,6 +186,8 @@ function onTabsKeydown(event: KeyboardEvent): void {
       v-show="playgroundActive"
       :code="kotlinCode"
       :ask-block-id="askBlockId"
+      :panel-id="`${accessibilityId}-playground-panel`"
+      :labelledby="tabId('kotlin')"
       @failed="playground.markFailed"
     />
   </section>

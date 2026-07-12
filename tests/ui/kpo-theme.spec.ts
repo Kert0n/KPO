@@ -1264,6 +1264,34 @@ test('ask ai context menu appears for selected document text', async ({ page }) 
   await expect(page.locator('.kpo-ai-menu')).toContainText('Ask ChatGPT about this')
 })
 
+test('keyboard Ask AI menu owns focus and restores the invoking control', async ({ page }) => {
+  await clearStorage(page)
+  await stubUiServiceAskAiContext(page)
+  await page.goto(UI_FIXTURE_ROUTE)
+
+  const initiator = page.locator('.kpo-sidebar-toggle')
+  await initiator.focus()
+  await page.evaluate(() => {
+    const paragraph = [...document.querySelectorAll<HTMLElement>('.vp-doc p')].find((node) =>
+      node.textContent?.includes('This page is intentionally hidden from navigation.')
+    )
+    const selection = window.getSelection()
+    if (!paragraph || !selection) throw new Error('Missing fixture text')
+    const range = document.createRange()
+    range.selectNodeContents(paragraph)
+    selection.removeAllRanges()
+    selection.addRange(range)
+    paragraph.dispatchEvent(
+      new MouseEvent('contextmenu', { bubbles: true, cancelable: true, button: 0 })
+    )
+  })
+
+  await expect(page.locator('.kpo-ai-menu')).toBeFocused()
+  await page.keyboard.press('Escape')
+  await expect(page.locator('.kpo-ai-menu')).toHaveCount(0)
+  await expect(initiator).toBeFocused()
+})
+
 test('ask ai menu ignores programmatic viewport stabilization', async ({ page }) => {
   await setStorage(page, { 'kpo:playground-mode': '0' })
   await stubUiServiceAskAiContext(page)
@@ -1814,6 +1842,29 @@ test('ask ai mobile bubble appears after text selection', async ({ page }) => {
   await expect(mobileMenu).toContainText('Ask AI')
 })
 
+test('code tabs and panels expose stable accessible relationships', async ({ page }) => {
+  await clearStorage(page)
+  await page.goto(UI_FIXTURE_ROUTE)
+
+  const switcher = page.locator('.kpo-switcher').first()
+  const tabs = switcher.getByRole('tab')
+  expect(await tabs.count()).toBeGreaterThan(1)
+  for (const tab of await tabs.all()) {
+    const panelId = await tab.getAttribute('aria-controls')
+    const tabId = await tab.getAttribute('id')
+    expect(panelId).toBeTruthy()
+    expect(tabId).toBeTruthy()
+    const panel = switcher.locator(`[id="${panelId}"]`)
+    await expect(panel).toHaveAttribute('role', 'tabpanel')
+    await expect(panel).toHaveAttribute('aria-labelledby', tabId!)
+  }
+
+  await tabs.filter({ hasText: 'Java' }).click()
+  await expect(tabs.filter({ hasText: 'Java' })).toHaveAttribute('aria-selected', 'true')
+  const activePanelId = await tabs.filter({ hasText: 'Java' }).getAttribute('aria-controls')
+  await expect(switcher.locator(`[id="${activePanelId}"]`)).toHaveAttribute('aria-hidden', 'false')
+})
+
 test('code switchers without author defaults follow the latest global language', async ({
   page
 }) => {
@@ -2045,6 +2096,49 @@ test('fixture renders mermaid and keeps playground disabled for marked blocks', 
   await expect(playgroundOff).toHaveCount(1)
   await expect(playgroundOff.locator('.kpo-switcher__playground-toggle')).toHaveCount(0)
   await expect(playgroundOff.locator('.kpo-playground')).toHaveCount(0)
+})
+
+test('overflow regions expose accessible names and keyboard focus only when scrollable', async ({
+  page
+}) => {
+  await page.setViewportSize(LAYOUT_VIEWPORTS.mobilePhone)
+  await clearStorage(page)
+  await page.goto(UI_FIXTURE_ROUTE)
+  await waitForMermaid(page, { requireDiagrams: true })
+
+  const wideMermaid = page.locator('.kpo-mermaid--has-overflow .kpo-mermaid__viewport').first()
+  await expect(wideMermaid).toHaveAttribute('role', 'img')
+  await expect(wideMermaid).toHaveAttribute('aria-label', 'Диаграмма Mermaid')
+  await expect(wideMermaid).toHaveAttribute('tabindex', '0')
+
+  const smallMermaid = page.locator('.kpo-mermaid:not(.kpo-mermaid--has-overflow)').first()
+  await expect(smallMermaid.locator('.kpo-mermaid__viewport')).not.toHaveAttribute('tabindex', '0')
+
+  const scrollTable = page.locator('.kpo-content-block--table.kpo-table--scroll').first()
+  await expect(scrollTable).toHaveAttribute('role', 'region')
+  await expect(scrollTable).toHaveAttribute('aria-label', 'Прокручиваемая таблица')
+  await expect(scrollTable).toHaveAttribute('tabindex', '0')
+})
+
+test('reduced motion disables KPO transitions without changing normal mode', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  await clearStorage(page)
+  await page.goto(UI_FIXTURE_ROUTE)
+
+  for (const selector of [
+    '.kpo-sidebar-toggle',
+    '.kpo-switcher__tab',
+    '.kpo-switcher__playground-toggle'
+  ]) {
+    await expect
+      .poll(() =>
+        page
+          .locator(selector)
+          .first()
+          .evaluate((node) => getComputedStyle(node).transitionDuration)
+      )
+      .toMatch(/^(?:0s(?:, 0s)*)$/)
+  }
 })
 
 test('fixture text code blocks keep overflow local on mobile', async ({ page }) => {

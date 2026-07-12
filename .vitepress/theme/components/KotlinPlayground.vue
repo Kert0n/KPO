@@ -33,10 +33,14 @@ const props = withDefaults(
     code: string
     platform?: string
     askBlockId?: string
+    panelId?: string
+    labelledby?: string
   }>(),
   {
     platform: 'java',
-    askBlockId: ''
+    askBlockId: '',
+    panelId: '',
+    labelledby: ''
   }
 )
 
@@ -140,7 +144,14 @@ function destroyTargetInstance(target: HTMLElement): void {
 </script>
 
 <template>
-  <div ref="host" class="kpo-playground" :class="{ 'kpo-playground--ready': ready }">
+  <div
+    :id="panelId || undefined"
+    ref="host"
+    class="kpo-playground"
+    :class="{ 'kpo-playground--ready': ready }"
+    role="tabpanel"
+    :aria-labelledby="labelledby || undefined"
+  >
     <div v-if="!ready" class="kpo-playground__skeleton" aria-live="polite">
       Загрузка Kotlin Playground…
     </div>
