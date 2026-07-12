@@ -1,16 +1,17 @@
-import { ref, type Ref } from 'vue'
+import { ref } from 'vue'
 import { readSvgViewBox } from '../lib/mermaidLayoutModel'
 import { createMermaidConfig, type MermaidThemeTokens } from '../lib/mermaidThemeModel'
 
 export type MermaidRenderResult = 'rendered' | 'failed' | 'stale'
 
+export type MermaidRenderRequest = {
+  code: string
+  theme: MermaidThemeTokens
+}
+
 let renderQueue: Promise<void> = Promise.resolve()
 
-export function useMermaidRenderer(options: {
-  code: Ref<string>
-  instanceId: string
-  themeTokens: () => MermaidThemeTokens
-}) {
+export function useMermaidRenderer(options: { instanceId: string }) {
   const svg = ref('')
   const failed = ref(false)
   const errorMessage = ref('')
@@ -20,10 +21,10 @@ export function useMermaidRenderer(options: {
   let renderCounter = 0
   let disposed = false
 
-  async function render(): Promise<MermaidRenderResult> {
+  async function render(request: MermaidRenderRequest): Promise<MermaidRenderResult> {
     const currentGeneration = ++generation
-    const code = options.code.value
-    const theme = options.themeTokens()
+    const code = request.code
+    const theme = request.theme
     resetState()
 
     return enqueue(async () => {
