@@ -448,6 +448,11 @@ async function waitForScopedPlayground(
   }
 }
 
+async function waitForAnchorTransaction(switcher: Locator): Promise<void> {
+  await expect(switcher).toHaveAttribute('data-kpo-anchor-pending', 'true')
+  await expect(switcher).not.toHaveAttribute('data-kpo-anchor-pending', 'true')
+}
+
 async function expectCenteredAgainstPage(page: Page, locator: Locator): Promise<void> {
   const result = await locator.evaluate((node) => {
     const rect = node.getBoundingClientRect()
@@ -1784,7 +1789,7 @@ test('language click preserves viewport position inside the interacted code bloc
 
   const before = await measureViewportRelativeTo(switcher)
   await switcher.getByRole('tab', { name: 'Java' }).click()
-  await waitForPageLayoutReady(page)
+  await waitForAnchorTransaction(switcher)
   const after = await measureViewportRelativeTo(switcher)
 
   await expectViewportAnchorStable(before, after)
@@ -1806,7 +1811,7 @@ test('keyboard language switch preserves viewport position inside the interacted
   const before = await measureViewportRelativeTo(switcher)
   await switcher.getByRole('tab', { name: 'Kotlin' }).focus()
   await page.keyboard.press('ArrowRight')
-  await waitForPageLayoutReady(page)
+  await waitForAnchorTransaction(switcher)
   const after = await measureViewportRelativeTo(switcher)
 
   await expectViewportAnchorStable(before, after)
@@ -1827,7 +1832,7 @@ test('playground toggle preserves viewport position inside the interacted code b
 
   const before = await measureViewportRelativeTo(switcher)
   await switcher.getByRole('button', { name: /Playground/ }).click()
-  await page.waitForTimeout(250)
+  await waitForAnchorTransaction(switcher)
   const after = await measureViewportRelativeTo(switcher)
 
   await expectViewportAnchorStable(before, after)
