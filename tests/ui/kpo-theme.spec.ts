@@ -2674,25 +2674,97 @@ test('manual mermaid scroll is preserved across zoom and reset recenters', async
   })
 
   await diagram.getByRole('button', { name: 'Увеличить диаграмму' }).click()
-  await page.waitForTimeout(150)
   await expectNoPageOverflowFromVpDoc(page)
 
-  const ratioAfterZoom = await viewport.evaluate((node) => {
+  await expect
+    .poll(async () => {
+      const ratioAfterZoom = await viewport.evaluate((node) => {
+        const element = node as HTMLElement
+        return (element.scrollLeft + element.clientWidth / 2) / element.scrollWidth
+      })
+      return Math.abs(ratioAfterZoom - ratioBefore) <= 0.03
+    })
+    .toBe(true)
+
+  await diagram.getByRole('button', { name: 'Сбросить масштаб диаграммы' }).click()
+  await expectNoPageOverflowFromVpDoc(page)
+
+  await expect
+    .poll(async () => {
+      return viewport.evaluate((node) => {
+        const element = node as HTMLElement
+        const expected = Math.round((element.scrollWidth - element.clientWidth) / 2)
+        return Math.abs(Math.round(element.scrollLeft) - expected) <= 2
+      })
+    })
+    .toBe(true)
+})
+
+test('rapid mermaid zoom resize and reset publish only the latest layout', async ({ page }) => {
+  await page.setViewportSize(LAYOUT_VIEWPORTS.mobilePhone)
+  await page.goto(UI_FIXTURE_ROUTE)
+  await waitForMermaid(page, { requireDiagrams: true })
+
+  const diagram = page.locator('.kpo-mermaid--has-overflow').first()
+  const viewport = diagram.locator('.kpo-mermaid__viewport')
+  await diagram.evaluate((node) => {
+    const buttons = [...node.querySelectorAll<HTMLButtonElement>('button')]
+    const zoomIn = buttons.find(
+      (button) => button.getAttribute('aria-label') === 'Увеличить диаграмму'
+    )
+    const zoomOut = buttons.find(
+      (button) => button.getAttribute('aria-label') === 'Уменьшить диаграмму'
+    )
+    zoomIn?.click()
+    zoomIn?.click()
+    zoomOut?.click()
+  })
+  await page.setViewportSize(LAYOUT_VIEWPORTS.narrowDesktop)
+  await diagram.getByRole('button', { name: 'Сбросить масштаб диаграммы' }).click()
+
+  await expect(diagram.getByRole('button', { name: 'Сбросить масштаб диаграммы' })).toBeDisabled()
+  await expect
+    .poll(async () => {
+      return viewport.evaluate((node) => {
+        const element = node as HTMLElement
+        const expected = Math.round((element.scrollWidth - element.clientWidth) / 2)
+        return Math.abs(Math.round(element.scrollLeft) - expected) <= 2
+      })
+    })
+    .toBe(true)
+  await expectNoPageOverflowFromVpDoc(page)
+})
+
+test('mermaid theme render preserves manual viewport ownership', async ({ page }) => {
+  await page.setViewportSize(LAYOUT_VIEWPORTS.desktop)
+  await setStorage(page, { 'vitepress-theme-appearance': 'light' })
+  await page.goto(UI_FIXTURE_ROUTE)
+  await waitForMermaid(page, { requireDiagrams: true })
+
+  const diagram = page.locator('.kpo-mermaid--has-overflow').first()
+  const viewport = diagram.locator('.kpo-mermaid__viewport')
+  await viewport.evaluate((node) => {
+    const element = node as HTMLElement
+    element.scrollLeft = 0
+    element.dispatchEvent(new Event('scroll', { bubbles: true }))
+  })
+  const ratioBefore = await viewport.evaluate((node) => {
     const element = node as HTMLElement
     return (element.scrollLeft + element.clientWidth / 2) / element.scrollWidth
   })
-  expect(Math.abs(ratioAfterZoom - ratioBefore)).toBeLessThanOrEqual(0.03)
 
-  await diagram.getByRole('button', { name: 'Сбросить масштаб диаграммы' }).click()
-  await page.waitForTimeout(150)
-  await expectNoPageOverflowFromVpDoc(page)
-
-  const centered = await viewport.evaluate((node) => {
-    const element = node as HTMLElement
-    const expected = Math.round((element.scrollWidth - element.clientWidth) / 2)
-    return Math.abs(Math.round(element.scrollLeft) - expected) <= 2
-  })
-  expect(centered).toBe(true)
+  await page.locator('.VPSwitchAppearance').first().click()
+  await expect(page.locator('html')).toHaveClass(/\bdark\b/)
+  await expectMermaidThemeSynchronized(page)
+  await expect
+    .poll(async () => {
+      const ratioAfter = await viewport.evaluate((node) => {
+        const element = node as HTMLElement
+        return (element.scrollLeft + element.clientWidth / 2) / element.scrollWidth
+      })
+      return Math.abs(ratioAfter - ratioBefore) <= 0.03
+    })
+    .toBe(true)
 })
 
 test('mermaid zoom controls visibility follows overflow, hover and focus', async ({ page }) => {
@@ -2743,7 +2815,7 @@ test('fixture mermaid dark theme keeps label colors readable and token-based', a
       return page.locator('html').evaluate((node) => node.classList.contains('dark'))
     })
     .toBe(true)
-  await page.waitForTimeout(500)
+  await expectMermaidThemeSynchronized(page)
 
   const labels = await getMermaidLabelContrasts(page)
 

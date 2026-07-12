@@ -7,7 +7,8 @@ import {
   resolveScrollLeftForCenterRatio,
   type MermaidViewportMode
 } from '../lib/mermaidLayoutModel'
-import { waitAnimationFrames } from '../lib/viewportAnchor'
+
+export type MermaidLayoutResult = 'applied' | 'stale'
 
 export function useMermaidViewport(options: {
   root: Ref<HTMLElement | null>
@@ -34,41 +35,43 @@ export function useMermaidViewport(options: {
   let isProgrammaticScroll = false
   let programmaticScrollLeft: number | null = null
   let disposed = false
+  let layoutGeneration = 0
 
   function start(): void {
     disposed = false
     updateMeasurements()
     resizeObserver = new ResizeObserver(() => {
-      updateMeasurements()
       void syncLayout()
     })
     if (options.root.value) resizeObserver.observe(options.root.value)
-    window.addEventListener('resize', onWindowResize)
   }
 
   function dispose(): void {
     disposed = true
+    layoutGeneration += 1
     resizeObserver?.disconnect()
     resizeObserver = null
-    window.removeEventListener('resize', onWindowResize)
     if (programmaticScrollFrame !== null) window.cancelAnimationFrame(programmaticScrollFrame)
     programmaticScrollFrame = null
   }
 
   async function syncLayout(
     syncOptions: { forceCenter?: boolean; centerRatio?: number | null } = {}
-  ): Promise<void> {
+  ): Promise<MermaidLayoutResult> {
+    const generation = ++layoutGeneration
     await nextTick()
-    await waitAnimationFrames(2)
-    if (disposed) return
+    if (isStale(generation)) return 'stale'
     updateMeasurements()
+    if (isStale(generation)) return 'stale'
     updateOverflowState()
+    if (isStale(generation)) return 'stale'
 
     if (syncOptions.centerRatio !== undefined && syncOptions.centerRatio !== null) {
       restoreCenterRatio(syncOptions.centerRatio)
-      return
+      return isStale(generation) ? 'stale' : 'applied'
     }
     centerIfNeeded(Boolean(syncOptions.forceCenter))
+    return isStale(generation) ? 'stale' : 'applied'
   }
 
   function updateMeasurements(): void {
@@ -174,15 +177,16 @@ export function useMermaidViewport(options: {
     isProgrammaticScroll = false
     programmaticScrollLeft = null
     userScrolledViewport.value = true
+    layoutGeneration += 1
   }
 
   function resetUserScroll(): void {
     userScrolledViewport.value = false
+    layoutGeneration += 1
   }
 
-  function onWindowResize(): void {
-    updateMeasurements()
-    void syncLayout()
+  function isStale(generation: number): boolean {
+    return disposed || generation !== layoutGeneration
   }
 
   return {
