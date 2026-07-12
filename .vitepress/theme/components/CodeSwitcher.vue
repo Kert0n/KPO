@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, useTemplateRef, watch } from 'vue'
+import { computed, nextTick, onMounted, ref, useTemplateRef, watch } from 'vue'
 import KotlinPlayground from './KotlinPlayground.vue'
 import { useCodeLanguage } from '../composables/useCodeLanguage'
 import { usePlaygroundMode } from '../composables/usePlaygroundMode'
@@ -10,6 +10,7 @@ import {
   resolveDisplayLanguage
 } from '../lib/codeBlockModel'
 import { preserveViewportAnchor } from '../lib/viewportAnchor'
+import { waitForPlaygroundInitializations } from '../lib/playgroundLifecycle'
 
 /**
  * Переключатель языка для примера кода.
@@ -23,8 +24,9 @@ import { preserveViewportAnchor } from '../lib/viewportAnchor'
  * ставит markdown-плагин), к глобально выбранному языку компонент
  * синхронизируется после монтирования (см. mounted).
  *
- * Геометрия шапки постоянна: кнопка Playground не исчезает при смене
- * языка или сбое инициализации, а лишь деактивируется.
+ * Кнопка Playground относится только к активному Kotlin-варианту.
+ * Изменение геометрии и асинхронная инициализация компенсируются
+ * scoped viewport anchor, который ждёт именно этот Playground.
  */
 
 const props = withDefaults(
@@ -54,12 +56,16 @@ const { playgroundMode, setPlaygroundMode } = usePlaygroundMode()
 
 const rootElement = useTemplateRef('root')
 const blocksElement = useTemplateRef('blocks')
+const playgroundElement = useTemplateRef<{
+  whenSettled: () => Promise<'ready' | 'failed' | 'disposed'>
+}>('playground')
 const mounted = ref(false)
 const authorDefaultReleased = ref(false)
 const localUnsupportedLanguage = ref<string | null>(null)
 const playgroundFailed = ref(false)
 const playgroundEverShown = ref(false)
 const kotlinCode = ref('')
+const anchorPending = ref(false)
 
 const langList = computed(() => parseCsv(props.langs))
 const labelList = computed(() => parseCsv(props.labels))
@@ -92,6 +98,15 @@ const playgroundUsable = computed(() => {
       playgroundFailed: playgroundFailed.value,
       hasKotlinCode: kotlinCode.value !== ''
     })
+  )
+})
+
+const shouldShowPlaygroundToggle = computed(() => {
+  return (
+    props.allowPlayground &&
+    displayLang.value === 'kotlin' &&
+    hasKotlin.value &&
+    !playgroundFailed.value
   )
 })
 
@@ -158,28 +173,53 @@ function tabLabel(index: number): string {
   return labelList.value[index] ?? langList.value[index]
 }
 
-async function selectLanguage(lang: string): Promise<void> {
-  await preserveViewportAnchor(rootElement.value, () => {
-    authorDefaultReleased.value = true
+async function selectLanguage(lang: string, initiatingKeyEvent?: KeyboardEvent): Promise<void> {
+  await runAnchored(
+    () => {
+      authorDefaultReleased.value = true
 
-    if (isSupportedCodeLanguage(lang)) {
-      localUnsupportedLanguage.value = null
-      setActiveLanguage(lang)
-      return
-    }
+      if (isSupportedCodeLanguage(lang)) {
+        localUnsupportedLanguage.value = null
+        setActiveLanguage(lang)
+        return
+      }
 
-    localUnsupportedLanguage.value = lang
-  })
+      localUnsupportedLanguage.value = lang
+    },
+    2,
+    initiatingKeyEvent
+  )
 }
 
 async function togglePlayground(): Promise<void> {
-  await preserveViewportAnchor(
-    rootElement.value,
-    () => {
-      setPlaygroundMode(!playgroundMode.value)
-    },
-    { frames: 3 }
-  )
+  await runAnchored(() => {
+    setPlaygroundMode(!playgroundMode.value)
+  }, 3)
+}
+
+async function runAnchored(
+  mutate: () => void,
+  frames = 2,
+  initiatingKeyEvent?: KeyboardEvent
+): Promise<void> {
+  anchorPending.value = true
+  await nextTick()
+  try {
+    await preserveViewportAnchor(rootElement.value, mutate, {
+      frames,
+      settle: waitForActivePlayground,
+      initiatingKeyEvent
+    })
+  } finally {
+    anchorPending.value = false
+  }
+}
+
+async function waitForActivePlayground(): Promise<void> {
+  await nextTick()
+  await waitForPlaygroundInitializations()
+  if (!playgroundActive.value) return
+  await playgroundElement.value?.whenSettled()
 }
 
 function onTabsKeydown(event: KeyboardEvent): void {
@@ -196,18 +236,23 @@ function onTabsKeydown(event: KeyboardEvent): void {
   if (next === undefined) return
 
   event.preventDefault()
-  void selectLanguage(langs[(next + langs.length) % langs.length])
+  void selectLanguage(langs[(next + langs.length) % langs.length], event)
 }
 </script>
 
 <template>
-  <section ref="root" class="kpo-switcher" :data-kpo-ask-block-id="askBlockId || undefined">
+  <section
+    ref="root"
+    class="kpo-switcher"
+    :data-kpo-ask-block-id="askBlockId || undefined"
+    :data-kpo-anchor-pending="anchorPending || undefined"
+  >
     <header class="kpo-switcher__header">
       <span v-if="title" class="kpo-switcher__title">{{ title }}</span>
 
       <div class="kpo-switcher__controls">
         <button
-          v-if="allowPlayground"
+          v-if="shouldShowPlaygroundToggle"
           type="button"
           class="kpo-switcher__playground-toggle"
           :disabled="!playgroundUsable"
@@ -250,6 +295,7 @@ function onTabsKeydown(event: KeyboardEvent): void {
 
     <KotlinPlayground
       v-if="playgroundEverShown"
+      ref="playground"
       v-show="playgroundActive"
       :code="kotlinCode"
       :ask-block-id="askBlockId"

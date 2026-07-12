@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { resolveAnchoredScrollTop } from '../viewportAnchor'
+import {
+  isAnchorLayoutStable,
+  isScrollIntentKey,
+  resolveAnchoredScrollTop
+} from '../viewportAnchor'
 
 describe('viewportAnchor', () => {
   it('preserves viewport position relative to the anchored root', () => {
@@ -30,5 +34,17 @@ describe('viewportAnchor', () => {
         maxScrollY: 2000
       })
     ).toBe(2000)
+  })
+
+  it('distinguishes stable geometry from a late async expansion', () => {
+    const previous = { rootTop: 800, rootHeight: 300, documentHeight: 2400 }
+    expect(isAnchorLayoutStable(previous, { ...previous, rootHeight: 300.5 })).toBe(true)
+    expect(isAnchorLayoutStable(previous, { ...previous, documentHeight: 2800 })).toBe(false)
+  })
+
+  it('treats future Home and End presses as scroll intent', () => {
+    expect(isScrollIntentKey('Home')).toBe(true)
+    expect(isScrollIntentKey('End')).toBe(true)
+    expect(isScrollIntentKey('ArrowRight')).toBe(false)
   })
 })

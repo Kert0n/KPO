@@ -21,7 +21,7 @@ order: NN
 
 ### Почему это работает
 
-::: multi-code "Минимальный пример" {default=kotlin}
+::: multi-code "Минимальный пример"
 
 ```kotlin
 class Service

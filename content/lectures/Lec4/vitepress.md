@@ -271,7 +271,7 @@ classDiagram
 
 Ключевая идея: метод `planDelivery` может быть общим, а выбор конкретного продукта переносится в `createTransport`.
 
-::: multi-code "Factory Method: логистика" {default=kotlin playground=off}
+::: multi-code "Factory Method: логистика" {playground=off}
 
 ```kotlin
 interface Transport {
@@ -427,7 +427,7 @@ flowchart LR
   Service --> Transport[Transport]
 ```
 
-::: multi-code "Factory Method: использование" {default=kotlin playground=off}
+::: multi-code "Factory Method: использование" {playground=off}
 
 ```kotlin
 fun logisticsFor(routeType: String): Logistics =
@@ -583,7 +583,7 @@ classDiagram
   VictorianFurnitureFactory ..> CoffeeTable
 ```
 
-::: multi-code "Abstract Factory: семейство мебели" {default=kotlin playground=off}
+::: multi-code "Abstract Factory: семейство мебели" {playground=off}
 
 ```kotlin
 interface Chair {
@@ -817,7 +817,7 @@ func (VictorianFurnitureFactory) CreateTable() CoffeeTable { return VictorianTab
 
 Клиентский код получает фабрику и больше не принимает решений о конкретных классах.
 
-::: multi-code "Abstract Factory: клиент" {default=kotlin playground=off}
+::: multi-code "Abstract Factory: клиент" {playground=off}
 
 ```kotlin
 class RoomPage(private val factory: FurnitureFactory) {
@@ -981,7 +981,7 @@ sequenceDiagram
   Builder-->>Report: готовый отчет
 ```
 
-::: multi-code "Builder: отчет" {default=kotlin playground=off}
+::: multi-code "Builder: отчет" {playground=off}
 
 ```kotlin
 data class Report(
@@ -1309,7 +1309,7 @@ classDiagram
   Client --> Prototype : clone()
 ```
 
-::: multi-code "Prototype: копирование документа" {default=kotlin playground=off}
+::: multi-code "Prototype: копирование документа" {playground=off}
 
 ```kotlin
 interface Prototype<T> {

@@ -11,6 +11,7 @@ import { escapeAttribute } from './htmlUtils'
 export function askAiAnchorsPlugin(md: MarkdownIt): void {
   md.core.ruler.push('kpo_ask_ai_anchors', (state) => {
     const lines = state.src.replace(/\r\n?/g, '\n').split('\n')
+    const sourcePath = markdownSourcePath(state.env)
     let multiCodeDepth = 0
 
     for (let index = 0; index < state.tokens.length; index += 1) {
@@ -18,7 +19,7 @@ export function askAiAnchorsPlugin(md: MarkdownIt): void {
 
       if (isMultiCodeOpen(token)) {
         multiCodeDepth += 1
-        assignBlockId(token, 'multi-code', lines)
+        assignBlockId(token, 'multi-code', lines, sourcePath)
         continue
       }
 
@@ -30,7 +31,7 @@ export function askAiAnchorsPlugin(md: MarkdownIt): void {
       if (multiCodeDepth > 0 && token.type === 'fence') continue
 
       const classification = classifyMarkdownToken(state.tokens, index)
-      if (classification) assignBlockId(token, classification.kind, lines)
+      if (classification) assignBlockId(token, classification.kind, lines, sourcePath)
     }
   })
 }
@@ -44,15 +45,27 @@ export function askAiBlockAttribute(token: Token): string {
   return id ? ` data-kpo-ask-block-id="${escapeAttribute(id)}"` : ''
 }
 
-function assignBlockId(token: Token, kind: AskAiBlockKind, lines: string[]): void {
+function assignBlockId(
+  token: Token,
+  kind: AskAiBlockKind,
+  lines: string[],
+  sourcePath?: string
+): void {
   if (!token.map) return
   const [start, end] = token.map
   const markdown = lines.slice(start, end).join('\n').trim()
   if (!markdown) return
 
-  const id = createAskAiBlockId(kind, markdown, start + 1)
+  const id = createAskAiBlockId(kind, markdown, start + 1, sourcePath)
   token.meta = { ...token.meta, kpoAskAiBlockId: id }
   if (token.nesting !== -1 && token.type !== 'fence' && !token.type.startsWith('container_')) {
     token.attrSet('data-kpo-ask-block-id', id)
   }
+}
+
+function markdownSourcePath(environment: unknown): string | undefined {
+  if (!environment || typeof environment !== 'object') return undefined
+  const value = environment as { path?: unknown; relativePath?: unknown }
+  if (typeof value.path === 'string') return value.path
+  return typeof value.relativePath === 'string' ? value.relativePath : undefined
 }

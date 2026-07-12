@@ -16,6 +16,13 @@ Markdown. Changing the classifier or normalization must not rewrite IDs for
 existing content. The characterization snapshots protect both IDs and the
 complete representative prompt.
 
+`default` is a protected author override, not a way to select the first fence.
+Kotlin-first examples put the Kotlin fence first and omit `default=kotlin`.
+The removal of the historical boilerplate is covered by a compatibility
+manifest: an old ID is retained only when source path, line and the canonical
+migrated block hash all match. A real code or prose edit therefore receives a
+new content-derived ID instead of being hidden by the migration mapping.
+
 Ask AI context caching uses the absolute source path as its key. A changed
 `mtime` replaces that path's entry, so repeated edits do not accumulate stale
 path-plus-time cache records.

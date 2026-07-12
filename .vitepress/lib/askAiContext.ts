@@ -74,7 +74,7 @@ export function buildAskAiPageContext(
     pageTitle: pageTitle(parsed.data, content),
     pageDescription: pageDescription(parsed.data, content),
     sourcePath: entry.sourcePath,
-    blocks: collectBlocks(tokens, lines)
+    blocks: collectBlocks(tokens, lines, entry.sourcePath)
   }
 
   cache.set(absolutePath, { mtimeMs: stat.mtimeMs, context })
@@ -97,7 +97,7 @@ export function findAskAiContextEntry(
   return listAskAiContextEntries(root).find((entry) => entry.routeKey === routeKey) ?? null
 }
 
-function collectBlocks(tokens: Token[], lines: string[]): AskAiBlock[] {
+function collectBlocks(tokens: Token[], lines: string[], sourcePath: string): AskAiBlock[] {
   const blocks: AskAiBlock[] = []
   let skipUntil = -1
 
@@ -112,21 +112,21 @@ function collectBlocks(tokens: Token[], lines: string[]): AskAiBlock[] {
 
     if (classification.kind === 'multi-code') {
       const closeIndex = findMatchingMultiCodeClose(tokens, index)
-      const block = createBlock('multi-code', token, lines)
+      const block = createBlock('multi-code', token, lines, sourcePath)
       if (block) blocks.push(block)
       skipUntil = closeIndex === -1 ? index + 1 : closeIndex + 1
       continue
     }
 
     if (classification.kind === 'code' || classification.kind === 'mermaid') {
-      const block = createBlock(classification.kind, token, lines, {
+      const block = createBlock(classification.kind, token, lines, sourcePath, {
         language: classification.language
       })
       if (block) blocks.push(block)
       continue
     }
 
-    const block = createBlock(classification.kind, token, lines)
+    const block = createBlock(classification.kind, token, lines, sourcePath)
     if (block) blocks.push(block)
   }
 
@@ -137,6 +137,7 @@ function createBlock(
   kind: AskAiBlockKind,
   token: Token,
   lines: string[],
+  sourcePath: string,
   extra: Partial<Pick<AskAiBlock, 'language' | 'title'>> = {}
 ): AskAiBlock | null {
   if (!token.map) return null
@@ -146,7 +147,7 @@ function createBlock(
   if (!markdownText) return null
 
   return {
-    id: createAskAiBlockId(kind, markdownText, start + 1),
+    id: createAskAiBlockId(kind, markdownText, start + 1, sourcePath),
     kind,
     markdown: markdownText,
     plainText: plainText(markdownText),

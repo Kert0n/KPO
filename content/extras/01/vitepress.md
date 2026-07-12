@@ -11,7 +11,7 @@ order: 1
 
 Включите Playground на блоке ниже, измените лимит или входные данные и запустите код снова.
 
-::: multi-code "Проверка правила скидки" {default=kotlin}
+::: multi-code "Проверка правила скидки"
 
 ```kotlin
 data class Order(val total: Int, val customerTier: String)

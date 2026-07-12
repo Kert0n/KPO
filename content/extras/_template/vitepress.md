@@ -11,7 +11,7 @@ order: NN
 
 ## Пример
 
-::: multi-code "Сравнение подходов" {default=kotlin}
+::: multi-code "Сравнение подходов"
 
 ```kotlin
 fun rule(value: Int) = value > 0
