@@ -2,6 +2,7 @@ import { expect, test } from './fixtures'
 import {
   ANCHOR_TOLERANCE_PX,
   LAYOUT_VIEWPORTS,
+  PLAYGROUND_MODULE_REQUEST,
   UI_FIXTURE_ROUTE,
   expectActiveTab,
   expectNoPageOverflowFromVpDoc,
@@ -180,7 +181,7 @@ test('user scroll takes ownership while a delayed playground is initializing', a
   const playgroundGate = new Promise<void>((resolve) => {
     releasePlayground = resolve
   })
-  await page.route('**/*kotlin-playground*', async (route) => {
+  await page.route(PLAYGROUND_MODULE_REQUEST, async (route) => {
     await playgroundGate
     await route.continue()
   })
@@ -198,7 +199,7 @@ test('user scroll takes ownership while a delayed playground is initializing', a
   await page.evaluate(() => window.scrollBy(0, 240))
   await switcher.getByRole('tab', { name: 'Go' }).focus()
 
-  const playgroundRequest = page.waitForRequest('**/*kotlin-playground*')
+  const playgroundRequest = page.waitForRequest(PLAYGROUND_MODULE_REQUEST)
   await page.keyboard.press('Home')
   await playgroundRequest
   await page.mouse.wheel(0, 360)

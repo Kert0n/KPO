@@ -11,7 +11,9 @@ describe('CodeSwitcher Playground template ref ownership', () => {
       'utf8'
     )
 
-    expect(component).toContain("useTemplateRef<{ lifecycle: PlaygroundLifecycle }>('playgroundElement')")
+    expect(component).toContain(
+      "useTemplateRef<{ lifecycle: PlaygroundLifecycle }>('playgroundElement')"
+    )
     expect(component).toContain('ref="playgroundElement"')
     expect(component).not.toContain('ref="playground"')
   })

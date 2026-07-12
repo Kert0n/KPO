@@ -1,6 +1,7 @@
 import { expect, test } from './fixtures'
 import {
   LAYOUT_VIEWPORTS,
+  PLAYGROUND_MODULE_REQUEST,
   SELECTION_FIRST_TEXT,
   SELECTION_MIDDLE_TEXT,
   SELECTION_NESTED_TEXT,
@@ -317,7 +318,7 @@ test('delayed Playground completion does not close an open ask ai menu', async (
   const playgroundGate = new Promise<void>((resolve) => {
     releasePlayground = resolve
   })
-  await page.route('**/*kotlin-playground*', async (route) => {
+  await page.route(PLAYGROUND_MODULE_REQUEST, async (route) => {
     await playgroundGate
     await route.fallback()
   })
