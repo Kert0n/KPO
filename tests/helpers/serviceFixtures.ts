@@ -58,7 +58,7 @@ export async function stubEmptyUiServiceAskAiContext(page: Page): Promise<void> 
       contentType: 'application/json',
       body: JSON.stringify({
         courseTitle: 'Конструирование ПО',
-        courseDescription: '',
+        courseDescription: 'Конспект лекций по архитектуре приложений и инженерным практикам',
         pageTitle: 'UI Contract Fixtures',
         pageDescription: '',
         sourcePath: 'service-pages/ui-contract.md',
