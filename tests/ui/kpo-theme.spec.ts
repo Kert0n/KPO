@@ -1429,7 +1429,9 @@ test('language-only text follows global language used by ordinary code switchers
   await expectNoPageOverflowFromVpDoc(page)
 })
 
-test('playground toggle is only rendered for the active kotlin tab', async ({ page }) => {
+test('playground toggle keeps stable geometry and availability follows the active tab', async ({
+  page
+}) => {
   await setStorage(page, {
     'kpo:code-language': 'kotlin',
     'kpo:playground-mode': '0'
@@ -1439,17 +1441,28 @@ test('playground toggle is only rendered for the active kotlin tab', async ({ pa
   const playgroundSwitcher = page.locator('.kpo-switcher').filter({
     hasText: 'Fixture Kotlin Playground'
   })
+  await waitForPageLayoutReady(page)
 
   await expectActiveTab(playgroundSwitcher, 'Kotlin')
-  await expect(playgroundSwitcher.locator('.kpo-switcher__playground-toggle')).toHaveCount(1)
+  const toggle = playgroundSwitcher.locator('.kpo-switcher__playground-toggle')
+  await expect(toggle).toBeVisible()
+  await expect(toggle).toBeEnabled()
+  const initialBox = await toggle.boundingBox()
 
   await playgroundSwitcher.getByRole('tab', { name: 'Java' }).click()
   await expectNoPageOverflowFromVpDoc(page)
-  await expect(playgroundSwitcher.locator('.kpo-switcher__playground-toggle')).toHaveCount(0)
+  await expect(toggle).toBeVisible()
+  await expect(toggle).toBeDisabled()
+  const javaBox = await toggle.boundingBox()
+  expect(Math.abs((javaBox?.width ?? 0) - (initialBox?.width ?? 0))).toBeLessThanOrEqual(2)
+  expect(javaBox?.height).toBe(initialBox?.height)
 
   await playgroundSwitcher.getByRole('tab', { name: 'Kotlin' }).click()
   await expectNoPageOverflowFromVpDoc(page)
-  await expect(playgroundSwitcher.locator('.kpo-switcher__playground-toggle')).toHaveCount(1)
+  await expect(toggle).toBeEnabled()
+  const kotlinBox = await toggle.boundingBox()
+  expect(Math.abs((kotlinBox?.width ?? 0) - (initialBox?.width ?? 0))).toBeLessThanOrEqual(2)
+  expect(kotlinBox?.height).toBe(initialBox?.height)
 
   const playgroundOff = page.locator('.kpo-switcher').filter({ hasText: 'Fixture playground off' })
   await expect(playgroundOff.locator('.kpo-switcher__playground-toggle')).toHaveCount(0)

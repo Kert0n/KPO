@@ -101,15 +101,6 @@ const playgroundUsable = computed(() => {
   )
 })
 
-const shouldShowPlaygroundToggle = computed(() => {
-  return (
-    props.allowPlayground &&
-    displayLang.value === 'kotlin' &&
-    hasKotlin.value &&
-    !playgroundFailed.value
-  )
-})
-
 /** Playground показан: возможен + включён читателем + есть исходник */
 const playgroundActive = computed(() => {
   return mounted.value && playgroundUsable.value && playgroundMode.value && kotlinCode.value !== ''
@@ -252,7 +243,7 @@ function onTabsKeydown(event: KeyboardEvent): void {
 
       <div class="kpo-switcher__controls">
         <button
-          v-if="shouldShowPlaygroundToggle"
+          v-if="allowPlayground"
           type="button"
           class="kpo-switcher__playground-toggle"
           :disabled="!playgroundUsable"
