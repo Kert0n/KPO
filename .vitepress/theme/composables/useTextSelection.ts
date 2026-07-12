@@ -6,6 +6,12 @@ export type SelectionSnapshot = {
   playgroundBlockId: string
 }
 
+type ContentSelection = {
+  selectedText: string
+  blockIds: string[]
+  ranges: Range[]
+}
+
 export function useTextSelection() {
   function createSelectionSnapshot(target: EventTarget | null): SelectionSnapshot | null {
     const targetElement = target instanceof Element ? target : null
@@ -22,21 +28,27 @@ export function useTextSelection() {
 
     const selection = window.getSelection()
     if (!selection || selection.rangeCount === 0) return null
-    const selectedText = selection.toString().trim()
-    if (!selectedText) return null
 
     const content = document.querySelector('.vp-doc')
-    if (!content || !selectionBelongsToContent(selection, content)) return null
-    const blockIds = selectedBlockIds(selection, content)
-    if (blockIds.length === 0) return null
+    if (!content) return null
+    const contentSelection = collectSelectionWithinContent(selection, content)
+    if (!contentSelection) return null
 
-    return { selectedText, blockIds, playgroundBlockId: playgroundBlockId || '' }
+    return {
+      selectedText: contentSelection.selectedText,
+      blockIds: contentSelection.blockIds,
+      playgroundBlockId: playgroundBlockId || ''
+    }
   }
 
   function selectedRangeRect(): DOMRect | null {
     const selection = window.getSelection()
     if (!selection || selection.rangeCount === 0) return null
-    const rect = selection.getRangeAt(0).getBoundingClientRect()
+    const content = document.querySelector('.vp-doc')
+    if (!content) return null
+    const contentSelection = collectSelectionWithinContent(selection, content)
+    const rect = contentSelection?.ranges[0]?.getBoundingClientRect()
+    if (!rect) return null
     return rect.width === 0 && rect.height === 0 ? null : rect
   }
 
@@ -56,19 +68,43 @@ export function playgroundOverride(
   }
 }
 
-function selectedBlockIds(selection: Selection, content: Element): string[] {
+function collectSelectionWithinContent(
+  selection: Selection,
+  content: Element
+): ContentSelection | null {
+  const contentRange = document.createRange()
+  contentRange.selectNodeContents(content)
+
+  const ranges: Range[] = []
+  for (let index = 0; index < selection.rangeCount; index += 1) {
+    const clipped = clippedRange(selection.getRangeAt(index), contentRange)
+    if (!clipped?.toString().trim()) continue
+    ranges.push(clipped)
+  }
+
+  if (ranges.length === 0) return null
+
+  const selectedText = ranges
+    .map((range) => range.toString())
+    .join('\n')
+    .trim()
+  if (!selectedText) return null
+
+  const blockIds = selectedBlockIds(ranges, content)
+  if (blockIds.length === 0) return null
+
+  return { selectedText, blockIds, ranges }
+}
+
+function selectedBlockIds(ranges: Range[], content: Element): string[] {
   const ids: string[] = []
   const seen = new Set<string>()
   const blocks = [...content.querySelectorAll<HTMLElement>('[data-kpo-ask-block-id]')]
 
-  for (let index = 0; index < selection.rangeCount; index += 1) {
-    const range = selection.getRangeAt(index)
-    const ancestor = elementForNode(range.commonAncestorContainer)
-    const closest = ancestor?.closest<HTMLElement>('[data-kpo-ask-block-id]')
-    if (closest?.dataset.kpoAskBlockId) addId(ids, seen, closest.dataset.kpoAskBlockId)
-
+  for (const range of ranges) {
     for (const block of blocks) {
-      if (!range.intersectsNode(block)) continue
+      const intersection = intersectElement(range, block)
+      if (!intersection?.toString().trim()) continue
       const id = block.dataset.kpoAskBlockId
       if (id) addId(ids, seen, id)
     }
@@ -76,16 +112,30 @@ function selectedBlockIds(selection: Selection, content: Element): string[] {
   return ids
 }
 
-function selectionBelongsToContent(selection: Selection, content: Element): boolean {
-  for (let index = 0; index < selection.rangeCount; index += 1) {
-    const container = elementForNode(selection.getRangeAt(index).commonAncestorContainer)
-    if (container && content.contains(container)) return true
-  }
-  return false
+function intersectElement(range: Range, element: Element): Range | null {
+  const elementRange = document.createRange()
+  elementRange.selectNodeContents(element)
+  return clippedRange(range, elementRange)
 }
 
-function elementForNode(node: Node): Element | null {
-  return node.nodeType === Node.ELEMENT_NODE ? (node as Element) : node.parentElement
+function clippedRange(range: Range, bounds: Range): Range | null {
+  if (!rangesOverlap(range, bounds)) return null
+
+  const clipped = range.cloneRange()
+  if (range.compareBoundaryPoints(Range.START_TO_START, bounds) < 0) {
+    clipped.setStart(bounds.startContainer, bounds.startOffset)
+  }
+  if (range.compareBoundaryPoints(Range.END_TO_END, bounds) > 0) {
+    clipped.setEnd(bounds.endContainer, bounds.endOffset)
+  }
+  return clipped.collapsed ? null : clipped
+}
+
+function rangesOverlap(range: Range, bounds: Range): boolean {
+  return (
+    range.compareBoundaryPoints(Range.END_TO_START, bounds) < 0 &&
+    range.compareBoundaryPoints(Range.START_TO_END, bounds) > 0
+  )
 }
 
 function closestPlaygroundBlockId(element: Element | null): string {
