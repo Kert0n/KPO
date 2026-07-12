@@ -2,6 +2,7 @@ import { expect, type Page } from '@playwright/test'
 
 type OpenAskAiMenuOptions = {
   activate?: boolean
+  allowManualFallback?: boolean
 }
 
 type BrowserIssue = {
@@ -35,6 +36,23 @@ export async function openAskAiMenuWhenReady(
 
   try {
     await page.locator('.vp-doc [data-kpo-ask-block-id]').first().waitFor({ state: 'attached' })
+    await page.evaluate(async (targetText) => {
+      const root = [...document.querySelectorAll<HTMLElement>('.vp-doc *')]
+        .filter((node) => node.textContent?.includes(targetText))
+        .sort((left, right) => {
+          return (left.textContent?.length ?? 0) - (right.textContent?.length ?? 0)
+        })[0]
+      root?.scrollIntoView({ block: 'center', inline: 'nearest' })
+      await new Promise<void>((resolve) => {
+        let frames = 4
+        const next = () => {
+          frames -= 1
+          if (frames === 0) resolve()
+          else requestAnimationFrame(next)
+        }
+        requestAnimationFrame(next)
+      })
+    }, text)
 
     await expect
       .poll(async () => {
@@ -46,7 +64,6 @@ export async function openAskAiMenuWhenReady(
             })[0]
           if (!root) return 'text-missing'
 
-          root.scrollIntoView({ block: 'center', inline: 'nearest' })
           const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT)
           const nodes: Text[] = []
           let combined = ''
@@ -104,7 +121,7 @@ export async function openAskAiMenuWhenReady(
           return 'pending'
         }, text)
       })
-      .toMatch(/^(menu|manual)$/)
+      .toMatch(options.allowManualFallback ? /^(menu|manual)$/ : /^menu$/)
 
     if (options.activate) {
       const item = page.locator('.kpo-ai-menu__item')
