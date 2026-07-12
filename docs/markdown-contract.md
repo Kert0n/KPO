@@ -22,10 +22,12 @@ The precedence is: protected author `default`, then the persisted reader
 language after hydration, then the natural first fence. Once the reader clicks
 that block, its author override is released and it follows the shared persisted
 language across navigation.
-The removal of the historical boilerplate is covered by a compatibility
-manifest: an old ID is retained only when source path, line and the canonical
-migrated block hash all match. A real code or prose edit therefore receives a
-new content-derived ID instead of being hidden by the migration mapping.
+Published Ask AI IDs are retained through a semantic compatibility manifest.
+The key is source identity, block kind, canonical content and duplicate index.
+For `multi-code`, container title, `default`, `playground`, delimiter length
+and source line are presentation details and do not change the ID. A real code
+or prose edit receives a new content-derived ID instead of being hidden by the
+manifest.
 
 Ask AI context caching uses the absolute source path as its key. A changed
 `mtime` replaces that path's entry, so repeated edits do not accumulate stale
