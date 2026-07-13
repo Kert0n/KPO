@@ -1,0 +1,16 @@
+
+
+/* ---------- Скрытие сайдбара ----------
+
+   Состояние живёт в памяти сессии (useSidebarVisibility): любая
+   загрузка страницы начинается с видимым сайдбаром. Сайдбар сохраняет
+   ширину (--kpo-sidebar-width) и плавно уезжает влево, а обнуление
+   --vp-sidebar-width анимированно схлопывает отступы контента. */
+
+@media (min-width: 960px) {
+  .VPSidebar {
+    width: var(--kpo-sidebar-width) !important;
+    border-right: 1px solid var(--vp-c-divider);
+    transition: transform 0.3s ease, opacity 0.3s ease, visibility 0.3s !important;
+  }
+}

@@ -17,7 +17,7 @@ const { site, theme } = useData()
       <div class="KpoNavBarExtra__divider" />
       <div class="KpoNavBarExtra__appearance">
         <p class="KpoNavBarExtra__label">{{ theme.darkModeSwitchLabel || 'Appearance' }}</p>
-        <VPSwitchAppearance />
+        <VPSwitchAppearance aria-label="Переключить тему" />
       </div>
     </div>
   </VPFlyout>

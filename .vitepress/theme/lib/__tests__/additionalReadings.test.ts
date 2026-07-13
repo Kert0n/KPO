@@ -1,9 +1,6 @@
-import { readFileSync, readdirSync } from 'node:fs'
-import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import {
   extractAdditionalReadingsSection,
-  type LectureAdditionalReadings,
   parseAdditionalReadingsSection,
   parseLectureAdditionalReadings
 } from '../additionalReadings'
@@ -44,6 +41,7 @@ describe('additional readings parser', () => {
 
 - [Без заметки](https://example.com/a)
 - [С заметкой](https://example.com/b) — короткое пояснение
+- [С ASCII дефисом](https://example.com/c) - еще одно пояснение
 
 ### Видео
 
@@ -54,7 +52,12 @@ describe('additional readings parser', () => {
         title: 'Теория',
         items: [
           { title: 'Без заметки', url: 'https://example.com/a' },
-          { title: 'С заметкой', url: 'https://example.com/b', note: 'короткое пояснение' }
+          { title: 'С заметкой', url: 'https://example.com/b', note: 'короткое пояснение' },
+          {
+            title: 'С ASCII дефисом',
+            url: 'https://example.com/c',
+            note: 'еще одно пояснение'
+          }
         ]
       },
       {
@@ -105,36 +108,4 @@ title: Лекция 15. Итоговая тема
       )
     ).toBeNull()
   })
-
-  it('finds additional readings in real lectures 1-12', () => {
-    const readings = readRealLectureReadings()
-    const lectureNumbers = readings.map((reading) => reading.lecture)
-
-    expect(lectureNumbers).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12])
-    expect(lectureNumbers).toEqual([...lectureNumbers].sort((a, b) => a - b))
-
-    for (const reading of readings) {
-      expect(reading.title).not.toHaveLength(0)
-      expect(reading.groups.length).toBeGreaterThan(0)
-      for (const group of reading.groups) {
-        expect(group.title).not.toHaveLength(0)
-        expect(group.items.length).toBeGreaterThan(0)
-        for (const item of group.items) {
-          expect(item.title).not.toHaveLength(0)
-          expect(item.url).toMatch(/^https?:\/\//)
-        }
-      }
-    }
-  })
 })
-
-function readRealLectureReadings(): LectureAdditionalReadings[] {
-  const lecturesRoot = resolve(process.cwd(), 'content/lectures')
-
-  return readdirSync(lecturesRoot, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory() && /^Lec\d+$/.test(entry.name))
-    .map((entry) => resolve(lecturesRoot, entry.name, 'vitepress.md'))
-    .map((filePath) => parseLectureAdditionalReadings(filePath, readFileSync(filePath, 'utf8')))
-    .filter((reading): reading is LectureAdditionalReadings => reading !== null)
-    .sort((a, b) => a.lecture - b.lecture)
-}

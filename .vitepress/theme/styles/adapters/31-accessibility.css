@@ -1,0 +1,12 @@
+@media (prefers-reduced-motion: reduce) {
+  .VPSidebar,
+  .VPContent.has-sidebar,
+  .VPLocalNav.has-sidebar {
+    transition: none !important;
+  }
+
+  .VPNavBar .VPNavBarMenuLink,
+  .VPNavBar .DocSearch-Button {
+    transition: none;
+  }
+}

@@ -5,6 +5,7 @@ const root = resolve(import.meta.dirname, '..')
 const sourceRoot = resolve(root, '.vitepress')
 const sourceExtensions = /\.(?:ts|mts|vue)$/
 const importPattern = /(?:import|export)\s+(?:type\s+)?(?:[^'";]+?\s+from\s+)?['"]([^'"]+)['"]/g
+const vitePressSelectorPattern = /(?:\.VP[A-Za-z0-9_-]*|\.vp-doc\b|\.DocSearch-[A-Za-z0-9_-]*)/
 
 const violations: string[] = []
 
@@ -30,6 +31,16 @@ for (const file of walk(sourceRoot)) {
   }
 }
 
+const componentStylesRoot = resolve(sourceRoot, 'theme/styles/components')
+for (const file of walk(componentStylesRoot)) {
+  if (!file.endsWith('.css')) continue
+  if (vitePressSelectorPattern.test(readFileSync(file, 'utf8'))) {
+    violations.push(
+      `${normalize(relative(root, file))}: VitePress selectors belong to styles/adapters`
+    )
+  }
+}
+
 if (violations.length > 0) {
   throw new Error(
     `Architecture boundary violations:\n${violations.map((item) => `  - ${item}`).join('\n')}`
@@ -46,7 +57,9 @@ function importsLayer(specifier: string, layers: string[]): boolean {
 function walk(directory: string): string[] {
   return readdirSync(directory).flatMap((name) => {
     const path = resolve(directory, name)
-    return statSync(path).isDirectory() ? walk(path) : [path]
+    if (!statSync(path).isDirectory()) return [path]
+    if (['cache', 'dist', 'node_modules'].includes(name)) return []
+    return walk(path)
   })
 }
 

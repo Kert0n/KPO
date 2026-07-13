@@ -1,0 +1,18 @@
+@page {
+  size: A4;
+  margin: 14mm 12mm;
+}
+
+@media print {
+  *,
+  *::before,
+  *::after {
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  html,
+  body {
+    background: #ffffff !important;
+  }
+}

@@ -4,32 +4,41 @@ import {
   getCatalogRewrites,
   getContentCatalog
 } from '../shared/content/contentCatalog'
+import type { ContentPage } from '../shared/content/contentTypes'
 
 export function getSidebar(): DefaultTheme.Sidebar {
-  const lectures = sectionItems('lectures')
-  const extras = sectionItems('extras')
+  return buildSidebar(contentPagesFor('sidebar'))
+}
+
+export function buildSidebar(pages: ContentPage[]): DefaultTheme.Sidebar {
+  const lectures = sectionItems(pages, 'lectures')
+  const extras = sectionItems(pages, 'extras')
 
   return [
-    { text: 'Начало', items: [{ text: page('/intro').title, link: '/intro' }] },
+    { text: 'Начало', items: [{ text: page(pages, '/intro').title, link: '/intro' }] },
     { text: 'Лекции', collapsed: false, items: lectures },
     ...(extras.length > 0
       ? [
           {
             text: 'Дополнения',
             collapsed: false,
-            items: [{ text: navigationTitle(page('/extras/')), link: '/extras/' }, ...extras]
+            items: [{ text: navigationTitle(page(pages, '/extras/')), link: '/extras/' }, ...extras]
           }
         ]
       : []),
-    { text: 'Финал', items: [{ text: page('/conclusion').title, link: '/conclusion' }] }
+    { text: 'Финал', items: [{ text: page(pages, '/conclusion').title, link: '/conclusion' }] }
   ] satisfies DefaultTheme.SidebarItem[]
 }
 
 export function getNav(): DefaultTheme.NavItem[] {
+  return buildNav(getContentCatalog())
+}
+
+export function buildNav(pages: ContentPage[]): DefaultTheme.NavItem[] {
   return [
     { text: 'Введение', link: '/intro' },
-    { text: 'Лекции', link: getFirstLectureLink(), activeMatch: '^/lectures/' },
-    { text: 'Дополнения', link: page('/extras/').route, activeMatch: '^/extras/' },
+    { text: 'Лекции', link: firstLectureLink(pages), activeMatch: '^/lectures/' },
+    { text: 'Дополнения', link: page(pages, '/extras/').route, activeMatch: '^/extras/' },
     { text: 'Заключение', link: '/conclusion' }
   ]
 }
@@ -38,8 +47,14 @@ export function getRewrites(): Record<string, string> {
   return getCatalogRewrites()
 }
 
+export function buildRewrites(pages: ContentPage[]): Record<string, string> {
+  return Object.fromEntries(
+    pages.map((item) => [item.sourcePath.replace(/^content\//, ''), item.outputPath])
+  )
+}
+
 export function getFirstLectureLink(): string {
-  return getContentCatalog().find((item) => item.kind === 'lecture')?.route ?? '/intro'
+  return firstLectureLink(getContentCatalog())
 }
 
 export function extractNumber(name: string): number {
@@ -47,18 +62,25 @@ export function extractNumber(name: string): number {
   return match ? Number.parseInt(match[1], 10) : Number.MAX_SAFE_INTEGER
 }
 
-function sectionItems(section: 'lectures' | 'extras'): DefaultTheme.SidebarItem[] {
-  return contentPagesFor('sidebar')
+function sectionItems(
+  pages: ContentPage[],
+  section: 'lectures' | 'extras'
+): DefaultTheme.SidebarItem[] {
+  return pages
     .filter((item) => item.section === section && item.kind !== 'extras-index')
     .map((item) => ({ text: navigationTitle(item), link: item.route }))
 }
 
-function page(route: string) {
-  const result = getContentCatalog().find((item) => item.route === route)
+function page(pages: ContentPage[], route: string) {
+  const result = pages.find((item) => item.route === route)
   if (!result) throw new Error(`Missing content page: ${route}`)
   return result
 }
 
-function navigationTitle(item: ReturnType<typeof page>): string {
+function navigationTitle(item: ContentPage): string {
   return item.navigationTitle ?? item.title
+}
+
+function firstLectureLink(pages: ContentPage[]): string {
+  return pages.find((item) => item.kind === 'lecture')?.route ?? '/intro'
 }

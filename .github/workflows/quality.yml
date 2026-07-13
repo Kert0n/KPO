@@ -1,0 +1,280 @@
+name: Quality gates
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+concurrency:
+  group: quality-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  NODE_VERSION: '24'
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - name: Start timer
+        run: echo "KPO_JOB_STARTED_AT_MS=$(date +%s%3N)" >> "$GITHUB_ENV"
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm run format:check:tracked
+      - run: npm run workflow:check
+      - run: npm run test:fixture-isolation
+      - run: npm run test:coverage
+      - run: npm run content:check
+      - run: npm run audit
+      - name: Record timing
+        if: always()
+        run: node scripts/record-ci-timing.mjs .ci-artifacts/timing/quality.json quality "$KPO_JOB_STARTED_AT_MS"
+      - name: Upload coverage and timing
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: quality-artifacts
+          path: |
+            coverage
+            .ci-artifacts/timing/quality.json
+          if-no-files-found: warn
+          retention-days: 7
+
+  kotlin-playground:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - uses: actions/setup-java@0f481fcb613427c0f801b606911222b5b6f3083a # v5
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: gradle
+      - name: Start timer
+        run: echo "KPO_JOB_STARTED_AT_MS=$(date +%s%3N)" >> "$GITHUB_ENV"
+      - run: npm ci
+      - run: npm run kotlin:check
+      - name: Record timing
+        if: always()
+        run: node scripts/record-ci-timing.mjs .ci-artifacts/timing/kotlin-playground.json kotlin-playground "$KPO_JOB_STARTED_AT_MS"
+      - name: Upload Kotlin manifest and timing
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: kotlin-playground-artifacts
+          path: |
+            .generated/kotlin-snippets/manifest.json
+            .ci-artifacts/timing/kotlin-playground.json
+          if-no-files-found: warn
+          retention-days: 7
+
+  build:
+    needs: quality
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - name: Start timer
+        run: echo "KPO_JOB_STARTED_AT_MS=$(date +%s%3N)" >> "$GITHUB_ENV"
+      - run: npm ci
+      - run: npm run build
+      - run: npm run budgets:check
+      - name: Upload production artifact
+        if: success()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: production-dist
+          path: .vitepress/dist
+          if-no-files-found: error
+          retention-days: 1
+      - name: Record timing
+        if: always()
+        run: node scripts/record-ci-timing.mjs .ci-artifacts/timing/build.json build "$KPO_JOB_STARTED_AT_MS"
+      - name: Upload build timing
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: build-timing
+          path: .ci-artifacts/timing/build.json
+          if-no-files-found: warn
+          retention-days: 7
+
+  browser-chromium:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-chromium-${{ hashFiles('package-lock.json') }}
+      - name: Start timer
+        run: echo "KPO_JOB_STARTED_AT_MS=$(date +%s%3N)" >> "$GITHUB_ENV"
+      - run: npm ci
+      - uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
+        with:
+          name: production-dist
+          path: .vitepress/dist
+      - run: npx playwright install --with-deps chromium
+      - run: npx playwright test --config playwright.prebuilt.config.ts --workers=4
+      - name: Record timing
+        if: always()
+        run: node scripts/record-ci-timing.mjs .ci-artifacts/timing/browser-chromium.json browser-chromium "$KPO_JOB_STARTED_AT_MS"
+      - name: Upload Chromium diagnostics
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: browser-chromium-failure
+          path: |
+            test-results
+            playwright-report
+          if-no-files-found: warn
+          retention-days: 7
+      - name: Upload Chromium timing
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: browser-chromium-timing
+          path: |
+            .ci-artifacts/timing/browser-chromium.json
+          if-no-files-found: warn
+          retention-days: 7
+
+  browser-smoke:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-smoke-${{ hashFiles('package-lock.json') }}
+      - name: Start timer
+        run: echo "KPO_JOB_STARTED_AT_MS=$(date +%s%3N)" >> "$GITHUB_ENV"
+      - run: npm ci
+      - uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
+        with:
+          name: production-dist
+          path: .vitepress/dist
+      - run: npx playwright install --with-deps firefox webkit
+      - run: npx playwright test --config playwright.smoke.config.ts
+      - name: Record timing
+        if: always()
+        run: node scripts/record-ci-timing.mjs .ci-artifacts/timing/browser-smoke.json browser-smoke "$KPO_JOB_STARTED_AT_MS"
+      - name: Upload smoke diagnostics
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: browser-smoke-failure
+          path: |
+            test-results
+            playwright-report
+          if-no-files-found: warn
+          retention-days: 7
+      - name: Upload smoke timing
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: browser-smoke-timing
+          path: |
+            .ci-artifacts/timing/browser-smoke.json
+          if-no-files-found: warn
+          retention-days: 7
+
+  browser-visual:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-visual-${{ hashFiles('package-lock.json') }}
+      - name: Start timer
+        run: echo "KPO_JOB_STARTED_AT_MS=$(date +%s%3N)" >> "$GITHUB_ENV"
+      - run: npm ci
+      - uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
+        with:
+          name: production-dist
+          path: .vitepress/dist
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:characterization:prebuilt
+      - name: Record timing
+        if: always()
+        run: node scripts/record-ci-timing.mjs .ci-artifacts/timing/browser-visual.json browser-visual "$KPO_JOB_STARTED_AT_MS"
+      - name: Upload visual diagnostics
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: browser-visual-failure
+          path: |
+            test-results
+            playwright-report
+          if-no-files-found: warn
+          retention-days: 7
+      - name: Upload visual timing
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: browser-visual-timing
+          path: |
+            .ci-artifacts/timing/browser-visual.json
+          if-no-files-found: warn
+          retention-days: 7
+
+  browser:
+    if: always()
+    needs: [browser-chromium, browser-smoke, browser-visual]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+      - name: Start timer
+        run: echo "KPO_JOB_STARTED_AT_MS=$(date +%s%3N)" >> "$GITHUB_ENV"
+      - name: Require all browser suites
+        env:
+          CHROMIUM_RESULT: ${{ needs.browser-chromium.result }}
+          SMOKE_RESULT: ${{ needs.browser-smoke.result }}
+          VISUAL_RESULT: ${{ needs.browser-visual.result }}
+        run: |
+          test "$CHROMIUM_RESULT" = success
+          test "$SMOKE_RESULT" = success
+          test "$VISUAL_RESULT" = success
+      - name: Record timing
+        if: always()
+        run: node scripts/record-ci-timing.mjs .ci-artifacts/timing/browser.json browser "$KPO_JOB_STARTED_AT_MS"
+      - name: Upload browser aggregator timing
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: browser-timing
+          path: .ci-artifacts/timing/browser.json
+          if-no-files-found: warn
+          retention-days: 7

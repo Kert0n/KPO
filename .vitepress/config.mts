@@ -1,5 +1,6 @@
 import { defineConfig } from 'vitepress'
 import { askAiContextPlugin } from './lib/askAiContextPlugin'
+import { assertAskAiContextParity } from './lib/askAiContext'
 import { getNav, getRewrites, getSidebar } from './lib/content'
 import { paletteCss } from './lib/paletteCss'
 import { kpoDark, kpoLight } from './lib/shikiThemes'
@@ -15,6 +16,13 @@ export default defineConfig({
   srcDir: 'content',
   cleanUrls: true,
   lastUpdated: true,
+
+  buildEnd(siteConfig) {
+    assertAskAiContextParity(siteConfig.outDir, {
+      courseTitle: SITE.title,
+      courseDescription: SITE.description
+    })
+  },
 
   // Папочные страницы (lectures/Lec1/vitepress.md) получают чистые URL
   // вида /lectures/01 — карта строится автоматически из файловой системы
@@ -69,6 +77,13 @@ export default defineConfig({
     ]
   },
 
+  transformHtml(code) {
+    return code.replace(/<button([^>]*\bVPSwitchAppearance\b[^>]*)>/g, (button, attributes) => {
+      if (/\baria-label=/.test(attributes)) return button
+      return `<button${attributes} aria-label="Переключить тему">`
+    })
+  },
+
   // В папках лекций/дополнений публикуется только vitepress.md;
   // остальные .md — материалы редактора (черновики, заметки)
   srcExclude: [
@@ -109,7 +124,7 @@ export default defineConfig({
       // lazy Mermaid/Kotlin Playground chunks are larger than Vite's default
       // 500 KiB raw threshold, but the limit stays below 1 MiB so real
       // regressions remain visible.
-      chunkSizeWarningLimit: 900
+      chunkSizeWarningLimit: 1024
     },
     plugins: [
       askAiContextPlugin({

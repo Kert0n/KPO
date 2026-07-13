@@ -68,10 +68,10 @@ export function langOnlyPlugin(md: MarkdownIt): void {
 
       if (!lang) {
         console.warn('[only] контейнер без языка:', token.info)
-        return '<div class="kpo-only">\n'
+        return `<div class="kpo-only"${askAiBlockAttribute(token)}>\n`
       }
 
-      return `<div class="kpo-only kpo-only--${lang}">\n`
+      return `<div class="kpo-only kpo-only--${lang}"${askAiBlockAttribute(token)}>\n`
     }
   })
 }
@@ -91,7 +91,7 @@ export function multiCodePlugin(md: MarkdownIt): void {
       if (meta.languages.length === 0) {
         console.warn('[multi-code] контейнер без блоков кода:', token.info)
         return (
-          `<div class="kpo-content-block kpo-content-block--multi-code kpo-content-block--wide kpo-wide-block kpo-wide-block--code"${askAiBlockAttribute(token)}>\n` +
+          '<div class="kpo-content-block kpo-content-block--multi-code kpo-content-block--wide kpo-wide-block kpo-wide-block--code">\n' +
           `<CodeSwitcher title="${escapeAttribute(info.title)}" langs="" ask-block-id="${escapeAttribute(askAiBlockId(token))}">\n`
         )
       }
@@ -106,7 +106,7 @@ export function multiCodePlugin(md: MarkdownIt): void {
         : ''
 
       return (
-        `<div class="kpo-content-block kpo-content-block--multi-code kpo-content-block--wide kpo-wide-block kpo-wide-block--code"${askAiBlockAttribute(token)}>\n` +
+        '<div class="kpo-content-block kpo-content-block--multi-code kpo-content-block--wide kpo-wide-block kpo-wide-block--code">\n' +
         `<CodeSwitcher title="${escapeAttribute(info.title)}"` +
         ` langs="${meta.languages.join(',')}"` +
         ` labels="${escapeAttribute(meta.labels.join(','))}"` +

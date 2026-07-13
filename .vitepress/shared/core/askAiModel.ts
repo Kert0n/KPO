@@ -27,13 +27,22 @@ export type AskAiPromptInput = {
   pageContext: AskAiPageContext
   selectedText: string
   blockIds: string[]
-  currentOverride?: {
-    kind: AskAiBlockKind
-    language?: string
-    markdown: string
-    title?: string
-  }
+  currentOverride?: AskAiCurrentOverride
   maxChars: number
+}
+
+export type AskAiCurrentOverride = {
+  kind: AskAiBlockKind
+  language?: string
+  markdown: string
+  title?: string
+}
+
+export class AskAiPromptTooLongError extends Error {
+  constructor() {
+    super('Выделенный фрагмент слишком длинный для Ask AI')
+    this.name = 'AskAiPromptTooLongError'
+  }
 }
 
 export type AskAiProviderAction = {
@@ -49,6 +58,8 @@ const CONTEXT_AFTER_TARGET_CHARS = 1800
 const CONTEXT_SIDE_MAX_BLOCKS = 4
 const SHORT_BRIDGE_BLOCK_CHARS = 140
 const TRIM_MARKER = '\n[... фрагмент сокращен ...]\n'
+const MIN_SIDE_SECTION_CHARS = 160
+const MIN_CURRENT_SECTION_CHARS = 240
 
 export const ASK_AI_PROVIDERS: Array<{
   id: AskAiProviderId
@@ -313,37 +324,44 @@ function trimPromptSections(
   },
   maxChars: number
 ): string {
-  let next = { ...sections }
-  const order: Array<{ key: keyof typeof next; min: number }> = [
-    { key: 'after', min: 0 },
-    { key: 'before', min: 0 },
-    { key: 'current', min: 120 },
-    { key: 'selected', min: 80 }
-  ]
+  const original = { ...sections }
+  let next = {
+    ...sections,
+    before: trimMiddle(sections.before, CONTEXT_BEFORE_TARGET_CHARS),
+    after: trimMiddle(sections.after, CONTEXT_AFTER_TARGET_CHARS)
+  }
+  const minima = {
+    before: sectionMinimum(original.before, MIN_SIDE_SECTION_CHARS),
+    current: sectionMinimum(original.current, MIN_CURRENT_SECTION_CHARS),
+    after: sectionMinimum(original.after, MIN_SIDE_SECTION_CHARS)
+  }
+  const minimumPrompt = renderPrompt(context, {
+    ...next,
+    before: trimMiddle(original.before, minima.before),
+    current: trimMiddle(original.current, minima.current),
+    after: trimMiddle(original.after, minima.after),
+    selected: original.selected
+  })
+  if (minimumPrompt.length > maxChars) throw new AskAiPromptTooLongError()
 
-  for (const item of order) {
-    if (renderPrompt(context, next).length <= maxChars) break
-    while (renderPrompt(context, next).length > maxChars && next[item.key].length > item.min) {
-      const currentPrompt = renderPrompt(context, next)
-      const targetLength = Math.max(
-        item.min,
-        next[item.key].length - overflow(currentPrompt, maxChars) - 200
-      )
-      next = {
-        ...next,
-        [item.key]: trimMiddle(next[item.key], targetLength)
-      }
-    }
+  const keys = ['current', 'before', 'after'] as const
+  while (renderPrompt(context, next).length > maxChars) {
+    const key = keys.reduce((largest, candidate) => {
+      const largestRoom = next[largest].length - minima[largest]
+      const candidateRoom = next[candidate].length - minima[candidate]
+      return candidateRoom > largestRoom ? candidate : largest
+    })
+    const reducible = next[key].length - minima[key]
+    if (reducible <= 0) throw new AskAiPromptTooLongError()
+    const amount = Math.min(reducible, overflow(renderPrompt(context, next), maxChars) + 64)
+    next = { ...next, [key]: trimMiddle(original[key], next[key].length - amount) }
   }
 
-  while (renderPrompt(context, next).length > maxChars && next.selected.length > 80) {
-    next = {
-      ...next,
-      selected: trimMiddle(next.selected, Math.max(80, next.selected.length - 500))
-    }
-  }
+  return renderPrompt(context, { ...next, selected: original.selected })
+}
 
-  return renderPrompt(context, next)
+function sectionMinimum(value: string, target: number): number {
+  return value ? Math.min(value.length, target) : 0
 }
 
 function renderPrompt(

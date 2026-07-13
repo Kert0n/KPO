@@ -5,7 +5,10 @@ const publicSiteFiles = new Set([
   'content/intro/vitepress.md',
   'content/conclusion/vitepress.md',
   'content/extras/index/vitepress.md',
-  'content/service-pages/ui-contract/vitepress.md'
+  'content/service-pages/ask-ai-contract/vitepress.md',
+  'content/service-pages/ui-contract/vitepress.md',
+  'content/service-pages/sidebar-contract/vitepress.md',
+  'content/service-pages/visual-components/vitepress.md'
 ])
 
 const internalFiles = new Set([

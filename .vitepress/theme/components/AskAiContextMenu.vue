@@ -1,53 +1,39 @@
 <script setup lang="ts">
 import { useData, useRoute, withBase } from 'vitepress'
-import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
-import { clamp } from '../../shared/core/math'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, useTemplateRef, watch } from 'vue'
+import { useAskAiActionPreparation } from '../composables/useAskAiActionPreparation'
+import { useAskAiContextLoader } from '../composables/useAskAiContextLoader'
 import { useAskAiProvider } from '../composables/useAskAiProvider'
-import {
-  ASK_AI_PROVIDERS,
-  askAiContextUrlForRoute,
-  resolveAskAiProviderAction,
-  routePathToAskAiContextKey,
-  type AskAiBlock,
-  type AskAiProviderAction,
-  type AskAiPageContext
-} from '../lib/askAiModel'
-import { copyPromptToClipboard } from '../lib/clipboardPrompt'
-import { readPlaygroundCode, readPlaygroundSelection } from '../lib/playgroundRegistry'
-
-type SelectionSnapshot = {
-  selectedText: string
-  blockIds: string[]
-  playgroundBlockId: string
-}
-
-type PreparedAskAiAction = {
-  snapshot: SelectionSnapshot
-  action: AskAiProviderAction
-  contextUnavailable: boolean
-}
+import { useClipboardFallback } from '../composables/useClipboardFallback'
+import { useFloatingMenuPosition } from '../composables/useFloatingMenuPosition'
+import { useTextSelection, type SelectionSnapshot } from '../composables/useTextSelection'
+import { ASK_AI_PROVIDERS, type AskAiBlock, type AskAiPageContext } from '../lib/askAiModel'
 
 const route = useRoute()
 const { page, site } = useData()
 const { askAiProvider } = useAskAiProvider()
-
-const menu = reactive({
-  visible: false,
-  x: 0,
-  y: 0,
-  mode: 'desktop' as 'desktop' | 'mobile'
+const { menu, showMenu, hideMenu } = useFloatingMenuPosition()
+const { createSelectionSnapshot, selectedRangeRect } = useTextSelection()
+const contextLoader = useAskAiContextLoader({
+  routePath: () => route.path,
+  base: () => site.value.base,
+  withBase
 })
-const snapshot = ref<SelectionSnapshot | null>(null)
-const preparedAction = ref<PreparedAskAiAction | null>(null)
-const prepareError = ref<unknown>(null)
-const preparing = ref(false)
-const toast = ref('')
-const manualPrompt = ref('')
-const contextCache = new Map<string, AskAiPageContext>()
+const clipboardFallback = useClipboardFallback()
+const { manualPrompt, copyPrompt, closeManualPrompt, handleDialogKeydown } = clipboardFallback
+const actionPreparation = useAskAiActionPreparation({
+  provider: askAiProvider,
+  loadPageContext: contextLoader.loadPageContext,
+  fallbackContext
+})
+const { preparedAction, prepareError, preparing } = actionPreparation
 
+const snapshot = ref<SelectionSnapshot | null>(null)
+const toast = ref('')
+const menuElement = useTemplateRef<HTMLElement>('menuElement')
 let toastTimer: number | null = null
 let mobileSelectionTimer: number | null = null
-let prepareVersion = 0
+let keyboardMenuInitiator: HTMLElement | null = null
 
 const menuLabel = computed(() => {
   return (
@@ -57,6 +43,7 @@ const menuLabel = computed(() => {
 })
 
 const askAiButtonLabel = computed(() => {
+  if (prepareError.value instanceof Error) return prepareError.value.message
   if (preparing.value) return menu.mode === 'mobile' ? 'Preparing...' : 'Preparing prompt...'
   return menu.mode === 'mobile' ? 'Ask AI' : menuLabel.value
 })
@@ -67,9 +54,10 @@ onMounted(() => {
   document.addEventListener('keydown', onKeydown)
   document.addEventListener('selectionchange', onSelectionChange)
   document.addEventListener('pointerup', onPointerUp)
-  window.addEventListener('scroll', hideMenu, true)
-  window.addEventListener('resize', hideMenu)
-  queuePageContextPrefetch()
+  document.addEventListener('wheel', onScrollIntent, { passive: true })
+  document.addEventListener('touchmove', onScrollIntent, { passive: true })
+  window.addEventListener('resize', closeMenuWithoutRestore)
+  void queueAvailablePageContext()
 })
 
 onBeforeUnmount(() => {
@@ -78,37 +66,53 @@ onBeforeUnmount(() => {
   document.removeEventListener('keydown', onKeydown)
   document.removeEventListener('selectionchange', onSelectionChange)
   document.removeEventListener('pointerup', onPointerUp)
-  window.removeEventListener('scroll', hideMenu, true)
-  window.removeEventListener('resize', hideMenu)
+  document.removeEventListener('wheel', onScrollIntent)
+  document.removeEventListener('touchmove', onScrollIntent)
+  window.removeEventListener('resize', closeMenuWithoutRestore)
   clearToast()
   clearMobileSelectionTimer()
+  actionPreparation.clear()
+  contextLoader.dispose()
+  clipboardFallback.dispose()
 })
 
 watch(
   () => route.path,
   () => {
-    hideMenu()
-    clearPreparedAction()
-    queuePageContextPrefetch()
+    closeMenuWithoutRestore()
+    snapshot.value = null
+    clearMobileSelectionTimer()
+    clipboardFallback.dispose()
+    actionPreparation.clear()
+    contextLoader.invalidateRoute()
+    void queueAvailablePageContext()
   }
 )
 
 watch(askAiProvider, () => {
   if (!menu.visible || !snapshot.value) return
-  void prepareAskAiAction(snapshot.value)
+  void actionPreparation.prepare(snapshot.value)
 })
+
+async function queueAvailablePageContext(): Promise<void> {
+  await nextTick()
+  if (document.querySelector('.vp-doc [data-kpo-ask-block-id]')) {
+    contextLoader.queuePrefetch()
+  }
+}
 
 function onContextMenu(event: MouseEvent): void {
   if (event.shiftKey) return
-
   const nextSnapshot = createSelectionSnapshot(event.target)
   if (!nextSnapshot) return
 
   event.preventDefault()
   snapshot.value = nextSnapshot
   menu.mode = 'desktop'
-  void prepareAskAiAction(nextSnapshot)
+  keyboardMenuInitiator = event.button === 2 ? null : activeFocusTarget()
+  void actionPreparation.prepare(nextSnapshot)
   showMenu(event.clientX, event.clientY)
+  if (keyboardMenuInitiator) void nextTick(() => menuElement.value?.focus())
 }
 
 function onSelectionChange(): void {
@@ -118,62 +122,70 @@ function onSelectionChange(): void {
   mobileSelectionTimer = window.setTimeout(() => {
     const nextSnapshot = createSelectionSnapshot(document.activeElement)
     if (!nextSnapshot) return
-
     const rect = selectedRangeRect()
     if (!rect) return
 
     snapshot.value = nextSnapshot
     menu.mode = 'mobile'
-    void prepareAskAiAction(nextSnapshot)
+    void actionPreparation.prepare(nextSnapshot)
     showMenu(rect.left + rect.width / 2, rect.top - 12)
   }, 220)
 }
 
 function onPointerUp(): void {
-  if (!isMobileLike()) return
-  onSelectionChange()
+  if (isMobileLike()) onSelectionChange()
 }
 
 function onDocumentClick(event: MouseEvent): void {
   const target = event.target
   if (target instanceof Element && target.closest('.kpo-ai-menu, .kpo-ai-manual')) return
-  hideMenu()
+  closeMenu(true)
 }
 
 function onKeydown(event: KeyboardEvent): void {
+  if (handleDialogKeydown(event)) return
   if (event.key === 'Escape') {
-    hideMenu()
-    manualPrompt.value = ''
+    closeMenu(true)
+    return
   }
+  if (isScrollIntentKey(event)) closeMenuWithoutRestore()
+}
+
+function onScrollIntent(): void {
+  closeMenuWithoutRestore()
+}
+
+function isScrollIntentKey(event: KeyboardEvent): boolean {
+  if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey) return false
+  const target = event.target
+  if (
+    target instanceof HTMLElement &&
+    (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName))
+  ) {
+    return false
+  }
+  return ['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End', ' '].includes(event.key)
 }
 
 async function askAi(): Promise<void> {
   const prepared = preparedAction.value
+  const restoreFocusTarget = keyboardMenuInitiator ?? visibleProviderControl()
   hideMenu()
+  keyboardMenuInitiator = null
   if (!prepared) return
+  clipboardFallback.setRestoreFocusTarget(restoreFocusTarget)
 
   const { action, contextUnavailable } = prepared
   let openedWindow: Window | null = null
   try {
     let copied = false
     let copyPromise: Promise<boolean> | null = null
-    if (action.copyPrompt) {
-      copyPromise = copyPrompt(action.prompt)
-    }
+    if (action.copyPrompt) copyPromise = copyPrompt(action.prompt)
+    if (action.openUrl) openedWindow = openBlankWindow()
+    if (copyPromise) copied = await copyPromise
 
-    if (action.openUrl) {
-      openedWindow = openBlankWindow()
-    }
-
-    if (copyPromise) {
-      copied = await copyPromise
-    }
-
-    if (action.openUrl) {
-      navigateOpenedWindow(openedWindow, action.openUrl)
-    } else {
-      closeOpenedWindow(openedWindow)
-    }
+    if (action.openUrl) navigateOpenedWindow(openedWindow, action.openUrl)
+    else closeOpenedWindow(openedWindow)
 
     showToast(actionToast(action.toastKind, copied, contextUnavailable))
   } catch (error) {
@@ -181,183 +193,6 @@ async function askAi(): Promise<void> {
     showToast('Ask AI unavailable')
     console.warn('[ask-ai] не удалось выполнить Ask AI:', error)
   }
-}
-
-async function prepareAskAiAction(nextSnapshot: SelectionSnapshot): Promise<void> {
-  const version = ++prepareVersion
-  preparing.value = true
-  preparedAction.value = null
-  prepareError.value = null
-
-  try {
-    let contextUnavailable = false
-    const pageContext = await loadPageContext().catch(() => {
-      contextUnavailable = true
-      return fallbackContext(nextSnapshot.selectedText)
-    })
-    const action = resolveAskAiProviderAction(askAiProvider.value, {
-      pageContext,
-      selectedText: nextSnapshot.selectedText,
-      blockIds: nextSnapshot.blockIds,
-      currentOverride: playgroundOverride(nextSnapshot.playgroundBlockId)
-    })
-
-    if (version !== prepareVersion) return
-    preparedAction.value = {
-      snapshot: nextSnapshot,
-      action,
-      contextUnavailable
-    }
-  } catch (error) {
-    if (version !== prepareVersion) return
-    prepareError.value = error
-    console.warn('[ask-ai] не удалось подготовить prompt:', error)
-  } finally {
-    if (version === prepareVersion) preparing.value = false
-  }
-}
-
-function clearPreparedAction(): void {
-  prepareVersion += 1
-  preparing.value = false
-  preparedAction.value = null
-  prepareError.value = null
-}
-
-function actionToast(
-  toastKind: 'copied' | 'copied-and-opened' | 'manual-copy' | 'unavailable',
-  copied: boolean,
-  contextUnavailable: boolean
-): string {
-  if (toastKind === 'unavailable') return 'Ask AI unavailable'
-  if (toastKind === 'manual-copy') return 'Copy prompt manually'
-  if (toastKind === 'copied' && !copied) return 'Copy prompt manually'
-  if (toastKind === 'copied-and-opened' && !copied) return 'Copy prompt manually'
-
-  const suffix = contextUnavailable ? ' without page context' : ''
-  if (toastKind === 'copied') return `Prompt copied${suffix}`
-
-  if (askAiProvider.value === 'claude') return `Prompt copied, opened Claude${suffix}`
-  if (askAiProvider.value === 'deepseek') return `Prompt copied, opened DeepSeek${suffix}`
-  return `Prompt copied, opened ChatGPT${suffix}`
-}
-
-async function loadPageContext(): Promise<AskAiPageContext> {
-  const key = routePathToAskAiContextKey(route.path, site.value.base)
-  const cached = contextCache.get(key)
-  if (cached) return cached
-
-  const response = await fetch(askAiContextUrlForRoute(route.path, site.value.base, withBase))
-  if (!response.ok) throw new Error(`Ask AI context HTTP ${response.status}`)
-
-  const context = (await response.json()) as AskAiPageContext
-  contextCache.set(key, context)
-  return context
-}
-
-function queuePageContextPrefetch(): void {
-  window.setTimeout(() => {
-    loadPageContext().catch(() => undefined)
-  }, 0)
-}
-
-function createSelectionSnapshot(target: EventTarget | null): SelectionSnapshot | null {
-  const targetElement = target instanceof Element ? target : null
-  const playgroundBlockId = closestPlaygroundBlockId(targetElement)
-  const playgroundSelection = playgroundBlockId ? readPlaygroundSelection(playgroundBlockId) : ''
-
-  if (playgroundSelection) {
-    return {
-      selectedText: playgroundSelection,
-      blockIds: [playgroundBlockId],
-      playgroundBlockId
-    }
-  }
-
-  const selection = window.getSelection()
-  if (!selection || selection.rangeCount === 0) return null
-  const selectedText = selection.toString().trim()
-  if (selectedText === '') return null
-
-  const content = document.querySelector('.vp-doc')
-  if (!content || !selectionBelongsToContent(selection, content)) return null
-
-  const blockIds = selectedBlockIds(selection, content)
-  if (blockIds.length === 0) return null
-
-  return {
-    selectedText,
-    blockIds,
-    playgroundBlockId: playgroundBlockId || ''
-  }
-}
-
-function selectedBlockIds(selection: Selection, content: Element): string[] {
-  const ids: string[] = []
-  const seen = new Set<string>()
-  const blocks = [...content.querySelectorAll<HTMLElement>('[data-kpo-ask-block-id]')]
-
-  for (let index = 0; index < selection.rangeCount; index += 1) {
-    const range = selection.getRangeAt(index)
-    const ancestor =
-      range.commonAncestorContainer.nodeType === Node.ELEMENT_NODE
-        ? (range.commonAncestorContainer as Element)
-        : range.commonAncestorContainer.parentElement
-    const closest = ancestor?.closest<HTMLElement>('[data-kpo-ask-block-id]')
-    if (closest?.dataset.kpoAskBlockId) addId(ids, seen, closest.dataset.kpoAskBlockId)
-
-    for (const block of blocks) {
-      if (!range.intersectsNode(block)) continue
-      const id = block.dataset.kpoAskBlockId
-      if (id) addId(ids, seen, id)
-    }
-  }
-
-  return ids
-}
-
-function selectionBelongsToContent(selection: Selection, content: Element): boolean {
-  for (let index = 0; index < selection.rangeCount; index += 1) {
-    const range = selection.getRangeAt(index)
-    const container =
-      range.commonAncestorContainer.nodeType === Node.ELEMENT_NODE
-        ? (range.commonAncestorContainer as Element)
-        : range.commonAncestorContainer.parentElement
-    if (container && content.contains(container)) return true
-  }
-  return false
-}
-
-function selectedRangeRect(): DOMRect | null {
-  const selection = window.getSelection()
-  if (!selection || selection.rangeCount === 0) return null
-
-  const rect = selection.getRangeAt(0).getBoundingClientRect()
-  if (rect.width === 0 && rect.height === 0) return null
-  return rect
-}
-
-function playgroundOverride(
-  blockId: string
-): { kind: 'playground'; language: 'kotlin'; markdown: string } | undefined {
-  if (!blockId) return undefined
-  const code = readPlaygroundCode(blockId)
-  if (!code) return undefined
-  return {
-    kind: 'playground',
-    language: 'kotlin',
-    markdown: `\`\`\`kotlin\n${code.replace(/\n?$/, '\n')}\`\`\``
-  }
-}
-
-async function copyPrompt(prompt: string): Promise<boolean> {
-  const result = await copyPromptToClipboard(prompt)
-  if (result.ok) return true
-
-  manualPrompt.value = prompt
-  await nextTick()
-  document.querySelector<HTMLTextAreaElement>('.kpo-ai-manual textarea')?.select()
-  return false
 }
 
 function fallbackContext(selectedText: string): AskAiPageContext {
@@ -369,7 +204,6 @@ function fallbackContext(selectedText: string): AskAiPageContext {
     lineStart: 0,
     lineEnd: 0
   }
-
   return {
     courseTitle: site.value.title,
     courseDescription: site.value.description,
@@ -380,32 +214,50 @@ function fallbackContext(selectedText: string): AskAiPageContext {
   }
 }
 
-function showMenu(x: number, y: number): void {
-  const width = menu.mode === 'mobile' ? 112 : 220
-  const height = 44
-  menu.x = clamp(x, 8 + width / 2, window.innerWidth - 8 - width / 2)
-  menu.y = clamp(y, 8, window.innerHeight - 8 - height)
-  menu.visible = true
-}
+function actionToast(
+  toastKind: 'copied' | 'copied-and-opened' | 'manual-copy' | 'unavailable',
+  copied: boolean,
+  contextUnavailable: boolean
+): string {
+  if (toastKind === 'unavailable') return 'Ask AI unavailable'
+  if (toastKind === 'manual-copy') return 'Copy prompt manually'
+  if ((toastKind === 'copied' || toastKind === 'copied-and-opened') && !copied) {
+    return 'Copy prompt manually'
+  }
 
-function hideMenu(): void {
-  menu.visible = false
+  const suffix = contextUnavailable ? ' without page context' : ''
+  if (toastKind === 'copied') return `Prompt copied${suffix}`
+  if (askAiProvider.value === 'claude') return `Prompt copied, opened Claude${suffix}`
+  if (askAiProvider.value === 'deepseek') return `Prompt copied, opened DeepSeek${suffix}`
+  return `Prompt copied, opened ChatGPT${suffix}`
 }
 
 function isMobileLike(): boolean {
   return window.matchMedia('(max-width: 767px), (pointer: coarse)').matches
 }
 
-function closestPlaygroundBlockId(element: Element | null): string {
-  const block = element?.closest<HTMLElement>('.kpo-switcher[data-kpo-ask-block-id]')
-  if (!block?.querySelector('.kpo-playground')) return ''
-  return block.dataset.kpoAskBlockId ?? ''
+function visibleProviderControl(): HTMLElement | null {
+  const selectors = ['.KpoAskAiProvider > button', '.KpoNavBarExtra > button', '.VPNavBarHamburger']
+  for (const selector of selectors) {
+    const control = document.querySelector<HTMLElement>(selector)
+    if (control?.offsetParent !== null) return control
+  }
+  return null
 }
 
-function addId(ids: string[], seen: Set<string>, id: string): void {
-  if (seen.has(id)) return
-  seen.add(id)
-  ids.push(id)
+function activeFocusTarget(): HTMLElement | null {
+  return document.activeElement instanceof HTMLElement ? document.activeElement : null
+}
+
+function closeMenu(restoreFocus: boolean): void {
+  const target = keyboardMenuInitiator
+  hideMenu()
+  keyboardMenuInitiator = null
+  if (restoreFocus && target?.isConnected) target.focus()
+}
+
+function closeMenuWithoutRestore(): void {
+  closeMenu(false)
 }
 
 function openBlankWindow(): Window | null {
@@ -415,11 +267,8 @@ function openBlankWindow(): Window | null {
 }
 
 function navigateOpenedWindow(openedWindow: Window | null, url: string): void {
-  if (openedWindow) {
-    openedWindow.location.href = url
-  } else {
-    window.open(url, '_blank', 'noopener,noreferrer')
-  }
+  if (openedWindow) openedWindow.location.href = url
+  else window.open(url, '_blank', 'noopener,noreferrer')
 }
 
 function closeOpenedWindow(openedWindow: Window | null): void {
@@ -454,10 +303,12 @@ function clearMobileSelectionTimer(): void {
   <Teleport to="body">
     <div
       v-if="menu.visible"
+      ref="menuElement"
       class="kpo-ai-menu"
       :class="{ 'kpo-ai-menu--mobile': menu.mode === 'mobile' }"
       :style="{ left: `${menu.x}px`, top: `${menu.y}px` }"
       role="menu"
+      tabindex="-1"
     >
       <button
         type="button"
@@ -484,7 +335,7 @@ function clearMobileSelectionTimer(): void {
       <div class="kpo-ai-manual__panel">
         <p class="kpo-ai-manual__title">Copy AI prompt</p>
         <textarea :value="manualPrompt" readonly />
-        <button type="button" @click="manualPrompt = ''">Close</button>
+        <button type="button" @click="closeManualPrompt">Close</button>
       </div>
     </div>
   </Teleport>

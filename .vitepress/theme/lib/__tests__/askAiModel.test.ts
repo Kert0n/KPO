@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   askAiContextUrlForRoute,
   buildAskAiPrompt,
+  AskAiPromptTooLongError,
   collectAfterContextBlocks,
   collectBeforeContextBlocks,
   resolveAskAiProviderAction,
@@ -14,7 +15,7 @@ const context: AskAiPageContext = {
   courseDescription: 'Курс',
   pageTitle: 'Лекция',
   pageDescription: 'Описание',
-  sourcePath: 'content/lectures/Lec1/vitepress.md',
+  sourcePath: 'content/service-pages/model-fixture/vitepress.md',
   blocks: [
     block('before', 'paragraph', 'before '.repeat(400)),
     block('current', 'code', 'current '.repeat(400), 'kotlin'),
@@ -23,19 +24,64 @@ const context: AskAiPageContext = {
 }
 
 describe('askAiModel', () => {
-  it('builds and trims prompts while preserving the selected fragment last', () => {
+  it('trims element content without removing context or changing the selection', () => {
+    const selectedText = 'important selection '.repeat(40).trim()
     const prompt = buildAskAiPrompt({
       pageContext: context,
-      selectedText: 'important selection '.repeat(40),
+      selectedText,
       blockIds: ['current'],
-      maxChars: 1200
+      maxChars: 2400
     })
 
-    expect(prompt.length).toBeLessThanOrEqual(1200)
+    expect(prompt.length).toBeLessThanOrEqual(2400)
     expect(prompt).toContain('Ты помогаешь студенту')
     expect(prompt).toContain('[Выделенный фрагмент]')
-    expect(prompt).toContain('important selection')
+    expect(prompt.split('[Выделенный фрагмент]\n')[1]).toBe(selectedText)
+    expect(prompt).not.toContain('[Контекст до]\n(нет)')
+    expect(prompt).not.toContain('[Контекст после]\n(нет)')
     expect(prompt).toContain('[... фрагмент сокращен ...]')
+  })
+
+  it('projects the selected multi-code language without changing neighboring elements', () => {
+    const pageContext: AskAiPageContext = {
+      ...context,
+      blocks: [
+        block('before-table', 'table', '| Key | Value |\n| --- | --- |\n| fixture | before |'),
+        block(
+          'current',
+          'multi-code',
+          '::: multi-code\n```kotlin\nval visible = true\n```\n```java\nvar hidden = true;\n```\n:::'
+        ),
+        block('after-mermaid', 'mermaid', '```mermaid\nflowchart LR\nA --> B\n```')
+      ]
+    }
+    const prompt = buildAskAiPrompt({
+      pageContext,
+      selectedText: 'val visible = true',
+      blockIds: ['current'],
+      currentOverride: {
+        kind: 'code',
+        language: 'kotlin',
+        markdown: '```kotlin\nval visible = true\n```'
+      },
+      maxChars: 12000
+    })
+
+    expect(prompt).toContain('| fixture | before |')
+    expect(prompt).toContain('[Mermaid source]\n```mermaid')
+    expect(prompt).toContain('[Текущий блок]\n[Code: kotlin]')
+    expect(prompt).not.toContain('var hidden = true')
+  })
+
+  it('rejects an oversized selection instead of silently truncating it', () => {
+    expect(() =>
+      buildAskAiPrompt({
+        pageContext: context,
+        selectedText: 'selected-exact '.repeat(1000),
+        blockIds: ['current'],
+        maxChars: 12000
+      })
+    ).toThrow(AskAiPromptTooLongError)
   })
 
   it('copies prompt and opens base ChatGPT without query parameter', () => {
@@ -154,9 +200,9 @@ describe('askAiModel', () => {
 const reportContext: AskAiPageContext = {
   courseTitle: 'Конструирование ПО',
   courseDescription: 'Курс',
-  pageTitle: 'Лекция 10',
+  pageTitle: 'Report fixture',
   pageDescription: '',
-  sourcePath: 'content/lectures/Lec10/vitepress.md',
+  sourcePath: 'content/service-pages/report-fixture/vitepress.md',
   blocks: [
     block(
       'report-table',

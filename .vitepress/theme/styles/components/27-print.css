@@ -1,0 +1,18 @@
+
+
+@media print {
+
+  .kpo-content-block,
+  pre,
+  table,
+  .kpo-mermaid,
+  .custom-block {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  .kpo-content-block--wide,
+  .kpo-wide-block {
+    max-width: 100% !important;
+  }
+}

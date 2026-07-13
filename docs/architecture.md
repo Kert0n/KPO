@@ -19,3 +19,24 @@ Adaptive tables follow this rule through `AdaptiveTablesController`:
 
 The controller changes lifecycle ownership only. Table markup, CSS and the
 fit/wrap/scroll geometry policy remain separate stable contracts.
+
+Code language and Playground transitions own a viewport-anchor transaction.
+The transaction observes the interacted switcher and document geometry,
+restores the anchor while it owns scrolling, and releases ownership immediately
+after wheel, touch or later keyboard scroll intent. The initiating Home/End
+event is explicitly excluded from interruption.
+
+Each Kotlin Playground exposes a ready/failed/disposed settlement signal and
+waits for its own ResizeObserver-backed geometry quiet period. Global language
+or Playground mode changes use a lifecycle registry of actually pending
+initializations; they never discover state through global DOM queries. Unmount
+settles the registry entry, invalidates the async generation and destroys any
+instance attached after the component became disconnected.
+
+Ask AI follows the same ownership model. Context loading owns an abortable
+request and prefetch timer; route invalidation aborts both and advances a
+generation token. Action preparation has a separate generation token so a
+slower earlier selection cannot overwrite the latest one. The manual clipboard
+fallback traps focus inside the existing dialog and restores it to the visible
+provider control when the dialog closes. Component unmount removes every
+document/window listener and disposes both loaders.

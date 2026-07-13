@@ -7,11 +7,13 @@ import tseslint from 'typescript-eslint'
 export default tseslint.config(
   {
     ignores: [
-      '.vitepress/cache/**',
-      '.vitepress/dist/**',
+      '.claude/worktrees/**',
+      '.worktrees/**',
+      '**/.vitepress/cache/**',
+      '**/.vitepress/dist/**',
+      '**/node_modules/**',
       'analysis/**',
       'coverage/**',
-      'node_modules/**',
       'output/**',
       'playwright-report/**',
       'test-results/**',

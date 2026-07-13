@@ -2,7 +2,8 @@ import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { afterEach, describe, expect, it } from 'vitest'
-import { contentPagesFor, getContentCatalog, validateContentCatalog } from '../contentCatalog'
+import { getContentCatalog, validateContentCatalog } from '../contentCatalog'
+import { inclusionForKind } from '../contentPolicy'
 
 const temporaryRoots: string[] = []
 
@@ -11,14 +12,15 @@ afterEach(() => {
 })
 
 describe('content catalog', () => {
-  it('includes public extras in PDF and UI sweep while excluding home and service from PDF', () => {
-    const pdf = contentPagesFor('pdf')
-    const uiSweep = contentPagesFor('uiSweep')
-
-    expect(pdf.map((page) => page.route)).toContain('/extras/02')
-    expect(uiSweep.map((page) => page.route)).toContain('/extras/02')
-    expect(pdf.some((page) => page.kind === 'home')).toBe(false)
-    expect(pdf.some((page) => page.kind === 'service')).toBe(false)
+  it('keeps public and service channel policies explicit', () => {
+    expect(inclusionForKind('extra')).toMatchObject({ pdf: true, uiSweep: true, askAi: true })
+    expect(inclusionForKind('home')).toMatchObject({ pdf: false, askAi: false })
+    expect(inclusionForKind('service')).toMatchObject({
+      pdf: false,
+      search: false,
+      askAi: false,
+      sitemap: false
+    })
   })
 
   it('honors frontmatter order before the directory number', () => {
@@ -35,11 +37,15 @@ describe('content catalog', () => {
   })
 
   it('rejects duplicate section order', () => {
-    const catalog = getContentCatalog().map((page) => ({
+    const root = fixtureRoot()
+    writePage(root, 'content/lectures/Fixture1/vitepress.md', '# First')
+    writePage(root, 'content/lectures/Fixture2/vitepress.md', '# Second')
+    const catalog = getContentCatalog({ root, fresh: true }).map((page) => ({
       ...page,
       inclusion: { ...page.inclusion }
     }))
     const lectures = catalog.filter((page) => page.kind === 'lecture')
+    expect(lectures).toHaveLength(2)
     lectures[1].order = lectures[0].order
     expect(() => validateContentCatalog(catalog)).toThrow(/lectures order/)
   })
