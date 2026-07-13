@@ -3,9 +3,24 @@ updates:
   - package-ecosystem: npm
     directory: /
     schedule: { interval: weekly }
+    open-pull-requests-limit: 5
+    groups:
+      routine-npm-updates:
+        patterns: ['*']
+        update-types: [minor, patch]
+    ignore:
+      # VitePress 1.6.4 declares markdown-it-mathjax3 ^4 as its peer contract.
+      - dependency-name: markdown-it-mathjax3
+        update-types: ['version-update:semver-major']
+      # typescript-eslint 8.63 supports TypeScript versions below 6.1.
+      - dependency-name: typescript
+        update-types: ['version-update:semver-major']
   - package-ecosystem: gradle
     directory: /
     schedule: { interval: weekly }
   - package-ecosystem: github-actions
     directory: /
     schedule: { interval: weekly }
+    groups:
+      github-actions:
+        patterns: ['*']
