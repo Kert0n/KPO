@@ -11,8 +11,8 @@ import MermaidDiagram from './components/MermaidDiagram.vue'
 import SidebarToggle from './components/SidebarToggle.vue'
 import { installAdaptiveTables } from './lib/adaptiveTables'
 
-import '@fontsource-variable/inter'
-import '@fontsource-variable/jetbrains-mono'
+import '@fontsource-variable/inter/index.css'
+import '@fontsource-variable/jetbrains-mono/index.css'
 
 import './styles/index.css'
 

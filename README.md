@@ -47,6 +47,7 @@ content/lectures/LecN/assets/                — изображения лекц
 content/lectures/_template/                  — скрытая заготовка новой лекции
 content/extras/index/vitepress.md            — landing page дополнительных материалов
 content/extras/01/vitepress.md               — публичная песочница для практики
+content/extras/NN/vitepress.md               — дополнительная тема N
 content/extras/_template/                    — скрытая заготовка дополнительной темы
 content/service-pages/ui-contract/vitepress.md — синтетическая страница для UI-регрессий
 content/service-pages/_internal/             — внутренние markdown-документы, не публикуются
@@ -224,11 +225,12 @@ npm run verify:full
 npm run format:check:tracked
 ```
 
-Browser-регрессии Playwright проверяют реальные страницы:
+Browser- и visual-регрессии Playwright проверяют только служебные fixture-страницы; учебные лекции и extras проверяются отдельными content-gates:
 
 ```sh
 npm run build
 npm run test:ui
+npm run content:check
 ```
 
 Перед публикацией используйте полный прогон:
@@ -239,6 +241,8 @@ npm exec --yes --package=node@24 -- npm run verify
 npm exec --yes --package=node@24 -- npm run test:ui
 npm run pdf
 ```
+
+Порядок обновления npm, Gradle и GitHub Actions, правила совместимости major-версий и разбор конфликтов Dependabot описаны в [`docs/dependency-maintenance.md`](docs/dependency-maintenance.md).
 
 ## Публикация на GitHub Pages
 
