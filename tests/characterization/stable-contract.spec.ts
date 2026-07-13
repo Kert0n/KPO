@@ -12,7 +12,7 @@ test.describe('stable geometry and DOM contracts', () => {
     test(`viewport geometry at ${width}px`, async ({ page }) => {
       await resetBrowserState(page)
       await page.setViewportSize({ width, height: 900 })
-      await page.goto('intro')
+      await page.goto(UI_FIXTURE_ROUTE)
       await waitForStableUi(page)
 
       const state = await page.evaluate(() => {
@@ -66,23 +66,33 @@ test.describe('stable geometry and DOM contracts', () => {
     })
   }
 
-  test('theme changes navbar, sidebar and content background synchronously', async ({ page }) => {
+  test('theme changes fixture shell backgrounds synchronously', async ({ page }) => {
     await resetBrowserState(page)
     await page.setViewportSize({ width: 1440, height: 900 })
-    await page.goto('intro')
+    await page.goto(UI_FIXTURE_ROUTE)
     const colors = async () =>
-      page.evaluate(() => ({
-        token: getComputedStyle(document.documentElement).getPropertyValue('--vp-c-bg').trim(),
-        navbar: getComputedStyle(document.querySelector('.VPNavBar')!).backgroundColor,
-        sidebar: getComputedStyle(document.querySelector('.VPSidebar')!).backgroundColor,
-        content: getComputedStyle(document.querySelector('.VPContent')!).backgroundColor
-      }))
+      page.evaluate(() => {
+        const background = (selector: string) => {
+          const element = document.querySelector(selector)
+          return element ? getComputedStyle(element).backgroundColor : null
+        }
+        return {
+          token: getComputedStyle(document.documentElement).getPropertyValue('--vp-c-bg').trim(),
+          navbar: background('.VPNavBar'),
+          sidebar: background('.VPSidebar'),
+          content: getComputedStyle(document.body).backgroundColor
+        }
+      })
     await setTheme(page, 'light')
     const light = await colors()
     await setTheme(page, 'dark')
     const dark = await colors()
     expect(dark).not.toEqual(light)
     expect(dark.token).not.toBe(light.token)
+    expect(dark.navbar).not.toBe(light.navbar)
+    expect(dark.content).not.toBe(light.content)
+    expect(dark.sidebar).toBeNull()
+    expect(light.sidebar).toBeNull()
   })
 
   test('sanitized representative HTML remains stable', async ({ page }) => {

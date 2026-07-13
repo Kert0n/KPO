@@ -1,18 +1,13 @@
 import { expect, test } from '@playwright/test'
 import {
-  hideSidebar,
   normalizeForScreenshot,
   resetBrowserState,
   selectText,
   UI_FIXTURE_ROUTE,
   waitForStableUi
 } from './helpers'
-import {
-  stubEmptyUiServiceAskAiContext,
-  stubUiServiceAskAiContext
-} from '../helpers/serviceFixtures'
 
-const VISUAL_COMPONENT_FIXTURE_ROUTE = 'service-pages/visual-components/vitepress'
+const VISUAL_COMPONENT_FIXTURE_ROUTE = 'service-pages/visual-components'
 
 test.describe('Linux Chromium golden master', () => {
   test.beforeEach(async ({ page }) => {
@@ -23,40 +18,26 @@ test.describe('Linux Chromium golden master', () => {
   })
 
   for (const theme of ['light', 'dark'] as const) {
-    test(`desktop ${theme}, sidebar visible`, async ({ page }) => {
+    test(`desktop ${theme} fixture shell`, async ({ page }) => {
       await resetBrowserState(page, {
         'kpo:playground-mode': '0',
         'vitepress-theme-appearance': theme
       })
       await page.setViewportSize({ width: 1440, height: 1000 })
-      await page.goto('intro')
+      await page.goto(UI_FIXTURE_ROUTE)
       await expect(page.locator('html')).toHaveClass(theme === 'dark' ? /dark/ : /^(?!.*\bdark\b)/)
       await waitForStableUi(page)
       await normalizeForScreenshot(page)
-      await expect(page).toHaveScreenshot(`desktop-${theme}-sidebar-visible.png`, {
+      await expect(page).toHaveScreenshot(`desktop-${theme}-fixture-shell.png`, {
         fullPage: true
       })
     })
   }
 
-  test('desktop dark, sidebar hidden', async ({ page }) => {
-    await resetBrowserState(page, {
-      'kpo:playground-mode': '0',
-      'vitepress-theme-appearance': 'dark'
-    })
-    await page.setViewportSize({ width: 1440, height: 1000 })
-    await page.goto(UI_FIXTURE_ROUTE)
-    await expect(page.locator('html')).toHaveClass(/dark/)
-    await hideSidebar(page)
-    await waitForStableUi(page)
-    await normalizeForScreenshot(page)
-    await expect(page).toHaveScreenshot('desktop-dark-sidebar-hidden.png', { fullPage: true })
-  })
-
   for (const width of [768, 800] as const) {
     test(`tablet ${width}`, async ({ page }) => {
       await page.setViewportSize({ width, height: 1000 })
-      await page.goto('intro')
+      await page.goto(UI_FIXTURE_ROUTE)
       await waitForStableUi(page)
       await normalizeForScreenshot(page)
       await expect(page).toHaveScreenshot(`tablet-${width}.png`, { fullPage: true })
@@ -69,8 +50,8 @@ test.describe('Linux Chromium golden master', () => {
         'kpo:playground-mode': '0',
         'vitepress-theme-appearance': theme
       })
-      await page.setViewportSize({ width: 390, height: 844 })
-      await page.goto('intro')
+      await page.setViewportSize({ width: 375, height: 844 })
+      await page.goto(UI_FIXTURE_ROUTE)
       await expect(page.locator('html')).toHaveClass(theme === 'dark' ? /dark/ : /^(?!.*\bdark\b)/)
       await waitForStableUi(page)
       await normalizeForScreenshot(page)
@@ -91,6 +72,17 @@ test.describe('Linux Chromium golden master', () => {
     })
   }
 
+  test('Mermaid after theme toggle', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 900 })
+    await page.goto(UI_FIXTURE_ROUTE)
+    await waitForStableUi(page)
+    await page.locator('.VPSwitchAppearance:visible').first().click()
+    await expect(page.locator('html')).toHaveClass(/dark/)
+    await waitForStableUi(page)
+    await normalizeForScreenshot(page)
+    await expect(page.locator('.kpo-mermaid').first()).toHaveScreenshot('mermaid-dark.png')
+  })
+
   test('Playground', async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 900 })
     await page.goto(VISUAL_COMPONENT_FIXTURE_ROUTE)
@@ -110,7 +102,6 @@ test.describe('Linux Chromium golden master', () => {
 
   test('Ask AI selection menu', async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 900 })
-    await stubUiServiceAskAiContext(page)
     await page.goto(UI_FIXTURE_ROUTE)
     await waitForStableUi(page)
     await selectText(page, 'This page is intentionally hidden from navigation.')
@@ -131,7 +122,6 @@ test.describe('Linux Chromium golden master', () => {
       document.execCommand = (() => false) as typeof document.execCommand
     })
     await page.setViewportSize({ width: 1280, height: 900 })
-    await stubEmptyUiServiceAskAiContext(page)
     await page.goto(UI_FIXTURE_ROUTE)
     await waitForStableUi(page)
     await selectText(page, 'This page is intentionally hidden from navigation.')
@@ -147,8 +137,8 @@ test.describe('Linux Chromium golden master', () => {
   })
 
   test('logo and title crop guard', async ({ page }) => {
-    await page.setViewportSize({ width: 390, height: 844 })
-    await page.goto('intro')
+    await page.setViewportSize({ width: 375, height: 844 })
+    await page.goto(UI_FIXTURE_ROUTE)
     await waitForStableUi(page)
     await normalizeForScreenshot(page)
     await expect(page.locator('.VPNavBarTitle')).toHaveScreenshot('logo-title-mobile.png')

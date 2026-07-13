@@ -7,18 +7,7 @@ import {
 
 import { openAskAiMenuWhenReady } from '../../helpers/askAi'
 
-import {
-  stubSelectionBoundaryAskAiContext,
-  stubUiServiceAskAiContext
-} from '../../helpers/serviceFixtures'
-
-export {
-  CONTENT_LAYOUT_TOKENS,
-  LAYOUT_VIEWPORTS,
-  openAskAiMenuWhenReady,
-  stubSelectionBoundaryAskAiContext,
-  stubUiServiceAskAiContext
-}
+export { CONTENT_LAYOUT_TOKENS, LAYOUT_VIEWPORTS, openAskAiMenuWhenReady }
 export const CENTER_TOLERANCE_PX = 2
 export const SCALE_TOLERANCE = 0.05
 export const ANCHOR_TOLERANCE_PX = 4
@@ -27,6 +16,7 @@ export const MERMAID_FOREIGN_OBJECT_TOLERANCE_PX = 2
 export const MERMAID_VIEWBOX_TOLERANCE_PX = 8
 export const MIN_READABLE_MERMAID_HEIGHT_PX = CONTENT_LAYOUT_TOKENS.mermaidMinHeight
 export const UI_FIXTURE_ROUTE = 'service-pages/ui-contract'
+export const SIDEBAR_FIXTURE_ROUTE = 'service-pages/sidebar-contract'
 export const ASK_AI_FIXTURE_ROUTE = 'service-pages/ask-ai-contract'
 export const PLAYGROUND_MODULE_REQUEST =
   /(?:kotlin-playground|playground\.min\.[^/]+\.js)(?:\?.*)?$/
@@ -359,6 +349,7 @@ export async function expectMermaidThemeSynchronized(page: Page): Promise<void> 
 
         for (const [diagramIndex, svg] of diagrams.entries()) {
           const edgeLabel = svg.querySelector('.edgeLabel span')
+          const edgeLabelBackground = svg.querySelector('.edgeLabel .labelBkg')
           const nodeLabel = svg.querySelector('.nodeLabel')
           const nodeShape = svg.querySelector(
             '.node rect, .node polygon, .node circle, .node ellipse'
@@ -389,6 +380,33 @@ export async function expectMermaidThemeSynchronized(page: Page): Promise<void> 
               'color',
               computedColor(edgeLabel, 'color'),
               tokens.text
+            )
+          }
+
+          if (!edgeLabelBackground) {
+            issues.push({
+              diagramIndex,
+              selector: '.edgeLabel .labelBkg',
+              property: 'presence',
+              actual: 'missing',
+              expected: 'present'
+            })
+          } else {
+            addIssue(
+              issues,
+              diagramIndex,
+              '.edgeLabel .labelBkg',
+              'background-color',
+              computedColor(edgeLabelBackground, 'backgroundColor'),
+              tokens.background
+            )
+            addIssue(
+              issues,
+              diagramIndex,
+              '.edgeLabel .labelBkg',
+              'opacity',
+              getComputedStyle(edgeLabelBackground).opacity,
+              '1'
             )
           }
 
@@ -522,9 +540,11 @@ export async function getMermaidClipIssues(page: Page): Promise<MermaidClipIssue
 }
 export async function hideSidebar(page: Page): Promise<void> {
   const html = page.locator('html')
+  const toggle = page.locator('.kpo-sidebar-toggle')
+  if (!(await toggle.isVisible())) return
   const isHidden = await html.evaluate((node) => node.classList.contains('kpo-sidebar-hidden'))
   if (!isHidden) {
-    await page.locator('.kpo-sidebar-toggle').click()
+    await toggle.click()
     await expect
       .poll(async () => {
         return html.evaluate((node) => node.classList.contains('kpo-sidebar-hidden'))
@@ -750,36 +770,6 @@ export async function waitForAskAiBoundaryFixture(page: Page): Promise<void> {
   await page.locator('.vp-doc [data-kpo-ask-block-id]').first().waitFor({ state: 'attached' })
   await page.locator('.KpoAskAiProvider').first().waitFor({ state: 'attached' })
   await waitForPageLayoutReady(page)
-}
-export async function mountAskAiBoundaryFixture(page: Page): Promise<void> {
-  await page.evaluate(
-    ({ firstText, middleText, nestedText, terminalText }) => {
-      const content = document.querySelector<HTMLElement>('.vp-doc')
-      if (!content) throw new Error('Missing .vp-doc')
-
-      content.innerHTML = `
-        <h1 data-kpo-ask-block-id="selection-heading">Selection Boundary Contract</h1>
-        <p data-kpo-ask-block-id="selection-first">${firstText}</p>
-        <p data-kpo-ask-block-id="selection-middle">${middleText}</p>
-        <p data-kpo-ask-block-id="selection-nested">Nested boundary phrase combines <strong>bold boundary text</strong> and <code>inline boundary code</code> inside one paragraph.</p>
-        <p data-kpo-ask-block-id="selection-whitespace-block">
-          <span id="selection-whitespace">   </span>
-        </p>
-        <p data-kpo-ask-block-id="selection-terminal">${terminalText}</p>
-      `
-
-      const nested = content.querySelector<HTMLElement>(
-        '[data-kpo-ask-block-id="selection-nested"]'
-      )
-      if (nested) nested.dataset.expectedText = nestedText
-    },
-    {
-      firstText: SELECTION_FIRST_TEXT,
-      middleText: SELECTION_MIDDLE_TEXT,
-      nestedText: SELECTION_NESTED_TEXT,
-      terminalText: SELECTION_TERMINAL_TEXT
-    }
-  )
 }
 export async function stubAskAiSideEffects(page: Page): Promise<void> {
   await page.addInitScript(() => {

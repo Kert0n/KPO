@@ -16,6 +16,7 @@ describe('content contract', () => {
     expect(classifyMarkdownPath('content/extras/01/vitepress.md')).toBe('site')
     expect(classifyMarkdownPath('content/extras/02/vitepress.md')).toBe('site')
     expect(classifyMarkdownPath('content/service-pages/ui-contract/vitepress.md')).toBe('site')
+    expect(classifyMarkdownPath('content/service-pages/sidebar-contract/vitepress.md')).toBe('site')
     expect(classifyMarkdownPath('content/service-pages/visual-components/vitepress.md')).toBe(
       'site'
     )

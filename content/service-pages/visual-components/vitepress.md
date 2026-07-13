@@ -1,5 +1,6 @@
 ---
 title: Visual Component Fixtures
+sidebar: false
 search: false
 outline: false
 lastUpdated: false

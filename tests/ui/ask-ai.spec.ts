@@ -9,7 +9,6 @@ import {
   ASK_AI_FIXTURE_ROUTE,
   UI_FIXTURE_ROUTE,
   dispatchAskAiBoundarySelection,
-  mountAskAiBoundaryFixture,
   openAskAiMenuWhenReady,
   resetComponentStorage,
   selectAskAiProviderDesktop,
@@ -18,8 +17,6 @@ import {
   setStorage,
   stubAskAiSideEffects,
   stubClipboardFailure,
-  stubSelectionBoundaryAskAiContext,
-  stubUiServiceAskAiContext,
   waitForAskAiBoundaryFixture,
   waitForPageLayoutReady
 } from './helpers/kpoTestSupport'
@@ -262,7 +259,6 @@ test('mobile ask ai provider changes and persists in default vitepress screen', 
 
 test('ask ai context menu appears for selected document text', async ({ page }) => {
   await resetComponentStorage(page)
-  await stubUiServiceAskAiContext(page)
   await page.goto(ASK_AI_FIXTURE_ROUTE)
 
   await selectTextAndOpenAskAiMenu(page, 'This page is intentionally hidden from navigation.')
@@ -273,7 +269,6 @@ test('ask ai context menu appears for selected document text', async ({ page }) 
 
 test('ask ai menu ignores programmatic viewport stabilization', async ({ page }) => {
   await setStorage(page, { 'kpo:playground-mode': '0' })
-  await stubUiServiceAskAiContext(page)
   await page.goto(ASK_AI_FIXTURE_ROUTE)
   await waitForPageLayoutReady(page)
   await selectTextAndOpenAskAiMenu(page, 'This page is intentionally hidden from navigation.')
@@ -285,7 +280,6 @@ test('ask ai menu ignores programmatic viewport stabilization', async ({ page })
 
 test('ask ai menu closes on wheel scroll intent', async ({ page }) => {
   await setStorage(page, { 'kpo:playground-mode': '0' })
-  await stubUiServiceAskAiContext(page)
   await page.goto(ASK_AI_FIXTURE_ROUTE)
   await waitForPageLayoutReady(page)
   await selectTextAndOpenAskAiMenu(page, 'This page is intentionally hidden from navigation.')
@@ -297,7 +291,6 @@ test('ask ai menu closes on wheel scroll intent', async ({ page }) => {
 
 test('ask ai menu closes on touch and keyboard scroll intent', async ({ page }) => {
   await setStorage(page, { 'kpo:playground-mode': '0' })
-  await stubUiServiceAskAiContext(page)
   await page.goto(ASK_AI_FIXTURE_ROUTE)
   await waitForPageLayoutReady(page)
   const selectedText = 'This page is intentionally hidden from navigation.'
@@ -313,7 +306,6 @@ test('ask ai menu closes on touch and keyboard scroll intent', async ({ page }) 
 
 test('delayed Playground completion does not close an open ask ai menu', async ({ page }) => {
   await setStorage(page, { 'kpo:playground-mode': '1' })
-  await stubUiServiceAskAiContext(page)
   let releasePlayground!: () => void
   const playgroundGate = new Promise<void>((resolve) => {
     releasePlayground = resolve
@@ -334,10 +326,8 @@ test('delayed Playground completion does not close an open ask ai menu', async (
 
 test('ask ai opens for content selections with browser boundary endpoints', async ({ page }) => {
   await resetComponentStorage(page)
-  await stubSelectionBoundaryAskAiContext(page)
   await page.goto(ASK_AI_FIXTURE_ROUTE)
   await waitForAskAiBoundaryFixture(page)
-  await mountAskAiBoundaryFixture(page)
 
   for (const scenario of [
     'terminal-inside',
@@ -357,10 +347,8 @@ test('ask ai opens for content selections with browser boundary endpoints', asyn
 
 test('ask ai ignores empty and non-content boundary selections', async ({ page }) => {
   await resetComponentStorage(page)
-  await stubSelectionBoundaryAskAiContext(page)
   await page.goto(ASK_AI_FIXTURE_ROUTE)
   await waitForAskAiBoundaryFixture(page)
-  await mountAskAiBoundaryFixture(page)
 
   for (const scenario of [
     'pager-only',
@@ -374,11 +362,9 @@ test('ask ai ignores empty and non-content boundary selections', async ({ page }
 
 test('ask ai mobile bubble uses the clipped terminal paragraph rect', async ({ page }) => {
   await resetComponentStorage(page)
-  await stubSelectionBoundaryAskAiContext(page)
   await page.setViewportSize(LAYOUT_VIEWPORTS.mobilePhone)
   await page.goto(ASK_AI_FIXTURE_ROUTE)
   await waitForAskAiBoundaryFixture(page)
-  await mountAskAiBoundaryFixture(page)
 
   await dispatchAskAiBoundarySelection(page, 'terminal-after-content', { mobile: true })
 
@@ -388,10 +374,8 @@ test('ask ai mobile bubble uses the clipped terminal paragraph rect', async ({ p
 test('ask ai prompt clips selection to vp-doc and excludes pager text', async ({ page }) => {
   await setStorage(page, { 'kpo:ask-ai-provider': 'clipboard' })
   await stubAskAiSideEffects(page)
-  await stubSelectionBoundaryAskAiContext(page)
   await page.goto(ASK_AI_FIXTURE_ROUTE)
   await waitForAskAiBoundaryFixture(page)
-  await mountAskAiBoundaryFixture(page)
   await selectAskAiProviderDesktop(page, 'Копировать промпт')
 
   await dispatchAskAiBoundarySelection(page, 'terminal-through-footer')
@@ -421,10 +405,8 @@ test('ask ai prompt clips selection to vp-doc and excludes pager text', async ({
 test('ask ai keeps intersected boundary blocks in document order', async ({ page }) => {
   await setStorage(page, { 'kpo:ask-ai-provider': 'clipboard' })
   await stubAskAiSideEffects(page)
-  await stubSelectionBoundaryAskAiContext(page)
   await page.goto(ASK_AI_FIXTURE_ROUTE)
   await waitForAskAiBoundaryFixture(page)
-  await mountAskAiBoundaryFixture(page)
   await selectAskAiProviderDesktop(page, 'Копировать промпт')
 
   await dispatchAskAiBoundarySelection(page, 'first-through-terminal')
@@ -462,10 +444,8 @@ test('ask ai keeps intersected boundary blocks in document order', async ({ page
 
 test('ask ai boundary menu closes on route change', async ({ page }) => {
   await resetComponentStorage(page)
-  await stubSelectionBoundaryAskAiContext(page)
   await page.goto(ASK_AI_FIXTURE_ROUTE)
   await waitForAskAiBoundaryFixture(page)
-  await mountAskAiBoundaryFixture(page)
   await dispatchAskAiBoundarySelection(page, 'terminal-after-content')
   await expect(page.locator('.kpo-ai-menu')).toBeVisible()
 
@@ -686,11 +666,90 @@ test('ask ai copies full page context without duplicating VitePress base', async
     return (window as unknown as { __kpoCopiedPrompts?: string[] }).__kpoCopiedPrompts?.at(-1) ?? ''
   })
 
-  expect(copiedPrompt).toContain('[Контекст до]\nStable context before')
+  expect(copiedPrompt).not.toContain('[Контекст до]\n(нет)')
+  expect(copiedPrompt).toContain('Stable context before')
   expect(copiedPrompt).toContain('[Контекст после]\n[Code: text]\n```text')
   expect(copiedPrompt).toContain('fixture context after selection')
   expect(copiedPrompt).toContain(`[Выделенный фрагмент]\n${selectedText}`)
 })
+
+test('ask ai freezes the visible multi-code language and keeps semantic neighbors', async ({
+  page
+}) => {
+  await setStorage(page, { 'kpo:ask-ai-provider': 'clipboard', 'kpo:code-language': 'kotlin' })
+  await stubAskAiSideEffects(page)
+  let releaseContext!: () => void
+  const gate = new Promise<void>((resolve) => {
+    releaseContext = resolve
+  })
+  await page.route('**/__ask-ai-context/service-pages/ask-ai-contract.json', async (route) => {
+    await gate
+    await route.fallback()
+  })
+  await page.goto(ASK_AI_FIXTURE_ROUTE)
+  await selectAskAiProviderDesktop(page, 'Копировать промпт')
+  await selectTextAndOpenAskAiMenu(page, 'kotlin-visible-only')
+
+  const menuItem = page.locator('.kpo-ai-menu__item')
+  await expect(menuItem).toBeDisabled()
+  const switcher = page.locator('.kpo-switcher').filter({ hasText: 'Language projection' })
+  await switcher.getByRole('tab', { name: 'Java' }).evaluate((element) => {
+    element.dispatchEvent(new MouseEvent('click', { bubbles: false, cancelable: true }))
+  })
+  await expect(switcher.getByRole('tab', { name: 'Java' })).toHaveAttribute('aria-selected', 'true')
+
+  releaseContext()
+  await expect(menuItem).toBeEnabled()
+  await menuItem.click()
+  const prompt = await page.evaluate(() => {
+    return (window as unknown as { __kpoCopiedPrompts?: string[] }).__kpoCopiedPrompts?.at(-1) ?? ''
+  })
+  expect(prompt).toContain('[Текущий блок]\n[Code: kotlin]')
+  expect(prompt).toContain('kotlin-visible-only')
+  expect(prompt).not.toContain('java-hidden-variant')
+  expect(prompt).not.toContain('csharp-hidden-variant')
+  expect(prompt).not.toContain('[Контекст до]\n(нет)')
+  expect(prompt).not.toContain('[Контекст после]\n(нет)')
+  expect(prompt).toContain('Context before the multi-code fixture.')
+  expect(prompt).toContain('Context after the multi-code fixture.')
+  expect(prompt.split('[Выделенный фрагмент]\n')[1]).toBe('kotlin-visible-only')
+})
+
+for (const fixture of [
+  { tab: 'C#', language: 'csharp', marker: 'csharp-hidden-variant' },
+  { tab: 'Java', language: 'java', marker: 'java-hidden-variant' },
+  { tab: 'Go', language: 'go', marker: 'go-hidden-variant' }
+] as const) {
+  test(`ask ai projects only the active ${fixture.tab} multi-code fence`, async ({ page }) => {
+    await setStorage(page, {
+      'kpo:ask-ai-provider': 'clipboard',
+      'kpo:code-language': fixture.language
+    })
+    await stubAskAiSideEffects(page)
+    await page.goto(ASK_AI_FIXTURE_ROUTE)
+    await selectAskAiProviderDesktop(page, 'Копировать промпт')
+
+    const switcher = page.locator('.kpo-switcher').filter({ hasText: 'Language projection' })
+    await switcher.getByRole('tab', { name: fixture.tab }).click()
+    await selectTextAndClickAskAiMenuItem(page, fixture.marker)
+
+    const prompt = await page.evaluate(() => {
+      return (
+        (window as unknown as { __kpoCopiedPrompts?: string[] }).__kpoCopiedPrompts?.at(-1) ?? ''
+      )
+    })
+    expect(prompt).toContain(`[Текущий блок]\n[Code: ${fixture.language}]`)
+    expect(prompt).toContain(fixture.marker)
+    for (const other of [
+      'kotlin-visible-only',
+      'csharp-hidden-variant',
+      'java-hidden-variant',
+      'go-hidden-variant'
+    ]) {
+      if (other !== fixture.marker) expect(prompt).not.toContain(other)
+    }
+  })
+}
 
 test('ask ai keeps clipboard fallback when page context is unavailable', async ({ page }) => {
   await resetComponentStorage(page)

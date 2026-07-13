@@ -4,6 +4,7 @@ import {
   CONTENT_LAYOUT_TOKENS,
   DESKTOP_PROSE_TOLERANCE_PX,
   LAYOUT_VIEWPORTS,
+  SIDEBAR_FIXTURE_ROUTE,
   UI_FIXTURE_ROUTE,
   expectCenteredAgainstPage,
   expectNoPageOverflowFromVpDoc,
@@ -14,7 +15,7 @@ import {
 } from './helpers/kpoTestSupport'
 
 test('sidebar toggle does not navigate away from the current page', async ({ page }) => {
-  await page.goto(UI_FIXTURE_ROUTE)
+  await page.goto(SIDEBAR_FIXTURE_ROUTE)
 
   const beforeUrl = page.url()
   const html = page.locator('html')
@@ -33,7 +34,7 @@ test('sidebar toggle does not navigate away from the current page', async ({ pag
 
 test('hidden sidebar expands wide content lane but keeps prose narrow', async ({ page }) => {
   await page.setViewportSize(LAYOUT_VIEWPORTS.desktop)
-  await page.goto(UI_FIXTURE_ROUTE)
+  await page.goto(SIDEBAR_FIXTURE_ROUTE)
   await waitForMermaid(page, { requireDiagrams: true })
 
   const open = await measureWideLane(page)
@@ -57,7 +58,7 @@ test('hidden sidebar enters focused-wide mode and removes the outline from layou
   page
 }) => {
   await page.setViewportSize(LAYOUT_VIEWPORTS.desktop)
-  await page.goto(UI_FIXTURE_ROUTE)
+  await page.goto(SIDEBAR_FIXTURE_ROUTE)
   await hideSidebar(page)
 
   const state = await page.evaluate(() => {

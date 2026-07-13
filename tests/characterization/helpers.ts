@@ -16,10 +16,12 @@ export async function resetBrowserState(
 }
 
 export async function setTheme(page: Page, theme: 'light' | 'dark'): Promise<void> {
-  await page.evaluate((value) => {
-    localStorage.setItem('vitepress-theme-appearance', value)
-    document.documentElement.classList.toggle('dark', value === 'dark')
-  }, theme)
+  const isDark = await page
+    .locator('html')
+    .evaluate((element) => element.classList.contains('dark'))
+  if (isDark !== (theme === 'dark')) {
+    await page.locator('.VPSwitchAppearance:visible').first().click()
+  }
   await expect(page.locator('html')).toHaveClass(theme === 'dark' ? /dark/ : /^(?!.*\bdark\b)/)
 }
 
@@ -39,8 +41,10 @@ export async function waitForStableUi(page: Page): Promise<void> {
 
 export async function hideSidebar(page: Page): Promise<void> {
   const html = page.locator('html')
+  const toggle = page.locator('.kpo-sidebar-toggle')
+  if (!(await toggle.isVisible())) return
   if (!(await html.evaluate((node) => node.classList.contains('kpo-sidebar-hidden')))) {
-    await page.locator('.kpo-sidebar-toggle').click()
+    await toggle.click()
   }
   await expect(html).toHaveClass(/kpo-sidebar-hidden/)
 }

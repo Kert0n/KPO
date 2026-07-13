@@ -1,5 +1,4 @@
 import { expect, test } from '@playwright/test'
-import { stubUiServiceAskAiContext } from '../helpers/serviceFixtures'
 
 test('published application shell and fixture components mount without browser errors', async ({
   page
@@ -9,7 +8,6 @@ test('published application shell and fixture components mount without browser e
     localStorage.setItem('kpo:code-language', 'kotlin')
     localStorage.setItem('kpo:ask-ai-provider', 'chatgpt')
   })
-  await stubUiServiceAskAiContext(page)
   const issues: string[] = []
   page.on('pageerror', (error) => issues.push(error.message))
   page.on('console', (message) => {

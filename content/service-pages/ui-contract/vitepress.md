@@ -1,5 +1,7 @@
 ---
 title: UI Contract Fixtures
+sidebar: false
+askAiFixture: true
 search: false
 outline: false
 lastUpdated: false

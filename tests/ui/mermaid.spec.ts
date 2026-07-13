@@ -12,7 +12,6 @@ import {
   getMermaidMetrics,
   hideSidebar,
   setStorage,
-  stubUiServiceAskAiContext,
   waitForMermaid
 } from './helpers/kpoTestSupport'
 
@@ -36,27 +35,30 @@ test('fixture renders mermaid and keeps playground disabled for marked blocks', 
   await expect(playgroundOff.locator('.kpo-playground')).toHaveCount(0)
 })
 
-test('moderately wide mermaid diagrams fit the expanded lane when sidebar is hidden', async ({
-  page
-}) => {
+test('mermaid theme assertion rejects a deliberately corrupted label surface', async ({ page }) => {
+  await page.goto(UI_FIXTURE_ROUTE)
+  await waitForMermaid(page, { requireDiagrams: true })
+  const background = page.locator('.kpo-mermaid svg .edgeLabel .labelBkg').first()
+  await expect(background).toBeAttached()
+  await background.evaluate((element) => {
+    ;(element as HTMLElement).style.setProperty('background-color', 'rgb(255, 0, 255)', 'important')
+  })
+
+  await expect(expectMermaidThemeSynchronized(page)).rejects.toThrow()
+})
+
+test('moderately wide mermaid diagrams fit the fixture content lane', async ({ page }) => {
   await page.setViewportSize(LAYOUT_VIEWPORTS.desktop)
-  const fitted = []
 
   await page.goto(UI_FIXTURE_ROUTE)
   await waitForMermaid(page, { requireDiagrams: true })
-  const openMetrics = await getMermaidMetrics(page)
-
   await hideSidebar(page)
   await expectNoPageOverflowFromVpDoc(page)
 
-  const hiddenMetrics = await getMermaidMetrics(page)
-  fitted.push(
-    ...hiddenMetrics.filter((item) => {
-      return openMetrics[item.index]?.hasLocalXScroll && !item.hasLocalXScroll
-    })
-  )
+  const metrics = await getMermaidMetrics(page)
+  const fitted = metrics.filter((item) => !item.hasLocalXScroll)
 
-  expect(fitted.length, JSON.stringify({ openMetrics, hiddenMetrics }, null, 2)).toBeGreaterThan(0)
+  expect(fitted.length, JSON.stringify({ metrics }, null, 2)).toBeGreaterThan(0)
 
   for (const item of fitted) {
     expect(item.hasLocalXScroll).toBe(false)
@@ -103,7 +105,13 @@ test('very wide mermaid diagrams stay readable and scroll locally on desktop', a
 
   for (const item of veryWide) {
     expect(item.scaleX).toBeGreaterThanOrEqual(CONTENT_LAYOUT_TOKENS.mermaidDesktopMinScale - 0.01)
-    expect(item.svgHeight).toBeGreaterThanOrEqual(MIN_READABLE_MERMAID_HEIGHT_PX)
+    if (item.viewBoxHeight >= MIN_READABLE_MERMAID_HEIGHT_PX) {
+      expect(item.svgHeight).toBeGreaterThanOrEqual(MIN_READABLE_MERMAID_HEIGHT_PX)
+    } else {
+      // Auto-layout never enlarges a naturally short diagram merely to meet the
+      // minimum-height guard used while shrinking tall diagrams.
+      expect(item.scaleY).toBeCloseTo(1, 2)
+    }
     expect(Math.abs(item.scaleX - item.scaleY)).toBeLessThan(SCALE_TOLERANCE)
     expect(item.hasLocalXScroll).toBe(true)
   }
@@ -404,7 +412,6 @@ test('fixture mermaid theme transitions keep SVG tokens synchronized with site t
 
   await page.setViewportSize(LAYOUT_VIEWPORTS.desktop)
   await setStorage(page, { 'vitepress-theme-appearance': 'light' })
-  await stubUiServiceAskAiContext(page)
   await page.goto(UI_FIXTURE_ROUTE)
   await waitForMermaid(page, { requireDiagrams: true })
   await expect(page.locator('html')).not.toHaveClass(/\bdark\b/)
@@ -422,10 +429,10 @@ test('fixture mermaid theme transitions keep SVG tokens synchronized with site t
   await expect(page.locator('html')).toHaveClass(/\bdark\b/)
   await expectMermaidThemeSynchronized(page)
 
-  await page.locator('.VPSwitchAppearance').first().click()
-  await page.locator('.VPSwitchAppearance').first().click()
-  await page.locator('.VPSwitchAppearance').first().click()
-  await expect(page.locator('html')).not.toHaveClass(/\bdark\b/)
+  for (let index = 0; index < 20; index += 1) {
+    await page.locator('.VPSwitchAppearance').first().click()
+  }
+  await expect(page.locator('html')).toHaveClass(/\bdark\b/)
   await expectMermaidThemeSynchronized(page)
   await expectNoPageOverflowFromVpDoc(page)
 

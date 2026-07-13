@@ -1,5 +1,4 @@
 import { expect, test as base } from '@playwright/test'
-import { stubUiServiceAskAiContext } from '../helpers/serviceFixtures'
 
 const componentStorageBaseline = {
   'kpo:playground-mode': '0',
@@ -14,8 +13,6 @@ export const test = base.extend({
         if (localStorage.getItem(key) === null) localStorage.setItem(key, value)
       }
     }, componentStorageBaseline)
-    await stubUiServiceAskAiContext(page)
-
     const pageErrors: string[] = []
     const consoleErrors: string[] = []
     page.on('pageerror', (error) => pageErrors.push(error.message))

@@ -77,6 +77,28 @@ const staticPages: Array<{
     order: 1,
     fallbackTitle: 'Ask AI Contract Fixture',
     uiSweep: false
+  },
+  {
+    kind: 'service',
+    section: 'service',
+    sourcePath: 'content/service-pages/visual-components/vitepress.md',
+    outputPath: 'service-pages/visual-components.md',
+    route: '/service-pages/visual-components',
+    routeKey: 'service-pages/visual-components',
+    order: 2,
+    fallbackTitle: 'Visual Component Fixtures',
+    uiSweep: false
+  },
+  {
+    kind: 'service',
+    section: 'service',
+    sourcePath: 'content/service-pages/sidebar-contract/vitepress.md',
+    outputPath: 'service-pages/sidebar-contract.md',
+    route: '/service-pages/sidebar-contract',
+    routeKey: 'service-pages/sidebar-contract',
+    order: 3,
+    fallbackTitle: 'Sidebar Contract Fixture',
+    uiSweep: false
   }
 ]
 

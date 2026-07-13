@@ -3,6 +3,7 @@ import {
   CENTER_TOLERANCE_PX,
   CONTENT_LAYOUT_TOKENS,
   LAYOUT_VIEWPORTS,
+  SIDEBAR_FIXTURE_ROUTE,
   UI_FIXTURE_ROUTE,
   expectNoPageOverflowFromVpDoc,
   getAdaptiveTableStates,
@@ -14,7 +15,7 @@ import {
 test('wide tables are centered in the hidden-sidebar wide lane', async ({ page }) => {
   await page.setViewportSize(LAYOUT_VIEWPORTS.desktop)
 
-  await page.goto(UI_FIXTURE_ROUTE)
+  await page.goto(SIDEBAR_FIXTURE_ROUTE)
   await waitForMermaid(page, { requireDiagrams: true })
   await waitForAdaptiveTables(page)
   await hideSidebar(page)
