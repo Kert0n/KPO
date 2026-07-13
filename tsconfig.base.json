@@ -4,13 +4,12 @@
     "lib": ["ESNext", "DOM", "DOM.Iterable"],
     "module": "ESNext",
     "moduleResolution": "Bundler",
-    "baseUrl": ".",
     "paths": {
       "vitepress/dist/client/theme-default/components/VPFlyout.vue": [
-        ".vitepress/types/vp-flyout.d.ts"
+        "./.vitepress/types/vp-flyout.d.ts"
       ],
       "vitepress/dist/client/theme-default/components/VPSwitchAppearance.vue": [
-        ".vitepress/types/vp-switch-appearance.d.ts"
+        "./.vitepress/types/vp-switch-appearance.d.ts"
       ]
     },
     "strict": true,
