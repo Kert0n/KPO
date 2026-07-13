@@ -60,7 +60,7 @@
     "gray-matter": "4.0.3",
     "markdown-it": "^14.3.0",
     "markdown-it-container": "4.0.0",
-    "markdown-it-mathjax3": "^4.3.2",
+    "markdown-it-mathjax3": "^5.2.0",
     "pdf-lib": "^1.17.1",
     "prettier": "^3.9.5",
     "shiki": "2.5.0",
