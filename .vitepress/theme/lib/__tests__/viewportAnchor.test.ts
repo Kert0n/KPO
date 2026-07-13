@@ -1,9 +1,38 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
+  captureViewportAnchor,
   isAnchorLayoutStable,
   isScrollIntentKey,
-  resolveAnchoredScrollTop
+  measureAnchorLayout,
+  preserveViewportAnchor,
+  restoreViewportAnchor,
+  resolveAnchoredScrollTop,
+  waitAnimationFrames
 } from '../viewportAnchor'
+
+const scrollTo = vi.fn()
+
+beforeEach(() => {
+  vi.stubGlobal('window', {
+    scrollY: 200,
+    innerHeight: 800,
+    scrollTo,
+    requestAnimationFrame: (callback: FrameRequestCallback) => {
+      callback(0)
+      return 1
+    },
+    cancelAnimationFrame: vi.fn(),
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn()
+  })
+  vi.stubGlobal('document', {
+    documentElement: { scrollHeight: 1800 },
+    body: { scrollHeight: 1700 }
+  })
+  scrollTo.mockReset()
+})
+
+afterEach(() => vi.unstubAllGlobals())
 
 describe('viewportAnchor', () => {
   it('preserves viewport position relative to the anchored root', () => {
@@ -46,5 +75,42 @@ describe('viewportAnchor', () => {
     expect(isScrollIntentKey('Home')).toBe(true)
     expect(isScrollIntentKey('End')).toBe(true)
     expect(isScrollIntentKey('ArrowRight')).toBe(false)
+  })
+
+  it('captures, measures and restores a connected element anchor', () => {
+    const root = {
+      isConnected: true,
+      getBoundingClientRect: () => ({ top: 300, height: 240 })
+    } as HTMLElement
+    const anchor = captureViewportAnchor(root)
+    expect(anchor.relativeViewportTop).toBe(-300)
+    expect(measureAnchorLayout(root)).toEqual({
+      rootTop: 500,
+      rootHeight: 240,
+      documentHeight: 1800
+    })
+
+    restoreViewportAnchor(anchor)
+    expect(scrollTo).toHaveBeenCalledWith({ top: 200, behavior: 'auto' })
+  })
+
+  it('runs anchored mutations and frame waits without browser-only observers', async () => {
+    const root = {
+      isConnected: true,
+      getBoundingClientRect: () => ({ top: 100, height: 100 })
+    } as HTMLElement
+    const mutate = vi.fn()
+
+    await preserveViewportAnchor(root, mutate)
+    await waitAnimationFrames(2)
+
+    expect(mutate).toHaveBeenCalledOnce()
+    expect(scrollTo).toHaveBeenCalled()
+  })
+
+  it('falls back to the mutation when no anchor root exists', async () => {
+    const mutate = vi.fn()
+    await preserveViewportAnchor(null, mutate)
+    expect(mutate).toHaveBeenCalledOnce()
   })
 })

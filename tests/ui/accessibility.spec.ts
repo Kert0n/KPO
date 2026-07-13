@@ -3,16 +3,14 @@ import {
   LAYOUT_VIEWPORTS,
   UI_FIXTURE_ROUTE,
   resetComponentStorage,
-  stubUiServiceAskAiContext,
   waitForMermaid
 } from './helpers/kpoTestSupport'
 
 test('keyboard Ask AI menu owns focus and restores the invoking control', async ({ page }) => {
   await resetComponentStorage(page)
-  await stubUiServiceAskAiContext(page)
   await page.goto(UI_FIXTURE_ROUTE)
 
-  const initiator = page.locator('.kpo-sidebar-toggle')
+  const initiator = page.locator('.VPNavBar .KpoAskAiProvider > button')
   await initiator.focus()
   await page.evaluate(() => {
     const paragraph = [...document.querySelectorAll<HTMLElement>('.vp-doc p')].find((node) =>
@@ -56,6 +54,20 @@ test('code tabs and panels expose stable accessible relationships', async ({ pag
   await expect(tabs.filter({ hasText: 'Java' })).toHaveAttribute('aria-selected', 'true')
   const activePanelId = await tabs.filter({ hasText: 'Java' }).getAttribute('aria-controls')
   await expect(switcher.locator(`[id="${activePanelId}"]`)).toHaveAttribute('aria-hidden', 'false')
+})
+
+test('visible theme switches have a stable accessible name and keyboard behavior', async ({
+  page
+}) => {
+  await page.goto(UI_FIXTURE_ROUTE)
+  const themeSwitch = page.locator('.VPSwitchAppearance:visible').first()
+  await expect(themeSwitch).toHaveAccessibleName('Переключить тему')
+  const before = await page.locator('html').evaluate((node) => node.classList.contains('dark'))
+  await themeSwitch.focus()
+  await page.keyboard.press('Space')
+  await expect
+    .poll(() => page.locator('html').evaluate((node) => node.classList.contains('dark')))
+    .toBe(!before)
 })
 
 test('overflow regions expose accessible names and keyboard focus only when scrollable', async ({
