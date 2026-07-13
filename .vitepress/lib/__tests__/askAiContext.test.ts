@@ -2,8 +2,7 @@ import { mkdtempSync, mkdirSync, rmSync, utimesSync, writeFileSync } from 'node:
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { buildAskAiPageContext, listAskAiContextEntries } from '../askAiContext'
-import { getContentCatalog } from '../../shared/content/contentCatalog'
+import { buildAskAiPageContext } from '../askAiContext'
 
 const temporaryRoots: string[] = []
 
@@ -12,14 +11,16 @@ afterEach(() => {
 })
 
 describe('askAiContext', () => {
-  it('keeps service fixtures out of production Ask AI context generation', () => {
-    const catalog = getContentCatalog({ fresh: true })
-    const contextRouteKeys = listAskAiContextEntries().map((entry) => entry.routeKey)
-
-    const servicePage = catalog.find((page) => page.routeKey === 'service-pages/ui-contract')
-    expect(servicePage?.kind).toBe('service')
-    expect(servicePage?.inclusion.askAi).toBe(false)
-    expect(contextRouteKeys).not.toContain('service-pages/ui-contract')
+  it('builds context from an explicitly opted-in service fixture', () => {
+    const context = buildAskAiPageContext(
+      {
+        routeKey: 'service-pages/ask-ai-contract',
+        sourcePath: 'content/service-pages/ask-ai-contract/vitepress.md'
+      },
+      { courseTitle: 'Course', courseDescription: 'Description' }
+    )
+    expect(context.sourcePath).toBe('content/service-pages/ask-ai-contract/vitepress.md')
+    expect(context.blocks.length).toBeGreaterThan(0)
   })
 
   it('extracts stable markdown blocks for code, mermaid, table and multi-code', () => {
@@ -52,13 +53,13 @@ describe('askAiContext', () => {
   it('replaces the absolute-path cache entry when source mtime changes', () => {
     const root = mkdtempSync(join(tmpdir(), 'kpo-ask-ai-cache-'))
     temporaryRoots.push(root)
-    const sourcePath = 'content/lectures/Lec1/vitepress.md'
+    const sourcePath = 'content/service-pages/cache-fixture/vitepress.md'
     const absolutePath = join(root, sourcePath)
     mkdirSync(dirname(absolutePath), { recursive: true })
     writeFileSync(absolutePath, '# First title\n\nFirst paragraph with enough context.', 'utf8')
     utimesSync(absolutePath, 1, 1)
 
-    const entry = { routeKey: 'lectures/01', sourcePath }
+    const entry = { routeKey: 'service-pages/cache-fixture', sourcePath }
     const options = { root, courseTitle: 'Course', courseDescription: 'Description' }
     expect(buildAskAiPageContext(entry, options).pageTitle).toBe('First title')
 
@@ -70,7 +71,7 @@ describe('askAiContext', () => {
   it('keeps multi-code as one context block without duplicating inner fences', () => {
     const root = mkdtempSync(join(tmpdir(), 'kpo-ask-ai-multi-code-'))
     temporaryRoots.push(root)
-    const sourcePath = 'content/lectures/Lec1/vitepress.md'
+    const sourcePath = 'content/service-pages/multi-code-fixture/vitepress.md'
     const absolutePath = join(root, sourcePath)
     mkdirSync(dirname(absolutePath), { recursive: true })
     writeFileSync(
@@ -80,7 +81,7 @@ describe('askAiContext', () => {
     )
 
     const context = buildAskAiPageContext(
-      { routeKey: 'lectures/01', sourcePath },
+      { routeKey: 'service-pages/multi-code-fixture', sourcePath },
       { root, courseTitle: 'Course', courseDescription: 'Description' }
     )
 

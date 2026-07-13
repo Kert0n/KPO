@@ -10,6 +10,7 @@ export type MarkdownBlockKind =
   | 'list'
   | 'blockquote'
   | 'table'
+  | 'custom-container'
 
 export type MarkdownBlockClassification = {
   kind: MarkdownBlockKind
@@ -24,6 +25,7 @@ export function classifyMarkdownToken(
   if (!token) return null
 
   if (isMultiCodeOpen(token)) return { kind: 'multi-code' }
+  if (isSemanticContainerOpen(token)) return { kind: 'custom-container' }
   if (token.type === 'fence') {
     const language = fenceLanguage(token)
     return { kind: language === 'mermaid' ? 'mermaid' : 'code', language }
@@ -38,6 +40,15 @@ export function classifyMarkdownToken(
   if (token.type === 'blockquote_open') return { kind: 'blockquote' }
   if (token.type === 'table_open') return { kind: 'table' }
   return null
+}
+
+export function isSemanticContainerOpen(token: Pick<Token, 'type' | 'nesting'>): boolean {
+  return (
+    token.nesting === 1 &&
+    token.type.startsWith('container_') &&
+    !isMultiCodeOpen(token) &&
+    !token.type.startsWith('container_code-group')
+  )
 }
 
 export function fenceLanguage(token: Pick<Token, 'info'>): string {

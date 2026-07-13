@@ -1,9 +1,15 @@
-import { readPlaygroundCode, readPlaygroundSelection } from '../lib/playgroundRegistry'
+import { readPlaygroundSelection } from '../lib/playgroundRegistry'
+import { playgroundOverride } from '../lib/askAiSelectionSnapshot'
+import type { AskAiBlockKind } from '../../shared/core/askAiIds'
+import type { AskAiCurrentOverride } from '../lib/askAiModel'
 
 export type SelectionSnapshot = {
   selectedText: string
   blockIds: string[]
-  playgroundBlockId: string
+  currentBlockId: string
+  currentBlockKind?: AskAiBlockKind
+  activeLanguage?: string
+  currentOverride?: AskAiCurrentOverride
 }
 
 type ContentSelection = {
@@ -19,10 +25,14 @@ export function useTextSelection() {
     const playgroundSelection = playgroundBlockId ? readPlaygroundSelection(playgroundBlockId) : ''
 
     if (playgroundSelection) {
+      const currentOverride = playgroundOverride(playgroundBlockId)
       return {
         selectedText: playgroundSelection,
         blockIds: [playgroundBlockId],
-        playgroundBlockId
+        currentBlockId: playgroundBlockId,
+        currentBlockKind: 'playground',
+        activeLanguage: 'kotlin',
+        currentOverride
       }
     }
 
@@ -34,10 +44,18 @@ export function useTextSelection() {
     const contentSelection = collectSelectionWithinContent(selection, content)
     if (!contentSelection) return null
 
+    const currentBlockId = contentSelection.blockIds[0] ?? ''
+    const currentElement = currentBlockId
+      ? closestBlockElement(targetElement, currentBlockId, content)
+      : null
+    const currentOverride = captureCodeOverride(currentElement)
     return {
       selectedText: contentSelection.selectedText,
       blockIds: contentSelection.blockIds,
-      playgroundBlockId: playgroundBlockId || ''
+      currentBlockId,
+      currentBlockKind: currentOverride?.kind ?? contentBlockKind(currentElement),
+      activeLanguage: currentOverride?.language,
+      currentOverride
     }
   }
 
@@ -55,17 +73,61 @@ export function useTextSelection() {
   return { createSelectionSnapshot, selectedRangeRect }
 }
 
-export function playgroundOverride(
-  blockId: string
-): { kind: 'playground'; language: 'kotlin'; markdown: string } | undefined {
-  if (!blockId) return undefined
-  const code = readPlaygroundCode(blockId)
-  if (!code) return undefined
-  return {
-    kind: 'playground',
-    language: 'kotlin',
-    markdown: `\`\`\`kotlin\n${code.replace(/\n?$/, '\n')}\`\`\``
+function captureCodeOverride(element: Element | null): AskAiCurrentOverride | undefined {
+  const switcher =
+    element?.closest<HTMLElement>('.kpo-switcher') ??
+    element?.querySelector<HTMLElement>('.kpo-switcher')
+  if (!switcher || switcher.querySelector('.kpo-playground:not([style*="display: none"])')) {
+    return undefined
   }
+
+  const active = switcher.querySelector<HTMLElement>(
+    '.kpo-switcher__blocks > [class*="language-"].active'
+  )
+  const code = active?.querySelector('code')?.textContent?.replace(/\n$/, '')
+  const language = active ? blockLanguage(active) : ''
+  if (!active || !code || !language) return undefined
+  return { kind: 'code', language, markdown: fencedCode(language, code) }
+}
+
+function closestBlockElement(
+  target: Element | null,
+  blockId: string,
+  content: Element
+): HTMLElement | null {
+  const closest = target?.closest<HTMLElement>('[data-kpo-ask-block-id]')
+  if (closest?.dataset.kpoAskBlockId === blockId) return closest
+  return (
+    [...content.querySelectorAll<HTMLElement>('[data-kpo-ask-block-id]')].find(
+      (element) => element.dataset.kpoAskBlockId === blockId
+    ) ?? null
+  )
+}
+
+function contentBlockKind(element: Element | null): AskAiBlockKind | undefined {
+  if (!element) return undefined
+  if (element.matches('.kpo-switcher, .kpo-content-block--multi-code')) return 'multi-code'
+  if (element.matches('.kpo-mermaid, .kpo-content-block--mermaid')) return 'mermaid'
+  if (element.matches('.kpo-content-block--table')) return 'table'
+  if (element.matches('.kpo-content-block--code')) return 'code'
+  if (element.matches('.custom-block, .kpo-only')) return 'custom-container'
+  if (element.matches('h1, h2, h3, h4, h5, h6')) return 'heading'
+  if (element.matches('blockquote')) return 'blockquote'
+  if (element.matches('ul, ol')) return 'list'
+  if (element.matches('p')) return 'paragraph'
+  return undefined
+}
+
+function blockLanguage(block: Element): string {
+  for (const name of block.classList) {
+    if (name.startsWith('language-')) return name.slice('language-'.length)
+  }
+  return ''
+}
+
+function fencedCode(language: string, code: string): string {
+  const fence = code.includes('```') ? '````' : '```'
+  return `${fence}${language}\n${code}\n${fence}`
 }
 
 function collectSelectionWithinContent(

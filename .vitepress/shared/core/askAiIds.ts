@@ -9,9 +9,9 @@ export type AskAiBlockKind =
   | 'mermaid'
   | 'table'
   | 'image'
+  | 'custom-container'
 
 import { stableHash } from './hash'
-import { publishedAskAiId } from './askAiLegacyIds'
 import { normalizeLanguage } from './codeLanguage'
 
 export { stableHash }
@@ -21,31 +21,20 @@ export function createAskAiBlockId(
   markdown: string,
   lineStart: number,
   sourcePath?: string,
-  duplicateIndex = 0
+  lineEnd = lineStart
 ): string {
   const canonical = canonicalizeAskAiBlockIdentity(kind, markdown)
-  const publishedId = publishedAskAiId(sourcePath, kind, canonical, duplicateIndex)
-  if (publishedId) return publishedId
-  if (isUnpublishedServiceFixture(sourcePath)) {
-    return `kpo-ai-${lineStart}-${kind}-${stableHash(markdown)}`
-  }
-  return `kpo-ai-${kind}-${stableHash(
-    `${normalizeSourceIdentity(sourcePath)}\n${kind}\n${duplicateIndex}\n${canonical}`
+  return `kpo-ai-${lineStart}-${kind}-${stableHash(
+    `${normalizeSourceIdentity(sourcePath)}\n${kind}\n${lineStart}:${lineEnd}\n${canonical}`
   )}`
 }
 
 export function createAskAiBlockIdAllocator(sourcePath?: string): {
-  next(kind: AskAiBlockKind, markdown: string, lineStart: number): string
+  next(kind: AskAiBlockKind, markdown: string, lineStart: number, lineEnd?: number): string
 } {
-  const occurrences = new Map<string, number>()
-
   return {
-    next(kind, markdown, lineStart) {
-      const canonical = canonicalizeAskAiBlockIdentity(kind, markdown)
-      const occurrenceKey = `${kind}\u0000${canonical}`
-      const duplicateIndex = occurrences.get(occurrenceKey) ?? 0
-      occurrences.set(occurrenceKey, duplicateIndex + 1)
-      return createAskAiBlockId(kind, markdown, lineStart, sourcePath, duplicateIndex)
+    next(kind, markdown, lineStart, lineEnd = lineStart) {
+      return createAskAiBlockId(kind, markdown, lineStart, sourcePath, lineEnd)
     }
   }
 }
@@ -104,8 +93,4 @@ function normalizeSourceIdentity(sourcePath?: string): string {
   if (contentIndex >= 0) return normalized.slice(contentIndex + 1)
   if (normalized.startsWith('content/')) return normalized
   return `content/${normalized.replace(/^\//, '')}`
-}
-
-function isUnpublishedServiceFixture(sourcePath?: string): boolean {
-  return /(?:^|\/)content\/service-pages\//.test(normalizeSourceIdentity(sourcePath))
 }

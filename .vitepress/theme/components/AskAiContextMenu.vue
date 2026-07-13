@@ -26,7 +26,7 @@ const actionPreparation = useAskAiActionPreparation({
   loadPageContext: contextLoader.loadPageContext,
   fallbackContext
 })
-const { preparedAction, preparing } = actionPreparation
+const { preparedAction, prepareError, preparing } = actionPreparation
 
 const snapshot = ref<SelectionSnapshot | null>(null)
 const toast = ref('')
@@ -43,6 +43,7 @@ const menuLabel = computed(() => {
 })
 
 const askAiButtonLabel = computed(() => {
+  if (prepareError.value instanceof Error) return prepareError.value.message
   if (preparing.value) return menu.mode === 'mobile' ? 'Preparing...' : 'Preparing prompt...'
   return menu.mode === 'mobile' ? 'Ask AI' : menuLabel.value
 })
@@ -56,7 +57,7 @@ onMounted(() => {
   document.addEventListener('wheel', onScrollIntent, { passive: true })
   document.addEventListener('touchmove', onScrollIntent, { passive: true })
   window.addEventListener('resize', closeMenuWithoutRestore)
-  contextLoader.queuePrefetch()
+  void queueAvailablePageContext()
 })
 
 onBeforeUnmount(() => {
@@ -84,7 +85,7 @@ watch(
     clipboardFallback.dispose()
     actionPreparation.clear()
     contextLoader.invalidateRoute()
-    contextLoader.queuePrefetch()
+    void queueAvailablePageContext()
   }
 )
 
@@ -92,6 +93,13 @@ watch(askAiProvider, () => {
   if (!menu.visible || !snapshot.value) return
   void actionPreparation.prepare(snapshot.value)
 })
+
+async function queueAvailablePageContext(): Promise<void> {
+  await nextTick()
+  if (document.querySelector('.vp-doc [data-kpo-ask-block-id]')) {
+    contextLoader.queuePrefetch()
+  }
+}
 
 function onContextMenu(event: MouseEvent): void {
   if (event.shiftKey) return

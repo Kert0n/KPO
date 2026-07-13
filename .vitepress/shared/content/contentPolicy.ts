@@ -14,7 +14,7 @@ const publicPage: ContentPageInclusion = {
 
 export function inclusionForKind(kind: ContentPageKind): ContentPageInclusion {
   if (kind === 'home') {
-    return { ...publicPage, sidebar: false, pdf: false }
+    return { ...publicPage, sidebar: false, askAi: false, pdf: false }
   }
   if (kind === 'service') {
     return {

@@ -5,7 +5,7 @@ import {
   type AskAiProviderAction,
   type AskAiProviderId
 } from '../lib/askAiModel'
-import { playgroundOverride, type SelectionSnapshot } from './useTextSelection'
+import type { SelectionSnapshot } from './useTextSelection'
 
 export type PreparedAskAiAction = {
   snapshot: SelectionSnapshot
@@ -24,6 +24,7 @@ export function useAskAiActionPreparation(options: {
   let generation = 0
 
   async function prepare(nextSnapshot: SelectionSnapshot): Promise<void> {
+    const capturedSnapshot = cloneSnapshot(nextSnapshot)
     const currentGeneration = ++generation
     preparing.value = true
     preparedAction.value = null
@@ -33,16 +34,16 @@ export function useAskAiActionPreparation(options: {
       let contextUnavailable = false
       const pageContext = await options.loadPageContext().catch(() => {
         contextUnavailable = true
-        return options.fallbackContext(nextSnapshot.selectedText)
+        return options.fallbackContext(capturedSnapshot.selectedText)
       })
       const action = resolveAskAiProviderAction(options.provider.value, {
         pageContext,
-        selectedText: nextSnapshot.selectedText,
-        blockIds: nextSnapshot.blockIds,
-        currentOverride: playgroundOverride(nextSnapshot.playgroundBlockId)
+        selectedText: capturedSnapshot.selectedText,
+        blockIds: capturedSnapshot.blockIds,
+        currentOverride: capturedSnapshot.currentOverride
       })
       if (currentGeneration !== generation) return
-      preparedAction.value = { snapshot: nextSnapshot, action, contextUnavailable }
+      preparedAction.value = { snapshot: capturedSnapshot, action, contextUnavailable }
     } catch (error) {
       if (currentGeneration !== generation) return
       prepareError.value = error
@@ -60,4 +61,12 @@ export function useAskAiActionPreparation(options: {
   }
 
   return { preparedAction, prepareError, preparing, prepare, clear }
+}
+
+function cloneSnapshot(snapshot: SelectionSnapshot): SelectionSnapshot {
+  return {
+    ...snapshot,
+    blockIds: [...snapshot.blockIds],
+    currentOverride: snapshot.currentOverride ? { ...snapshot.currentOverride } : undefined
+  }
 }

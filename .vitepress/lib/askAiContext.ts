@@ -4,7 +4,7 @@ import MarkdownIt from 'markdown-it'
 import type Token from 'markdown-it/lib/token.mjs'
 import container from 'markdown-it-container'
 import matter from 'gray-matter'
-import { contentPagesFor } from '../shared/content/contentCatalog'
+import { contentPagesFor, getContentCatalog } from '../shared/content/contentCatalog'
 import { createAskAiBlockIdAllocator, type AskAiBlockKind } from '../shared/core/askAiIds'
 import type { AskAiBlock, AskAiPageContext } from '../shared/core/askAiModel'
 import { classifyMarkdownToken, findMatchingMultiCodeClose } from '../shared/core/markdownStructure'
@@ -26,9 +26,14 @@ type CacheEntry = {
 }
 
 const cache = new Map<string, CacheEntry>()
-const markdown = MarkdownIt({ html: true }).use(container, 'multi-code')
+const markdown = createContextMarkdownParser()
 export function listAskAiContextEntries(root = process.cwd()): AskAiContextEntry[] {
-  return contentPagesFor('askAi', { root, fresh: true })
+  return [
+    ...contentPagesFor('askAi', { root, fresh: true }),
+    ...getContentCatalog({ root }).filter(
+      (page) => page.kind === 'service' && isAskAiFixture(page.sourcePath, root)
+    )
+  ]
     .sort(
       (left, right) =>
         askAiPageRank(left.kind) - askAiPageRank(right.kind) ||
@@ -90,6 +95,47 @@ export function writeAskAiContexts(outDir: string, options: AskAiContextOptions)
   }
 }
 
+export function assertAskAiContextParity(outDir: string, options: AskAiContextOptions): void {
+  const root = options.root ?? process.cwd()
+  const entries = new Map(listAskAiContextEntries(root).map((entry) => [entry.sourcePath, entry]))
+  for (const page of getContentCatalog({ root, fresh: true })) {
+    const entry = entries.get(page.sourcePath)
+    const htmlFile = join(outDir, page.outputPath.replace(/\.md$/, '.html'))
+    const html = readFileSync(htmlFile, 'utf8')
+    const domIds = [...html.matchAll(/data-kpo-ask-block-id="([^"]+)"/g)].map((match) => match[1])
+    const contextIds = entry
+      ? buildAskAiPageContext(entry, options).blocks.map((block) => block.id)
+      : []
+    assertMatchingIds(page.sourcePath, domIds, contextIds)
+  }
+}
+
+function assertMatchingIds(sourcePath: string, domIds: string[], contextIds: string[]): void {
+  const uniqueDom = new Set(domIds)
+  const uniqueContext = new Set(contextIds)
+  const duplicateDom = domIds.filter((id, index) => domIds.indexOf(id) !== index)
+  const duplicateContext = contextIds.filter((id, index) => contextIds.indexOf(id) !== index)
+  const missing = [...uniqueDom].filter((id) => !uniqueContext.has(id))
+  const extra = [...uniqueContext].filter((id) => !uniqueDom.has(id))
+  if (
+    duplicateDom.length === 0 &&
+    duplicateContext.length === 0 &&
+    missing.length === 0 &&
+    extra.length === 0
+  )
+    return
+  const show = (ids: string[]) => (ids.length ? [...new Set(ids)].join(', ') : '(none)')
+  throw new Error(
+    [
+      `[ask-ai] DOM/context identity mismatch for ${sourcePath}`,
+      `duplicate DOM IDs: ${show(duplicateDom)}`,
+      `duplicate context IDs: ${show(duplicateContext)}`,
+      `missing from context: ${show(missing)}`,
+      `missing from DOM: ${show(extra)}`
+    ].join('\n')
+  )
+}
+
 export function findAskAiContextEntry(
   routeKey: string,
   root = process.cwd()
@@ -106,7 +152,7 @@ function collectBlocks(tokens: Token[], lines: string[], sourcePath: string): As
     if (index < skipUntil) continue
 
     const token = tokens[index]
-    if (token.level !== 0 && token.type !== 'fence') continue
+    if (token.level !== 0) continue
 
     const classification = classifyMarkdownToken(tokens, index)
     if (!classification) continue
@@ -115,6 +161,16 @@ function collectBlocks(tokens: Token[], lines: string[], sourcePath: string): As
       const closeIndex = findMatchingMultiCodeClose(tokens, index)
       const block = createBlock('multi-code', token, lines, sourcePath, ids)
       if (block) blocks.push(block)
+      skipUntil = closeIndex === -1 ? index + 1 : closeIndex + 1
+      continue
+    }
+
+    if (classification.kind === 'custom-container') {
+      const block = createBlock('custom-container', token, lines, sourcePath, ids, {
+        title: containerTitle(token)
+      })
+      if (block) blocks.push(block)
+      const closeIndex = findMatchingContainerClose(tokens, index)
       skipUntil = closeIndex === -1 ? index + 1 : closeIndex + 1
       continue
     }
@@ -149,7 +205,7 @@ function createBlock(
   if (!markdownText) return null
 
   return {
-    id: ids.next(kind, markdownText, start + 1),
+    id: ids.next(kind, markdownText, start + 1, end),
     kind,
     markdown: markdownText,
     plainText: plainText(markdownText),
@@ -157,6 +213,45 @@ function createBlock(
     lineEnd: end,
     ...extra
   }
+}
+
+function createContextMarkdownParser(): MarkdownIt {
+  const parser = MarkdownIt({ html: true })
+  parser.block.ruler.disable('code')
+  for (const name of [
+    'tip',
+    'info',
+    'warning',
+    'danger',
+    'details',
+    'v-pre',
+    'raw',
+    'only',
+    'multi-code'
+  ]) {
+    parser.use(container, name)
+  }
+  return parser
+}
+
+function findMatchingContainerClose(tokens: Token[], openIndex: number): number {
+  const open = tokens[openIndex]
+  const closeType = open.type.replace(/_open$/, '_close')
+  for (let index = openIndex + 1; index < tokens.length; index += 1) {
+    if (tokens[index].type === closeType && tokens[index].level === open.level) return index
+  }
+  return -1
+}
+
+function containerTitle(token: Token): string | undefined {
+  const value = token.info.replace(/^\S+/, '').trim().replace(/^"|"$/g, '')
+  return value || undefined
+}
+
+function isAskAiFixture(sourcePath: string, root: string): boolean {
+  const absolutePath = resolve(root, sourcePath)
+  if (!statSync(absolutePath).isFile()) return false
+  return matter(readFileSync(absolutePath, 'utf8')).data.askAiFixture === true
 }
 
 function pageTitle(data: Record<string, unknown>, content: string): string {
