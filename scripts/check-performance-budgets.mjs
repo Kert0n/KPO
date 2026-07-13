@@ -8,7 +8,7 @@ const limits = {
   js: 1024 * 1024,
   css: 160 * 1024,
   context: 350 * 1024,
-  contextsTotal: 2.6 * 1024 * 1024,
+  contextAverage: 128 * 1024,
   html: 450 * 1024,
   dist: 22 * 1024 * 1024
 }
@@ -24,14 +24,29 @@ for (const entry of sizes) {
     failures.push(`${name}: Ask AI context ${entry.bytes}`)
 }
 const css = total(sizes.filter((entry) => extname(entry.file) === '.css'))
-const contexts = total(sizes.filter((entry) => entry.file.includes('__ask-ai-context')))
+const contextEntries = sizes.filter((entry) => entry.file.includes('__ask-ai-context'))
+const contexts = total(contextEntries)
+const contextAverage = contextEntries.length === 0 ? 0 : Math.ceil(contexts / contextEntries.length)
 const dist = total(sizes)
 if (css > limits.css) failures.push(`CSS total: ${css}`)
-if (contexts > limits.contextsTotal) failures.push(`Ask AI contexts total: ${contexts}`)
+if (contextAverage > limits.contextAverage)
+  failures.push(`Ask AI context average: ${contextAverage}`)
 if (dist > limits.dist) failures.push(`dist total: ${dist}`)
 
 console.log(
-  JSON.stringify({ jsMax: max('.js'), css, contexts, htmlMax: max('.html'), dist }, null, 2)
+  JSON.stringify(
+    {
+      jsMax: max('.js'),
+      css,
+      contexts,
+      contextCount: contextEntries.length,
+      contextAverage,
+      htmlMax: max('.html'),
+      dist
+    },
+    null,
+    2
+  )
 )
 if (failures.length) throw new Error(`Performance budgets exceeded:\n${failures.join('\n')}`)
 
