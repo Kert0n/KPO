@@ -7,6 +7,8 @@ import { spawn } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { chromium } from 'playwright'
 import { PDFDocument } from 'pdf-lib'
+import { contentPagesFor } from '../.vitepress/shared/content/contentCatalog.ts'
+import { buildPdfPagePlan } from '../.vitepress/shared/content/contentPolicy.ts'
 
 const root = resolve(fileURLToPath(new URL('..', import.meta.url)))
 const remote = process.argv.includes('--remote')
@@ -15,26 +17,7 @@ const localBaseUrl = 'http://127.0.0.1:4175/KPO/'
 const outputDirectory = join(root, 'output', 'pdf')
 const pagesDirectory = join(outputDirectory, 'pages')
 
-const PDF_ROUTES = [
-  ['intro', '001-intro'],
-  ['lectures/01', '002-lecture-01'],
-  ['lectures/02', '003-lecture-02'],
-  ['lectures/03', '004-lecture-03'],
-  ['lectures/04', '005-lecture-04'],
-  ['lectures/05', '006-lecture-05'],
-  ['lectures/06', '007-lecture-06'],
-  ['lectures/07', '008-lecture-07'],
-  ['lectures/08', '009-lecture-08'],
-  ['lectures/09', '010-lecture-09'],
-  ['lectures/10', '011-lecture-10'],
-  ['lectures/11', '012-lecture-11'],
-  ['lectures/12', '013-lecture-12'],
-  ['lectures/13', '014-lecture-13'],
-  ['lectures/14', '015-lecture-14'],
-  ['extras/', '016-extras'],
-  ['extras/01', '017-playground'],
-  ['conclusion', '018-conclusion']
-]
+const PDF_ROUTES = buildPdfPagePlan(contentPagesFor('pdf'))
 
 if (remote && !configuredBaseUrl) {
   throw new Error('KPO_PDF_BASE_URL is required with --remote')
@@ -69,7 +52,7 @@ try {
   const page = await context.newPage()
   const pageFiles = []
 
-  for (const [route, fileBase] of PDF_ROUTES) {
+  for (const { route, file: fileBase } of PDF_ROUTES) {
     const url = new URL(route, baseUrl).toString()
     const pageFile = join(pagesDirectory, `${fileBase}.pdf`)
 
@@ -162,12 +145,16 @@ async function waitForHttp(url) {
 }
 
 async function waitForMermaid(page, route) {
-  await page.waitForFunction(() => {
-    const diagrams = [...document.querySelectorAll('.kpo-mermaid')]
-    return diagrams.every((diagram) => {
-      return diagram.querySelector('svg') || diagram.querySelector('.kpo-mermaid__error')
-    })
-  }, null, { timeout: 30_000 })
+  await page.waitForFunction(
+    () => {
+      const diagrams = [...document.querySelectorAll('.kpo-mermaid')]
+      return diagrams.every((diagram) => {
+        return diagram.querySelector('svg') || diagram.querySelector('.kpo-mermaid__error')
+      })
+    },
+    null,
+    { timeout: 30_000 }
+  )
 
   const errors = await page.locator('.kpo-mermaid__error').evaluateAll((nodes) => {
     return nodes.map((node) => node.textContent?.trim().replace(/\s+/g, ' ') ?? '')

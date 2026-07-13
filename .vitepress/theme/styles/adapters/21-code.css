@@ -1,0 +1,21 @@
+
+
+/* Блоки кода внутри переключалки: показан только активный язык,
+   собственная рамка блока убирается — её даёт .kpo-switcher.
+   Префикс .vp-doc обязателен: правило темы для соседних блоков
+   (`div[class*='language-'] + div[class*='language-']` c margin -8px)
+   иначе перебивает наш margin: 0 и затаскивает код под шапку. */
+.vp-doc .kpo-switcher__blocks > div[class*='language-'] {
+  display: none;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+}
+/* Отдельное правило только про margin: у темы селектор соседних блоков
+   (div + div, специфичность 0,3,2) сильнее базового и ставит -8px */
+.vp-doc .kpo-switcher__blocks > div[class*='language-'] + div[class*='language-'] {
+  margin: 0;
+}
+.vp-doc .kpo-switcher__blocks > div[class*='language-'].active {
+  display: block;
+}

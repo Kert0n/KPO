@@ -1,4 +1,4 @@
-import { clamp } from '../../lib/math'
+import { clamp } from '../../shared/core/math'
 
 export type MermaidViewportMode = 'desktop' | 'mobile'
 
@@ -21,14 +21,11 @@ export type ResolveMermaidManualScaleInput = {
 
 export type MermaidOverflowState = {
   hasOverflowX: boolean
-  hasOverflowY: boolean
 }
 
 export type ResolveMermaidOverflowInput = {
   clientWidth: number
   scrollWidth: number
-  clientHeight: number
-  scrollHeight: number
   epsilon?: number
 }
 
@@ -81,13 +78,19 @@ export function resolveMermaidManualScale(input: ResolveMermaidManualScaleInput)
   return roundScale(clamp(next, min, 1.5))
 }
 
-export function resolveMermaidRenderedWidth(width: number | null | undefined, scale: number): number | null {
+export function resolveMermaidRenderedWidth(
+  width: number | null | undefined,
+  scale: number
+): number | null {
   const viewWidth = positive(width)
   if (!viewWidth) return null
   return Math.ceil(viewWidth * scale)
 }
 
-export function resolveMermaidRenderedHeight(height: number | null | undefined, scale: number): number | null {
+export function resolveMermaidRenderedHeight(
+  height: number | null | undefined,
+  scale: number
+): number | null {
   const viewHeight = positive(height)
   if (!viewHeight) return null
   return Math.ceil(viewHeight * scale)
@@ -97,8 +100,7 @@ export function resolveMermaidOverflow(input: ResolveMermaidOverflowInput): Merm
   const epsilon = input.epsilon ?? 1
 
   return {
-    hasOverflowX: input.scrollWidth > input.clientWidth + epsilon,
-    hasOverflowY: input.scrollHeight > input.clientHeight + epsilon
+    hasOverflowX: input.scrollWidth > input.clientWidth + epsilon
   }
 }
 
@@ -120,11 +122,7 @@ export function resolveScrollLeftForCenterRatio(input: {
 }
 
 export function shouldShowMermaidToolbar(input: ShouldShowMermaidToolbarInput): boolean {
-  return input.hasOverflowX
-    || input.hasOverflowY
-    || input.hasManualScale
-    || input.isHovered
-    || input.isFocusWithin
+  return input.hasOverflowX || input.hasManualScale || input.isHovered || input.isFocusWithin
 }
 
 function positive(value: number | null | undefined): number | null {

@@ -1,0 +1,22 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "composite": true,
+    "tsBuildInfoFile": "./node_modules/.cache/tsconfig.node.tsbuildinfo",
+    "types": ["node"]
+  },
+  "include": [
+    ".vitepress/config.mts",
+    ".vitepress/lib/**/*.ts",
+    ".vitepress/markdown/**/*.ts",
+    ".vitepress/shared/**/*.ts",
+    ".vitepress/theme/lib/**/*.ts",
+    ".vitepress/types/**/*.d.ts",
+    ".vitepress/scripts/**/*.mjs",
+    "scripts/**/*.mts",
+    "scripts/**/*.mjs",
+    "playwright*.ts",
+    "vitest.config.ts"
+  ],
+  "exclude": [".vitepress/**/*.test.ts", ".vitepress/dist/**", ".vitepress/cache/**"]
+}

@@ -1,0 +1,11 @@
+
+
+.kpo-additional-readings__lecture-link {
+  flex: 0 0 auto;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.kpo-additional-readings__group {
+  margin-top: 1.25rem;
+}

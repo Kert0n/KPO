@@ -1,0 +1,9 @@
+@media (prefers-reduced-motion: reduce) {
+  .kpo-sidebar-toggle,
+  .kpo-switcher__tab,
+  .kpo-switcher__playground-toggle,
+  .kpo-mermaid__toolbar,
+  .KpoAskAiProviderMenu .option {
+    transition: none;
+  }
+}

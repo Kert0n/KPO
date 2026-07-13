@@ -1,0 +1,14 @@
+/content/
+.claude/worktrees/
+.worktrees/
+**/.vitepress/cache/
+**/.vitepress/dist/
+**/node_modules/
+coverage/
+output/
+playwright-report/
+test-results/
+tests/characterization/__screenshots__/
+tests/characterization/__snapshots__/
+*.css
+package-lock.json

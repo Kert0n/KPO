@@ -1,0 +1,27 @@
+name: Scheduled maintenance
+
+on:
+  schedule:
+    - cron: '17 4 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  external-contracts:
+    continue-on-error: true
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - name: Internal links and assets
+        run: npm run content:check
+      - name: Published site and Kotlin API availability
+        run: |
+          curl --fail --location --retry 2 https://kert0n.github.io/KPO/ >/dev/null
+          curl --fail --location --retry 2 https://play.kotlinlang.org/api/compiler/latest >/dev/null

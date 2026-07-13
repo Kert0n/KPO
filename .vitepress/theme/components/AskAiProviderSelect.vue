@@ -2,11 +2,14 @@
 import VPFlyout from 'vitepress/dist/client/theme-default/components/VPFlyout.vue'
 import AskAiProviderMenuItems from './AskAiProviderMenuItems.vue'
 
-withDefaults(defineProps<{
-  screenMenu?: boolean
-}>(), {
-  screenMenu: false
-})
+withDefaults(
+  defineProps<{
+    screenMenu?: boolean
+  }>(),
+  {
+    screenMenu: false
+  }
+)
 </script>
 
 <template>
@@ -14,12 +17,7 @@ withDefaults(defineProps<{
     <AskAiProviderMenuItems />
   </div>
 
-  <VPFlyout
-    v-else
-    class="KpoAskAiProvider"
-    icon="vpi-sparkles"
-    label="Спросить ИИ"
-  >
+  <VPFlyout v-else class="KpoAskAiProvider" icon="vpi-sparkles" label="Спросить ИИ">
     <AskAiProviderMenuItems />
   </VPFlyout>
 </template>

@@ -1,0 +1,16 @@
+
+
+.kpo-additional-readings__note {
+  color: var(--vp-c-text-2);
+}
+
+@media (max-width: 639px) {
+  .kpo-additional-readings__header {
+    display: block;
+  }
+
+  .kpo-additional-readings__lecture-link {
+    display: inline-block;
+    margin-top: 0.35rem;
+  }
+}

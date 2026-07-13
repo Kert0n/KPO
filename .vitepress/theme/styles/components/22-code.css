@@ -1,0 +1,197 @@
+
+
+/* Язык показан в табах — дублирующий ярлык VitePress не нужен */
+.kpo-switcher__blocks div[class*='language-'] .lang {
+  display: none;
+}
+/* ---------- Секции для конкретного языка ----------
+
+   ::: only <язык> (блок) и <LangOnly lang="..."> (в строке) видимы,
+   только когда выбран их язык. Управляется атрибутом html[data-kpo-lang]
+   (его ставит скрипт в <head> и useCodeLanguage) — чистый CSS,
+   без гидрации и мерцаний. display: contents убирает обёртку из
+   раскладки, поэтому работает и для абзацев, и внутри предложения. */
+.kpo-only {
+  display: none;
+}
+html[data-kpo-lang='kotlin'] .kpo-only--kotlin,
+html[data-kpo-lang='csharp'] .kpo-only--csharp,
+html[data-kpo-lang='java'] .kpo-only--java,
+html[data-kpo-lang='go'] .kpo-only--go,
+html:not([data-kpo-lang]) .kpo-only--kotlin {
+  display: contents;
+}
+/* ---------- Диаграммы Mermaid ---------- */
+.kpo-mermaid {
+  box-sizing: border-box;
+  display: block;
+  position: relative;
+  max-width: 100%;
+  min-width: 0;
+  margin: 1.25rem 0;
+  padding: 1rem;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 8px;
+  background: var(--vp-c-bg);
+}
+.kpo-mermaid__toolbar {
+  display: flex;
+  justify-content: flex-end;
+  gap: 4px;
+  min-height: 28px;
+  margin: 0 0 0.75rem;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+}
+.kpo-mermaid:hover .kpo-mermaid__toolbar,
+.kpo-mermaid:focus-within .kpo-mermaid__toolbar,
+.kpo-mermaid--controls-visible .kpo-mermaid__toolbar {
+  opacity: 1;
+  pointer-events: auto;
+}
+.kpo-mermaid__zoom-button,
+.kpo-mermaid__zoom-reset {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 28px;
+  min-width: 28px;
+  padding: 0 8px;
+  border: 1px solid var(--vp-c-border);
+  border-radius: 6px;
+  background: var(--vp-c-bg-soft);
+  color: var(--vp-c-text-2);
+  font: inherit;
+  font-size: 0.8125rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.kpo-mermaid__zoom-button:hover,
+.kpo-mermaid__zoom-reset:hover:not(:disabled) {
+  color: var(--vp-c-text-1);
+  border-color: var(--vp-c-brand-1);
+}
+.kpo-mermaid__zoom-button:focus-visible,
+.kpo-mermaid__zoom-reset:focus-visible {
+  outline: 2px solid var(--vp-c-brand-1);
+  outline-offset: 2px;
+}
+.kpo-mermaid__zoom-reset {
+  min-width: 48px;
+  font-variant-numeric: tabular-nums;
+}
+.kpo-mermaid__zoom-reset:disabled {
+  cursor: default;
+  opacity: 0.72;
+}
+.kpo-mermaid__viewport {
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: visible;
+  max-height: none;
+  -webkit-overflow-scrolling: touch;
+}
+.kpo-mermaid__canvas {
+  box-sizing: border-box;
+  width: max-content;
+  margin-inline: auto;
+}
+.kpo-mermaid__canvas svg {
+  display: block;
+  width: var(--kpo-mermaid-render-width, auto) !important;
+  max-width: none !important;
+  height: var(--kpo-mermaid-render-height, auto) !important;
+}
+.kpo-mermaid svg p {
+  margin: 0;
+  line-height: inherit;
+}
+.kpo-mermaid svg .edgeLabel,
+.kpo-mermaid svg .edgeLabel .label,
+.kpo-mermaid svg .edgeLabel span {
+  background: var(--vp-c-bg) !important;
+  color: var(--vp-c-text-1) !important;
+}
+.kpo-mermaid svg .nodeLabel,
+.kpo-mermaid svg .label,
+.kpo-mermaid svg foreignObject,
+.kpo-mermaid svg foreignObject * {
+  color: var(--vp-c-text-1) !important;
+}
+.kpo-mermaid svg .labelBkg {
+  fill: var(--vp-c-bg) !important;
+}
+.kpo-mermaid svg .edgeLabel .labelBkg,
+.kpo-mermaid svg .edgeLabel foreignObject .labelBkg {
+  background: var(--vp-c-bg) !important;
+  background-color: var(--vp-c-bg) !important;
+  color: var(--vp-c-text-1) !important;
+  opacity: 1 !important;
+}
+.kpo-mermaid--rendering .kpo-mermaid__canvas {
+  visibility: hidden;
+}
+.kpo-mermaid svg .node rect,
+.kpo-mermaid svg .node circle,
+.kpo-mermaid svg .node ellipse,
+.kpo-mermaid svg .node polygon,
+.kpo-mermaid svg .node path {
+  stroke: var(--vp-c-border) !important;
+}
+.kpo-mermaid__loading {
+  color: var(--vp-c-text-2);
+  font-size: 0.8125rem;
+}
+.kpo-mermaid__error {
+  min-width: 0;
+  width: 100%;
+  color: var(--vp-c-text-2);
+  font-size: 0.8125rem;
+}
+.kpo-mermaid__error-title {
+  margin: 0 0 0.25rem;
+  color: var(--vp-c-text-1);
+  font-weight: 600;
+}
+.kpo-mermaid__error-message {
+  margin: 0 0 0.5rem;
+  overflow-wrap: anywhere;
+}
+.kpo-mermaid__source summary {
+  cursor: pointer;
+  color: var(--vp-c-text-2);
+}
+.kpo-mermaid__fallback {
+  margin: 0.5rem 0 0;
+  color: var(--vp-c-text-2);
+  font-family: var(--vp-font-family-mono), monospace;
+  font-size: var(--vp-code-font-size);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 639px) {
+  .kpo-switcher__header {
+    align-items: stretch;
+  }
+
+  .kpo-switcher__controls {
+    margin-left: 0;
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .kpo-switcher__tabs {
+    flex: 1;
+    min-width: min(100%, 12rem);
+  }
+
+  .kpo-switcher__tab {
+    flex: 1;
+    padding: 0 8px;
+  }
+
+  .kpo-switcher__playground-toggle {
+    flex: 0 0 auto;
+  }
+}

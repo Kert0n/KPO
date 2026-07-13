@@ -1,6 +1,7 @@
 import type { Ref } from 'vue'
 import { isSupportedCodeLanguage, type CodeLanguage } from '../lib/codeBlockModel'
 import { createPersistentState } from './persistentState'
+import { SITE } from '../../shared/site'
 
 /**
  * Глобально выбранный язык примеров кода.
@@ -15,7 +16,7 @@ import { createPersistentState } from './persistentState'
  */
 
 const language = createPersistentState<CodeLanguage>({
-  key: 'kpo:code-language',
+  key: SITE.storageKeys.codeLanguage,
   initial: 'kotlin',
   encode: (value) => value,
   decode: (raw) => raw as CodeLanguage,

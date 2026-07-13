@@ -1,182 +1,86 @@
 import type { DefaultTheme } from 'vitepress'
-import { existsSync, readFileSync, readdirSync } from 'node:fs'
-import { join, resolve } from 'node:path'
-import matter from 'gray-matter'
-
-/**
- * Автоматическое построение сайдбара, навигации и rewrites
- * из content/ — единственного VitePress srcDir.
- *
- * Элемент раздела — одно из двух:
- *  - папка с публикуемой страницей `vitepress.md` (например,
- *    lectures/Lec1/vitepress.md) — остальное содержимое папки
- *    (черновики, транскрипты, видео) принадлежит редактору
- *    и в сборку не попадает (см. srcExclude в config.mts).
- *
- * Папочные страницы через rewrites получают чистые URL вида
- * /lectures/01, /extras/01, /intro.
- *
- * Порядок: frontmatter `order` → число в имени (Lec7 → 7, 03.md → 3).
- * Заголовок: frontmatter `title` → первый H1 → «Лекция NN»/«Дополнение NN».
- * Добавление и удаление лекций не требует правок конфига.
- */
-
-type Page = {
-  text: string
-  link: string
-  order: number
-  /** Для папочных страниц: исходный путь → переписанный (для rewrites) */
-  rewrite?: { from: string; to: string }
-}
-
-const root = process.cwd()
-const contentRoot = resolve(root, 'content')
-
-const staticRewrites: Record<string, string> = {
-  'home/vitepress.md': 'index.md',
-  'intro/vitepress.md': 'intro.md',
-  'conclusion/vitepress.md': 'conclusion.md',
-  'extras/index/vitepress.md': 'extras/index.md',
-  'service-pages/ui-contract/vitepress.md': 'service-pages/ui-contract.md'
-}
-
-const sections = [
-  { directory: 'lectures', fallback: 'Лекция' },
-  { directory: 'extras', fallback: 'Дополнение' }
-] as const
+import {
+  contentPagesFor,
+  getCatalogRewrites,
+  getContentCatalog
+} from '../shared/content/contentCatalog'
+import type { ContentPage } from '../shared/content/contentTypes'
 
 export function getSidebar(): DefaultTheme.Sidebar {
-  const sidebar: DefaultTheme.SidebarItem[] = [
-    {
-      text: 'Начало',
-      items: [{ text: 'Введение', link: '/intro' }]
-    },
-    {
-      text: 'Лекции',
-      collapsed: false,
-      items: scanPages('lectures')
-    }
-  ]
+  return buildSidebar(contentPagesFor('sidebar'))
+}
 
-  const extras = scanPages('extras')
-  if (extras.length > 0) {
-    sidebar.push({
-      text: 'Дополнения',
-      collapsed: false,
-      items: [{ text: 'О дополнениях', link: '/extras/' }, ...extras]
-    })
-  }
+export function buildSidebar(pages: ContentPage[]): DefaultTheme.Sidebar {
+  const lectures = sectionItems(pages, 'lectures')
+  const extras = sectionItems(pages, 'extras')
 
-  sidebar.push({
-    text: 'Финал',
-    items: [{ text: 'Заключение', link: '/conclusion' }]
-  })
-
-  return sidebar
+  return [
+    { text: 'Начало', items: [{ text: page(pages, '/intro').title, link: '/intro' }] },
+    { text: 'Лекции', collapsed: false, items: lectures },
+    ...(extras.length > 0
+      ? [
+          {
+            text: 'Дополнения',
+            collapsed: false,
+            items: [{ text: navigationTitle(page(pages, '/extras/')), link: '/extras/' }, ...extras]
+          }
+        ]
+      : []),
+    { text: 'Финал', items: [{ text: page(pages, '/conclusion').title, link: '/conclusion' }] }
+  ] satisfies DefaultTheme.SidebarItem[]
 }
 
 export function getNav(): DefaultTheme.NavItem[] {
-  const nav: DefaultTheme.NavItem[] = [
-    { text: 'Введение', link: '/intro' },
-    { text: 'Лекции', link: getFirstLectureLink(), activeMatch: '/lectures/' }
-  ]
-
-  if (scanPages('extras').length > 0) {
-    nav.push({ text: 'Дополнения', link: '/extras/', activeMatch: '/extras/' })
-  }
-
-  nav.push({ text: 'Заключение', link: '/conclusion' })
-
-  return nav
+  return buildNav(getContentCatalog())
 }
 
-/** Карта rewrites для папочных страниц: lectures/Lec1/vitepress.md → lectures/01.md */
+export function buildNav(pages: ContentPage[]): DefaultTheme.NavItem[] {
+  return [
+    { text: 'Введение', link: '/intro' },
+    { text: 'Лекции', link: firstLectureLink(pages), activeMatch: '^/lectures/' },
+    { text: 'Дополнения', link: page(pages, '/extras/').route, activeMatch: '^/extras/' },
+    { text: 'Заключение', link: '/conclusion' }
+  ]
+}
+
 export function getRewrites(): Record<string, string> {
-  const rewrites: Record<string, string> = { ...staticRewrites }
+  return getCatalogRewrites()
+}
 
-  for (const section of sections) {
-    for (const page of scanPages(section.directory)) {
-      if (page.rewrite) rewrites[page.rewrite.from] = page.rewrite.to
-    }
-  }
-
-  return rewrites
+export function buildRewrites(pages: ContentPage[]): Record<string, string> {
+  return Object.fromEntries(
+    pages.map((item) => [item.sourcePath.replace(/^content\//, ''), item.outputPath])
+  )
 }
 
 export function getFirstLectureLink(): string {
-  return scanPages('lectures')[0]?.link ?? '/intro'
+  return firstLectureLink(getContentCatalog())
 }
 
-function scanPages(directory: (typeof sections)[number]['directory']): Page[] {
-  const directoryPath = resolve(contentRoot, directory)
-  if (!existsSync(directoryPath)) return []
-
-  const fallback = sections.find((s) => s.directory === directory)!.fallback
-
-  const pages = readdirSync(directoryPath, { withFileTypes: true })
-    .filter((entry) => entry.name !== 'index' && !entry.name.startsWith('_') && !entry.name.startsWith('.'))
-    .map((entry) => toPage(directory, entry, fallback))
-    .filter((page): page is Page => page !== null)
-    .sort((a, b) => a.order - b.order || a.link.localeCompare(b.link, 'ru'))
-
-  assertUniqueLinks(directory, pages)
-
-  return pages
-}
-
-function toPage(
-  directory: string,
-  entry: { name: string; isFile(): boolean; isDirectory(): boolean },
-  fallback: string
-): Page | null {
-  if (entry.isDirectory()) {
-    const source = join(contentRoot, directory, entry.name, 'vitepress.md')
-    if (!existsSync(source)) return null
-
-    const order = extractNumber(entry.name)
-    const slug = Number.isFinite(order) ? String(order).padStart(2, '0') : entry.name
-
-    return {
-      text: extractTitle(source, fallback, order),
-      link: `/${directory}/${slug}`,
-      order,
-      rewrite: {
-        from: `${directory}/${entry.name}/vitepress.md`,
-        to: `${directory}/${slug}.md`
-      }
-    }
-  }
-
-  return null
-}
-
-/** Число из имени: «Lec7» → 7, «03.md» → 3; без числа — в конец списка */
 export function extractNumber(name: string): number {
   const match = name.match(/(\d+)/)
   return match ? Number.parseInt(match[1], 10) : Number.MAX_SAFE_INTEGER
 }
 
-function extractTitle(file: string, fallback: string, order: number): string {
-  const { data, content } = matter(readFileSync(file, 'utf8'))
-
-  if (typeof data.title === 'string' && data.title.trim() !== '') {
-    return data.title.trim()
-  }
-
-  const h1 = content.match(/^#\s+(.+?)\s*$/m)?.[1]
-  if (h1) return h1
-
-  return order === Number.MAX_SAFE_INTEGER
-    ? fallback
-    : `${fallback} ${String(order).padStart(2, '0')}`
+function sectionItems(
+  pages: ContentPage[],
+  section: 'lectures' | 'extras'
+): DefaultTheme.SidebarItem[] {
+  return pages
+    .filter((item) => item.section === section && item.kind !== 'extras-index')
+    .map((item) => ({ text: navigationTitle(item), link: item.route }))
 }
 
-function assertUniqueLinks(directory: string, pages: Page[]): void {
-  const seen = new Set<string>()
-  for (const page of pages) {
-    if (seen.has(page.link)) {
-      throw new Error(`Дублирующаяся ссылка "${page.link}" в каталоге "${directory}".`)
-    }
-    seen.add(page.link)
-  }
+function page(pages: ContentPage[], route: string) {
+  const result = pages.find((item) => item.route === route)
+  if (!result) throw new Error(`Missing content page: ${route}`)
+  return result
+}
+
+function navigationTitle(item: ContentPage): string {
+  return item.navigationTitle ?? item.title
+}
+
+function firstLectureLink(pages: ContentPage[]): string {
+  return pages.find((item) => item.kind === 'lecture')?.route ?? '/intro'
 }

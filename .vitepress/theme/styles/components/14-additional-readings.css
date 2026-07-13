@@ -1,0 +1,18 @@
+.kpo-additional-readings {
+  display: grid;
+  gap: 2rem;
+  margin-top: 2rem;
+}
+
+.kpo-additional-readings__lecture {
+  border-top: 1px solid var(--vp-c-divider);
+  padding-top: 1.5rem;
+}
+
+.kpo-additional-readings__header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}

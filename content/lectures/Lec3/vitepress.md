@@ -416,7 +416,7 @@ flowchart LR
 Когда одну и ту же логику нужно проверить на нескольких наборах данных, каждый язык предлагает свой механизм. Вместо
 дублирования тестовых функций, данные собираются в таблицу:
 
-::: multi-code "Параметризованные тесты" {default=kotlin}
+::: multi-code "Параметризованные тесты"
 
 ```kotlin
 import org.junit.jupiter.params.ParameterizedTest
@@ -831,7 +831,7 @@ func (s CheckoutService) Checkout(amount int) Receipt {
 
 :::
 
-::: multi-code "Kotlin: fake gateway в unit-тесте" {default=kotlin}
+::: multi-code "Kotlin: fake gateway в unit-тесте"
 
 ```kotlin
 import kotlin.test.Test
@@ -980,7 +980,7 @@ func (FakePaymentGateway) Charge(amount int) Receipt {
 падает из-за ответа stub, проблема обычно в проверяемой логике. Если тест падает из-за mock, проблема может быть как в
 логике, так и в слишком жестком ожидании внутреннего процесса.
 
-::: multi-code "Stub и spy в одном сценарии" {default=kotlin}
+::: multi-code "Stub и spy в одном сценарии"
 
 ```kotlin
 import kotlin.test.Test

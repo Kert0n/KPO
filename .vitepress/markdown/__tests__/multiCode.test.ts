@@ -42,7 +42,9 @@ fun main() {}
 :::
 `)
 
-    expect(warn).toHaveBeenCalledWith(expect.stringContaining('default="go" не найден среди языков блока'))
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining('default="go" не найден среди языков блока')
+    )
     expect(html).not.toContain('author-default-lang')
     expect(html).toContain('initial-lang="kotlin"')
   })
@@ -57,6 +59,22 @@ fun main() {}
 `)
 
     expect(html).toContain(':allow-playground="false"')
+  })
+
+  it('keeps an illustrative Kotlin action visible but does not provide runnable code', () => {
+    const html = render(`
+::: multi-code "Illustrative"
+\`\`\`kotlin
+class ExternalFrameworkType
+\`\`\`
+\`\`\`java
+class ExternalFrameworkType {}
+\`\`\`
+:::
+`)
+
+    expect(html).toContain(':allow-playground="true"')
+    expect(html).not.toContain('playground-code=')
   })
 
   it('warns about duplicate language blocks', () => {

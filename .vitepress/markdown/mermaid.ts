@@ -1,5 +1,6 @@
 import type MarkdownIt from 'markdown-it'
-import { stableHash } from '../lib/hash'
+import { stableHash } from '../shared/core/hash'
+import { classifyMarkdownToken } from '../shared/core/markdownStructure'
 import { askAiBlockAttribute } from './askAiAnchors'
 
 export type MermaidLintDiagnostic = {
@@ -27,7 +28,7 @@ export function mermaidPlugin(md: MarkdownIt): void {
   md.renderer.rules.fence = (tokens, index, options, env, self) => {
     const token = tokens[index]
 
-    if (token.info.trim() === 'mermaid') {
+    if (classifyMarkdownToken(tokens, index)?.kind === 'mermaid') {
       const lineOffset = token.map?.[0] ?? 0
 
       assertValidMermaidCode(token.content, {
@@ -36,9 +37,11 @@ export function mermaidPlugin(md: MarkdownIt): void {
       })
 
       const diagramId = `kpo-mermaid-${stableHash(`${lineOffset}:${token.content}`)}`
-      return `<div class="kpo-content-block kpo-content-block--mermaid kpo-content-block--wide kpo-wide-block kpo-wide-block--mermaid"${askAiBlockAttribute(token)}>\n`
-        + `<MermaidDiagram code="${encodeURIComponent(token.content)}" diagram-id="${diagramId}"></MermaidDiagram>\n`
-        + '</div>\n'
+      return (
+        `<div class="kpo-content-block kpo-content-block--mermaid kpo-content-block--wide kpo-wide-block kpo-wide-block--mermaid"${askAiBlockAttribute(token)}>\n` +
+        `<MermaidDiagram code="${encodeURIComponent(token.content)}" diagram-id="${diagramId}"></MermaidDiagram>\n` +
+        '</div>\n'
+      )
     }
 
     return defaultFence(tokens, index, options, env, self)
@@ -53,16 +56,17 @@ export function assertValidMermaidCode(code: string, source: MermaidLintSource =
   const file = source.file ? `${source.file}:` : ''
   const line = (source.lineOffset ?? 0) + first.line
 
-  throw new Error(
-    `[mermaid] ${file}${line}: ${first.message}\n`
-      + `  ${first.snippet}`
-  )
+  throw new Error(`[mermaid] ${file}${line}: ${first.message}\n` + `  ${first.snippet}`)
 }
 
 export function lintMermaidCode(code: string): MermaidLintDiagnostic[] {
   const diagnostics: MermaidLintDiagnostic[] = []
   const labelPattern = /\b[A-Za-z][\w-]*\[([^\]\n]+)\]/g
-  const firstDirective = code.split('\n').find((line) => line.trim() !== '')?.trim() ?? ''
+  const firstDirective =
+    code
+      .split('\n')
+      .find((line) => line.trim() !== '')
+      ?.trim() ?? ''
   const isFlowchart = /^(flowchart|graph)\b/.test(firstDirective)
 
   for (const [lineIndex, line] of code.split('\n').entries()) {
@@ -70,7 +74,8 @@ export function lintMermaidCode(code: string): MermaidLintDiagnostic[] {
       diagnostics.push({
         line: lineIndex + 1,
         snippet: line.trim(),
-        message: 'classDiagram arrows are not valid in flowchart; use classDiagram or flowchart arrows'
+        message:
+          'classDiagram arrows are not valid in flowchart; use classDiagram or flowchart arrows'
       })
     }
 
@@ -95,11 +100,7 @@ function isQuotedLabel(label: string): boolean {
 }
 
 function isMermaidShapeLabel(label: string): boolean {
-  return (
-    /^\(.+\)$/.test(label)
-    || /^\[.+\]$/.test(label)
-    || /^\{.+\}$/.test(label)
-  )
+  return /^\(.+\)$/.test(label) || /^\[.+\]$/.test(label) || /^\{.+\}$/.test(label)
 }
 
 function markdownEnvPath(env: unknown): string | undefined {

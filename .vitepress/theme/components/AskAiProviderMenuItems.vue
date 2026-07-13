@@ -1,9 +1,6 @@
 <script setup lang="ts">
 import { useAskAiProvider } from '../composables/useAskAiProvider'
-import {
-  isAskAiProviderId,
-  type AskAiProviderId
-} from '../lib/askAiModel'
+import { isAskAiProviderId, type AskAiProviderId } from '../lib/askAiModel'
 
 const { askAiProvider, setAskAiProvider } = useAskAiProvider()
 
@@ -27,10 +24,7 @@ function selectProvider(value: string): void {
 <template>
   <div class="KpoAskAiProviderMenu">
     <p class="KpoAskAiProviderMenu__title">СПРОСИТЬ ИИ</p>
-    <template
-      v-for="provider in providerMenuItems"
-      :key="provider.id"
-    >
+    <template v-for="provider in providerMenuItems" :key="provider.id">
       <div v-if="provider.separated" class="KpoAskAiProviderMenu__divider" />
       <button
         type="button"

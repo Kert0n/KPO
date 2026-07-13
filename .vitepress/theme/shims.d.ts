@@ -4,6 +4,11 @@ declare module '*.vue' {
   export default component
 }
 
+declare module '*.data' {
+  const data: import('./lib/additionalReadings').LectureAdditionalReadings[]
+  export { data }
+}
+
 declare module 'kotlin-playground' {
   type PlaygroundOptions = {
     server?: string

@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://kert0n.github.io/KPO/sitemap.xml

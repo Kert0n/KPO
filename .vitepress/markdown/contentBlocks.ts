@@ -2,8 +2,12 @@ import type MarkdownIt from 'markdown-it'
 import type { Options } from 'markdown-it'
 import type Renderer from 'markdown-it/lib/renderer.mjs'
 import type Token from 'markdown-it/lib/token.mjs'
+import {
+  classifyMarkdownToken,
+  isMultiCodeClose,
+  isMultiCodeOpen
+} from '../shared/core/markdownStructure'
 import { askAiBlockAttribute } from './askAiAnchors'
-import { isImageOnlyParagraph } from './tokenUtils'
 
 const TABLE_CLOSE = '</div>\n'
 const CODE_CLOSE = '</div>\n'
@@ -15,7 +19,10 @@ export function contentBlocksPlugin(md: MarkdownIt): void {
   const defaultFence = md.renderer.rules.fence!
   md.renderer.rules.fence = (tokens, index, options, env, self) => {
     const token = tokens[index]
-    if (token.meta?.kpoInsideMultiCode || token.info.trim() === 'mermaid') {
+    if (
+      token.meta?.kpoInsideMultiCode ||
+      classifyMarkdownToken(tokens, index)?.kind === 'mermaid'
+    ) {
       return defaultFence(tokens, index, options, env, self)
     }
 
@@ -66,13 +73,13 @@ function markSpecialContentTokens(md: MarkdownIt): void {
     for (let index = 0; index < state.tokens.length; index += 1) {
       const token = state.tokens[index]
 
-      if (token.type === 'container_multi-code_open') {
+      if (isMultiCodeOpen(token)) {
         multiCodeDepth += 1
-      } else if (token.type === 'container_multi-code_close') {
+      } else if (isMultiCodeClose(token)) {
         multiCodeDepth = Math.max(0, multiCodeDepth - 1)
       } else if (token.type === 'fence' && multiCodeDepth > 0) {
         token.meta = { ...token.meta, kpoInsideMultiCode: true }
-      } else if (token.type === 'paragraph_open' && isImageOnlyParagraph(state.tokens, index)) {
+      } else if (classifyMarkdownToken(state.tokens, index)?.kind === 'image') {
         token.meta = { ...token.meta, kpoImageOnlyParagraph: true }
 
         const closeIndex = findParagraphClose(state.tokens, index)

@@ -1,0 +1,43 @@
+
+
+@media (min-width: 960px) {
+
+  html.kpo-sidebar-hidden .VPSidebar {
+    transform: translateX(-100%) !important;
+    opacity: 0 !important;
+    visibility: hidden;
+    pointer-events: none;
+  }
+
+  .VPContent.has-sidebar,
+  .VPLocalNav.has-sidebar {
+    transition: padding-left 0.3s ease;
+  }
+}
+
+/* На широких экранах (≥1440) тема «центрирует» сайдбар, раздувая его
+   padding-left формулой от ширины окна — с фиксированной шириной это
+   сжимает содержимое в ноль, а край сайдбара уезжает от кнопки-якоря.
+   Отменяем: сайдбар одинаков на любой десктопной ширине, контент
+   начинается сразу за ним (колонка текста центрируется самим VPDoc). */
+
+@media (min-width: 1440px) {
+  .VPSidebar {
+    padding-left: 32px !important;
+  }
+
+  .VPContent.has-sidebar {
+    padding-right: 0 !important;
+    padding-left: var(--vp-sidebar-width) !important;
+  }
+}
+
+/* KpoNavBarExtra полностью заменяет нативный VPNavBarExtra на всех
+   брейкпоинтах — прячем оригинал безусловно. */
+
+.VPNavBar .VPNavBarExtra {
+  display: none !important;
+}
+
+/* Content typography and wide-lane contracts live in content-lanes.css.
+   VitePress document internals live in vitepress-adapter.css. */

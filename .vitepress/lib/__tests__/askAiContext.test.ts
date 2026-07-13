@@ -1,15 +1,39 @@
-import { describe, expect, it } from 'vitest'
+import { mkdtempSync, mkdirSync, rmSync, utimesSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { dirname, join } from 'node:path'
+import { afterEach, describe, expect, it } from 'vitest'
 import { buildAskAiPageContext } from '../askAiContext'
 
+const temporaryRoots: string[] = []
+
+afterEach(() => {
+  for (const root of temporaryRoots.splice(0)) rmSync(root, { recursive: true, force: true })
+})
+
 describe('askAiContext', () => {
+  it('builds context from an explicitly opted-in service fixture', () => {
+    const context = buildAskAiPageContext(
+      {
+        routeKey: 'service-pages/ask-ai-contract',
+        sourcePath: 'content/service-pages/ask-ai-contract/vitepress.md'
+      },
+      { courseTitle: 'Course', courseDescription: 'Description' }
+    )
+    expect(context.sourcePath).toBe('content/service-pages/ask-ai-contract/vitepress.md')
+    expect(context.blocks.length).toBeGreaterThan(0)
+  })
+
   it('extracts stable markdown blocks for code, mermaid, table and multi-code', () => {
-    const context = buildAskAiPageContext({
-      routeKey: 'service-pages/ui-contract',
-      sourcePath: 'content/service-pages/ui-contract/vitepress.md'
-    }, {
-      courseTitle: 'Course',
-      courseDescription: 'Description'
-    })
+    const context = buildAskAiPageContext(
+      {
+        routeKey: 'service-pages/ui-contract',
+        sourcePath: 'content/service-pages/ui-contract/vitepress.md'
+      },
+      {
+        courseTitle: 'Course',
+        courseDescription: 'Description'
+      }
+    )
 
     expect(context.pageTitle).toBe('UI Contract Fixtures')
     expect(context.blocks.some((block) => block.kind === 'multi-code')).toBe(true)
@@ -24,5 +48,44 @@ describe('askAiContext', () => {
     const multiCode = context.blocks.find((block) => block.kind === 'multi-code')
     expect(multiCode?.markdown).toContain(':::: multi-code')
     expect(multiCode?.markdown).toContain('```kotlin')
+  })
+
+  it('replaces the absolute-path cache entry when source mtime changes', () => {
+    const root = mkdtempSync(join(tmpdir(), 'kpo-ask-ai-cache-'))
+    temporaryRoots.push(root)
+    const sourcePath = 'content/service-pages/cache-fixture/vitepress.md'
+    const absolutePath = join(root, sourcePath)
+    mkdirSync(dirname(absolutePath), { recursive: true })
+    writeFileSync(absolutePath, '# First title\n\nFirst paragraph with enough context.', 'utf8')
+    utimesSync(absolutePath, 1, 1)
+
+    const entry = { routeKey: 'service-pages/cache-fixture', sourcePath }
+    const options = { root, courseTitle: 'Course', courseDescription: 'Description' }
+    expect(buildAskAiPageContext(entry, options).pageTitle).toBe('First title')
+
+    writeFileSync(absolutePath, '# Updated title\n\nUpdated paragraph with enough context.', 'utf8')
+    utimesSync(absolutePath, 2, 2)
+    expect(buildAskAiPageContext(entry, options).pageTitle).toBe('Updated title')
+  })
+
+  it('keeps multi-code as one context block without duplicating inner fences', () => {
+    const root = mkdtempSync(join(tmpdir(), 'kpo-ask-ai-multi-code-'))
+    temporaryRoots.push(root)
+    const sourcePath = 'content/service-pages/multi-code-fixture/vitepress.md'
+    const absolutePath = join(root, sourcePath)
+    mkdirSync(dirname(absolutePath), { recursive: true })
+    writeFileSync(
+      absolutePath,
+      '# Example\n\n::: multi-code\n```kotlin\nval x = 1\n```\n```java\nvar x = 1;\n```\n:::',
+      'utf8'
+    )
+
+    const context = buildAskAiPageContext(
+      { routeKey: 'service-pages/multi-code-fixture', sourcePath },
+      { root, courseTitle: 'Course', courseDescription: 'Description' }
+    )
+
+    expect(context.blocks.filter((block) => block.kind === 'multi-code')).toHaveLength(1)
+    expect(context.blocks.filter((block) => block.kind === 'code')).toHaveLength(0)
   })
 })
