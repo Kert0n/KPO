@@ -10,6 +10,7 @@ const mermaid = vi.hoisted(() => ({
 vi.mock('mermaid', () => ({ default: mermaid }))
 
 const lightTokens: MermaidThemeTokens = {
+  darkMode: false,
   fontFamily: 'Inter',
   background: '#fff',
   softBackground: '#eee',
@@ -19,6 +20,7 @@ const lightTokens: MermaidThemeTokens = {
 }
 
 const darkTokens: MermaidThemeTokens = {
+  darkMode: true,
   fontFamily: 'Inter',
   background: '#111',
   softBackground: '#222',
@@ -43,6 +45,7 @@ describe('useMermaidRenderer', () => {
     expect(mermaid.initialize).toHaveBeenCalledWith(
       expect.objectContaining({
         themeVariables: expect.objectContaining({
+          darkMode: false,
           background: lightTokens.background,
           edgeLabelBackground: lightTokens.background,
           primaryTextColor: lightTokens.text,
@@ -96,6 +99,7 @@ describe('useMermaidRenderer', () => {
     expect(mermaid.initialize).toHaveBeenLastCalledWith(
       expect.objectContaining({
         themeVariables: expect.objectContaining({
+          darkMode: true,
           background: darkTokens.background,
           primaryTextColor: darkTokens.text
         })
@@ -237,6 +241,33 @@ describe('useMermaidRenderer', () => {
     await expect(pending).resolves.toBe('stale')
     expect(renderer.failed.value).toBe(false)
     expect(renderer.errorMessage.value).toBe('')
+  })
+
+  it('publishes an active render failure and recovers on the next request', async () => {
+    const warning = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    mermaid.render.mockRejectedValueOnce(new Error('fixture render failure'))
+    const renderer = createRenderer()
+
+    await expect(renderer.render(request(darkTokens))).resolves.toBe('failed')
+    expect(renderer.failed.value).toBe(true)
+    expect(renderer.errorMessage.value).toBe('fixture render failure')
+    expect(renderer.svg.value).toBe('')
+
+    mermaid.render.mockResolvedValueOnce({ svg: svg(120, 60) })
+    await expect(renderer.render(request(lightTokens))).resolves.toBe('rendered')
+    expect(renderer.failed.value).toBe(false)
+    expect(renderer.svg.value).toBe(svg(120, 60))
+    warning.mockRestore()
+  })
+
+  it('formats non-Error Mermaid failures without hiding them', async () => {
+    const warning = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    mermaid.render.mockRejectedValueOnce('fixture failure')
+    const renderer = createRenderer()
+
+    await expect(renderer.render(request(lightTokens))).resolves.toBe('failed')
+    expect(renderer.errorMessage.value).toBe('fixture failure')
+    warning.mockRestore()
   })
 })
 

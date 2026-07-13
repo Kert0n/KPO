@@ -1,4 +1,5 @@
 export type MermaidThemeTokens = {
+  darkMode: boolean
   fontFamily: string
   background: string
   softBackground: string
@@ -10,7 +11,7 @@ export type MermaidThemeTokens = {
 export type MermaidConfig = {
   startOnLoad: false
   theme: 'base'
-  themeVariables: Record<string, string>
+  themeVariables: Record<string, string | boolean>
   fontFamily: string
   flowchart: {
     htmlLabels: true
@@ -18,8 +19,11 @@ export type MermaidConfig = {
   }
 }
 
-export function createMermaidThemeVariables(tokens: MermaidThemeTokens): Record<string, string> {
+export function createMermaidThemeVariables(
+  tokens: MermaidThemeTokens
+): Record<string, string | boolean> {
   return {
+    darkMode: tokens.darkMode,
     fontFamily: tokens.fontFamily,
     primaryColor: tokens.softBackground,
     primaryTextColor: tokens.text,

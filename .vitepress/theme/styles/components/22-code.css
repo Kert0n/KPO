@@ -122,6 +122,16 @@ html:not([data-kpo-lang]) .kpo-only--kotlin {
 .kpo-mermaid svg .labelBkg {
   fill: var(--vp-c-bg) !important;
 }
+.kpo-mermaid svg .edgeLabel .labelBkg,
+.kpo-mermaid svg .edgeLabel foreignObject .labelBkg {
+  background: var(--vp-c-bg) !important;
+  background-color: var(--vp-c-bg) !important;
+  color: var(--vp-c-text-1) !important;
+  opacity: 1 !important;
+}
+.kpo-mermaid--rendering .kpo-mermaid__canvas {
+  visibility: hidden;
+}
 .kpo-mermaid svg .node rect,
 .kpo-mermaid svg .node circle,
 .kpo-mermaid svg .node ellipse,

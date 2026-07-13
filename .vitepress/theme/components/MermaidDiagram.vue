@@ -25,7 +25,7 @@ const { isDark } = useData()
 const decodedCode = computed(() => decodeURIComponent(props.code))
 const instanceId = props.diagramId ?? `kpo-mermaid-${stableHash(decodedCode.value)}`
 const renderer = useMermaidRenderer({ instanceId })
-const { svg, failed, errorMessage, viewBoxWidth, viewBoxHeight } = renderer
+const { svg, failed, errorMessage, rendering, viewBoxWidth, viewBoxHeight } = renderer
 const root = ref<HTMLElement | null>(null)
 const viewport = ref<HTMLElement | null>(null)
 const viewportController = useMermaidViewport({ root, viewport })
@@ -67,7 +67,7 @@ async function render(expectedIsDark: boolean): Promise<void> {
 
   const result = await renderer.render({
     code: decodedCode.value,
-    theme: readMermaidThemeTokens()
+    theme: readMermaidThemeTokens(expectedIsDark)
   })
   if (result === 'rendered') {
     const layout = await viewportController.syncLayout({
@@ -117,8 +117,10 @@ function updateTextRisk(): void {
     :class="{
       'kpo-mermaid--controls-visible': controlsVisible,
       'kpo-mermaid--has-overflow': hasOverflowX,
-      'kpo-mermaid--text-risk': textRisk
+      'kpo-mermaid--text-risk': textRisk,
+      'kpo-mermaid--rendering': rendering
     }"
+    :aria-busy="rendering"
     @mouseenter="hovered = true"
     @mouseleave="hovered = false"
     @focusin="focusWithin = true"
