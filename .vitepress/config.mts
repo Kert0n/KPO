@@ -122,9 +122,10 @@ export default defineConfig({
     build: {
       // Code examples intentionally stay searchable. The local search index and
       // lazy Mermaid/Kotlin Playground chunks are larger than Vite's default
-      // 500 KiB raw threshold, but the limit stays below 1 MiB so real
-      // regressions remain visible.
-      chunkSizeWarningLimit: 1024
+      // 500 KiB raw threshold. The content-backed search index may grow to
+      // 1.5 MiB; scripts/check-performance-budgets.mjs still keeps ordinary
+      // runtime JS chunks under the stricter 1 MiB limit.
+      chunkSizeWarningLimit: 1536
     },
     plugins: [
       askAiContextPlugin({
