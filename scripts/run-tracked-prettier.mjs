@@ -2,6 +2,11 @@ import { execFileSync, spawnSync } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 
+const mode = process.argv[2]
+if (mode !== '--check' && mode !== '--write') {
+  throw new Error('Usage: run-tracked-prettier.mjs <--check|--write>')
+}
+
 const files = execFileSync('git', ['ls-files', '-z'], { encoding: 'utf8' })
   .split('\0')
   .filter(Boolean)
@@ -10,7 +15,7 @@ const files = execFileSync('git', ['ls-files', '-z'], { encoding: 'utf8' })
 const prettier = fileURLToPath(
   new URL('../node_modules/prettier/bin/prettier.cjs', import.meta.url)
 )
-const result = spawnSync(process.execPath, [prettier, '--check', '--ignore-unknown', ...files], {
+const result = spawnSync(process.execPath, [prettier, mode, '--ignore-unknown', ...files], {
   stdio: 'inherit'
 })
 

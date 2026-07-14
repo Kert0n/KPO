@@ -7,6 +7,7 @@
     "node": ">=24"
   },
   "scripts": {
+    "prepare": "husky",
     "dev": "vitepress dev",
     "dev:host": "vitepress dev --host 0.0.0.0",
     "prebuild": "node .vitepress/scripts/assert-node-version.mjs && node .vitepress/scripts/assert-content-contract.mjs",
@@ -37,13 +38,17 @@
     "kotlin:check": "npm run kotlin:extract && ./gradlew compileKotlin --no-daemon",
     "lint": "eslint . --max-warnings=0 && npm run architecture:check",
     "format:check": "prettier --check .",
-    "format:check:tracked": "node scripts/check-tracked-format.mjs",
+    "format:check:tracked": "node scripts/run-tracked-prettier.mjs --check",
+    "format:tracked": "node scripts/run-tracked-prettier.mjs --write",
     "format": "prettier --write .",
     "audit": "npm audit --audit-level=moderate",
     "verify": "npm run typecheck && npm run lint && npm run format:check && npm run workflow:check && npm test && npm run audit && npm run content:check && npm run build",
     "verify:full": "npm run verify && npm run test:ui",
     "pdf": "npm run build && node scripts/export-pdf.mjs",
     "pdf:published": "KPO_PDF_BASE_URL=https://kert0n.github.io/KPO/ node scripts/export-pdf.mjs --remote"
+  },
+  "lint-staged": {
+    "*": "prettier --write --ignore-unknown"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
@@ -58,6 +63,8 @@
     "eslint-plugin-vue": "^10.9.2",
     "globals": "^17.7.0",
     "gray-matter": "4.0.3",
+    "husky": "9.1.7",
+    "lint-staged": "17.0.8",
     "markdown-it": "^14.3.0",
     "markdown-it-container": "4.0.0",
     "markdown-it-mathjax3": "^4.3.2",

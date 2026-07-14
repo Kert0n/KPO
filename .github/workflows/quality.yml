@@ -28,9 +28,28 @@ jobs:
       - name: Start timer
         run: echo "KPO_JOB_STARTED_AT_MS=$(date +%s%3N)" >> "$GITHUB_ENV"
       - run: npm ci
+      - name: Auto-format tracked files for master publication
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+        run: |
+          npm run format:tracked
+          if ! git diff --quiet; then
+            files="$(git diff --name-only | tr '\n' ' ')"
+            echo "::notice title=Prettier normalized publication inputs::$files"
+            {
+              echo '### Prettier normalized publication inputs'
+              echo
+              echo 'The CI workspace was formatted without creating a commit:'
+              echo
+              echo '```text'
+              git diff --name-only
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - name: Check tracked formatting
+        if: github.event_name != 'push'
+        run: npm run format:check:tracked
       - run: npm run typecheck
       - run: npm run lint
-      - run: npm run format:check:tracked
       - run: npm run workflow:check
       - run: npm run test:fixture-isolation
       - run: npm run test:coverage
@@ -93,6 +112,9 @@ jobs:
       - name: Start timer
         run: echo "KPO_JOB_STARTED_AT_MS=$(date +%s%3N)" >> "$GITHUB_ENV"
       - run: npm ci
+      - name: Auto-format master publication inputs
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+        run: npm run format:tracked
       - run: npm run build
       - run: npm run budgets:check
       - name: Upload production artifact

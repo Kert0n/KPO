@@ -8,6 +8,7 @@ Dependabot запускается раз в неделю для npm, Gradle wrap
 
 ```sh
 npm ci
+npm run format:check:tracked
 npm run typecheck
 npm run lint
 npm run workflow:check
@@ -20,6 +21,19 @@ npm run test:ui
 npm run test:characterization:prebuilt
 npm run kotlin:check
 ```
+
+`npm install` и `npm ci` восстанавливают Husky pre-commit hook через lifecycle-скрипт `prepare`.
+Hook запускает lint-staged и форматирует только staged-файлы, не затрагивая исключения из
+`.prettierignore`. Если hooks были отключены локально, перед push необходимо вручную выполнить:
+
+```sh
+npm run format:tracked
+npm run format:check:tracked
+```
+
+Pull request Dependabot проходит тот же строгий `format:check:tracked`, что и остальные PR.
+Formatting gate нельзя обходить через отключение шага, расширение `.prettierignore` или ослабление
+workflow assertions: сначала исправляется сам candidate tree.
 
 Visual baseline не обновляется только потому, что изменился toolchain. Сначала проверяется actual/diff artifact и воспроизводимость; изменение baseline допустимо лишь при подтверждённом изменении интерфейса.
 

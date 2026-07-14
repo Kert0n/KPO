@@ -222,8 +222,14 @@ TypeScript, security audit, unit-тесты и сборка объединены
 ```sh
 npm run verify
 npm run verify:full
+npm run format:tracked
 npm run format:check:tracked
 ```
+
+После `npm install` или `npm ci` Husky устанавливает pre-commit hook: lint-staged запускает
+Prettier только для staged-файлов и повторно добавляет их в commit. Файлы из
+`.prettierignore`, включая `content/`, CSS и PDF-артефакты, hook не изменяет. В pull request
+форматирование проверяется строго через `format:check:tracked`.
 
 Browser- и visual-регрессии Playwright проверяют только служебные fixture-страницы; учебные лекции и extras проверяются отдельными content-gates:
 
@@ -256,7 +262,15 @@ npm run pdf
 
 ## Публикация на GitHub Pages
 
-Workflow `.github/workflows/deploy.yml` собирает сайт при пуше в `master` и публикует `.vitepress/dist` через GitHub Pages. Репозиторий должен называться `KPO`, потому что в `.vitepress/config.mts` задан `base: '/KPO/'`.
+При push в `master` workflow `.github/workflows/quality.yml` нормализует tracked-файлы в
+изолированном CI workspace, выполняет все quality gates, собирает сайт и загружает проверенный
+`production-dist`. Если Prettier что-то изменил, список файлов появляется в Job Summary, но CI не
+создаёт скрытый commit и не переписывает историю `master`.
+
+Workflow `.github/workflows/deploy.yml` запускается только после успешных Quality gates, скачивает
+тот же `production-dist` и публикует его через GitHub Pages. Pull request и ручной запуск Quality
+gates остаются строгими: неотформатированный tracked-файл приводит к ошибке до merge. Репозиторий
+должен называться `KPO`, потому что в `.vitepress/config.mts` задан `base: '/KPO/'`.
 
 Адрес опубликованного сайта: https://kert0n.github.io/KPO/
 
