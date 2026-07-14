@@ -31,6 +31,8 @@ describe('content contract', () => {
     expect(
       classifyMarkdownPath('content/service-pages/_internal/editorial-rubric/vitepress.md')
     ).toBe('internal')
+    expect(classifyMarkdownPath('docs/architecture.md')).toBe('internal')
+    expect(classifyMarkdownPath('report/individualnoe-zadanie.md')).toBe('internal')
   })
 
   it('rejects old root and flat content locations', () => {

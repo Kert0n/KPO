@@ -1,8 +1,8 @@
 # КПО — конспект курса
 
-Интерактивный сайт курса «Конструирование программного обеспечения» на VitePress. В репозитории лежат 14 лекций-компаньонов, вводная страница, заключение, дополнительная песочница для практики и технические материалы темы.
+Интерактивный сайт курса «Конструирование программного обеспечения» на VitePress. В репозитории лежат 14 лекций-компаньонов, вводная страница, заключение и раздел «Дополнения»: песочница для практики (`/extras/01`), автособираемый список дополнительного чтения (`/extras/02`) и дополнительные темы.
 
-Сайт поддерживает примеры на Kotlin, C#, Java и Go, Kotlin Playground, Mermaid-диаграммы, MathJax, адаптивные таблицы, Ask AI prompt-copy workflow и регрессионные UI-тесты.
+Сайт поддерживает примеры на Kotlin, C#, Java и Go с глобальным переключателем языка, Kotlin Playground, Mermaid-диаграммы, MathJax, адаптивные таблицы, Ask AI prompt-copy workflow, PDF-экспорт курса и регрессионные UI-тесты.
 
 ## Требования
 
@@ -243,6 +243,18 @@ npm run pdf
 ```
 
 Порядок обновления npm, Gradle и GitHub Actions, правила совместимости major-версий и разбор конфликтов Dependabot описаны в [`docs/dependency-maintenance.md`](docs/dependency-maintenance.md).
+
+## Документация
+
+Технические документы репозитория живут в `docs/`:
+
+- [`docs/architecture.md`](docs/architecture.md) — архитектура сайта: слои `.vitepress/shared` / theme, правила владения lifecycle и `dispose()`;
+- [`docs/content-catalog.md`](docs/content-catalog.md) — единый каталог контента: routes, порядок, inclusion policies, из которых выводятся nav/sidebar/PDF/Ask AI;
+- [`docs/markdown-contract.md`](docs/markdown-contract.md) — контракт авторского Markdown (`multi-code`, `only`, Mermaid, playground-fences);
+- [`docs/refactoring-audit.md`](docs/refactoring-audit.md) — журнал восстановления архитектуры: дефекты F-01…F-13 и P-01…P-06 с корневыми причинами, исправляющими PR и командами отката;
+- [`docs/dependency-maintenance.md`](docs/dependency-maintenance.md) — сопровождение зависимостей и Dependabot.
+
+Папка `report/` содержит материалы учебной практики: индивидуальное задание, план-график, полный отчёт и черновик отзыва руководителя. В сборку сайта они не попадают.
 
 ## Публикация на GitHub Pages
 

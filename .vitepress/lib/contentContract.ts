@@ -29,6 +29,7 @@ export function classifyMarkdownPath(path: string): ContentContractKind {
   if (/^content\/service-pages\/_internal\/[^/]+\/vitepress\.md$/.test(normalized))
     return 'internal'
   if (/^docs\/[^/]+\.md$/.test(normalized)) return 'internal'
+  if (/^report\/[^/]+\.md$/.test(normalized)) return 'internal'
 
   return 'unexpected'
 }
