@@ -250,9 +250,7 @@ npm run pdf
 
 - [`docs/architecture.md`](docs/architecture.md) — архитектура сайта: слои `.vitepress/shared` / theme, правила владения lifecycle и `dispose()`;
 - [`docs/content-catalog.md`](docs/content-catalog.md) — единый каталог контента: routes, порядок, inclusion policies, из которых выводятся nav/sidebar/PDF/Ask AI;
-- [`docs/markdown-contract.md`](docs/markdown-contract.md) — контракт авторского Markdown (`multi-code`, `only`, Mermaid, playground-fences);
-- [`docs/refactoring-audit.md`](docs/refactoring-audit.md) — журнал восстановления архитектуры: дефекты F-01…F-13 и P-01…P-06 с корневыми причинами, исправляющими PR и командами отката;
-- [`docs/dependency-maintenance.md`](docs/dependency-maintenance.md) — сопровождение зависимостей и Dependabot.
+-  [`docs/dependency-maintenance.md`](docs/dependency-maintenance.md) — сопровождение зависимостей и Dependabot.
 
 Папка `report/` содержит материалы учебной практики: индивидуальное задание, план-график, полный отчёт и черновик отзыва руководителя. В сборку сайта они не попадают.
 
