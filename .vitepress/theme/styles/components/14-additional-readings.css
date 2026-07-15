@@ -4,7 +4,17 @@
   margin-top: 2rem;
 }
 
-.kpo-additional-readings__lecture {
+.kpo-additional-readings__category {
+  display: grid;
+  gap: 1.5rem;
+}
+
+.kpo-additional-readings__sources {
+  display: grid;
+  gap: 2rem;
+}
+
+.kpo-additional-readings__source {
   border-top: 1px solid var(--vp-c-divider);
   padding-top: 1.5rem;
 }

@@ -1,5 +1,7 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { join, relative } from 'node:path'
+import { parseContentAdditionalReadings } from '../.vitepress/shared/content/additionalReadings.ts'
+import { getContentCatalog } from '../.vitepress/shared/content/contentCatalog.ts'
 const roots = ['content/lectures', 'content/extras', 'content/intro', 'README.md']
 const failures: string[] = []
 
@@ -13,12 +15,15 @@ for (const file of roots.flatMap(markdownFiles)) {
       failures.push(`${file}:mermaid-${index + 1}:${diagnostic.line}: ${diagnostic.message}`)
     }
   }
-  if (/content\/lectures\/Lec\d+\/vitepress\.md$/.test(file.replace(/\\/g, '/'))) {
-    const sectionPresent = /^##\s+Дополнительное чтение\s*$/m.test(source)
-    const hasReading = /^###\s+.+$/m.test(source) && /^\s*-\s+\[[^\]]+]\(https?:\/\//m.test(source)
-    if (sectionPresent && !hasReading) {
-      failures.push(`${file}: additional readings section has no valid groups`)
-    }
+}
+
+for (const page of getContentCatalog({ fresh: true })) {
+  if (page.kind !== 'lecture' && page.kind !== 'extra') continue
+  try {
+    parseContentAdditionalReadings(page, readFileSync(page.sourcePath, 'utf8'))
+  } catch (error) {
+    if (!(error instanceof Error)) throw error
+    failures.push(error.message)
   }
 }
 

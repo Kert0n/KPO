@@ -5,7 +5,7 @@ declare module '*.vue' {
 }
 
 declare module '*.data' {
-  const data: import('./lib/additionalReadings').LectureAdditionalReadings[]
+  const data: import('../shared/content/additionalReadings').ContentAdditionalReadings[]
   export { data }
 }
 

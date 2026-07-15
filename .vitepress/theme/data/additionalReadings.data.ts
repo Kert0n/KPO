@@ -1,26 +1,23 @@
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { defineLoader } from 'vitepress'
-import { getContentCatalog } from '../../shared/content/contentCatalog'
 import {
-  parseLectureAdditionalReadings,
-  type LectureAdditionalReadings
-} from '../lib/additionalReadings'
+  collectAdditionalReadings,
+  type ContentAdditionalReadings
+} from '../../shared/content/additionalReadings'
+import { getContentCatalog } from '../../shared/content/contentCatalog'
 
 export type {
   AdditionalReadingGroup,
   AdditionalReadingItem,
-  LectureAdditionalReadings
-} from '../lib/additionalReadings'
+  ContentAdditionalReadings
+} from '../../shared/content/additionalReadings'
 
 export default defineLoader({
-  watch: '../../../content/lectures/Lec*/vitepress.md',
-  load(): LectureAdditionalReadings[] {
-    return getContentCatalog({ fresh: true })
-      .filter((page) => page.kind === 'lecture')
-      .map((page) => resolve(process.cwd(), page.sourcePath))
-      .map((filePath) => parseLectureAdditionalReadings(filePath, readFileSync(filePath, 'utf8')))
-      .filter((reading): reading is LectureAdditionalReadings => reading !== null)
-      .sort((a, b) => a.lecture - b.lecture)
+  watch: ['../../../content/lectures/Lec*/vitepress.md', '../../../content/extras/*/vitepress.md'],
+  load(): ContentAdditionalReadings[] {
+    return collectAdditionalReadings(getContentCatalog({ fresh: true }), (page) => {
+      return readFileSync(resolve(process.cwd(), page.sourcePath), 'utf8')
+    })
   }
 })
