@@ -1168,9 +1168,8 @@ flowchart LR
 | IaC scanning | небезопасные настройки инфраструктуры | review Terraform/Kubernetes manifests | S3 bucket с `public-read` ACL — данные доступны без авторизации |
 | Compliance checks | соответствие политикам и стандартам | pipeline gates, audit reports | Сервис не прошёл audit log requirements для PCI DSS |
 
-![Предпосылки DevSecOps](assets/slide-063.png)
 
-![Цели DevSecOps](assets/slide-073.png)
+## Предпосылки и цели DevSecOps
 
 | Security как блокер в конце | Security как постоянная обратная связь |
 |---|---|
