@@ -1,3 +1,4 @@
+import type { Locator } from '@playwright/test'
 import { expect, test } from './fixtures'
 import {
   CONTENT_LAYOUT_TOKENS,
@@ -189,7 +190,12 @@ test('mermaid zoom controls adjust scale without page overflow', async ({ page }
 })
 
 test('overflowing mermaid diagrams start centered in their local viewport', async ({ page }) => {
-  for (const viewport of [LAYOUT_VIEWPORTS.mobilePhone, LAYOUT_VIEWPORTS.narrowDesktop]) {
+  for (const viewport of [
+    LAYOUT_VIEWPORTS.mobilePhone,
+    { width: 768, height: LAYOUT_VIEWPORTS.tablet.height },
+    LAYOUT_VIEWPORTS.tablet,
+    LAYOUT_VIEWPORTS.narrowDesktop
+  ]) {
     await page.setViewportSize(viewport)
     await page.goto(UI_FIXTURE_ROUTE)
     await waitForMermaid(page, { requireDiagrams: true })
@@ -217,6 +223,20 @@ test('overflowing mermaid diagrams start centered in their local viewport', asyn
 
     await expectNoPageOverflowFromVpDoc(page)
   }
+})
+
+test('a late programmatic scroll event does not claim viewport ownership', async ({ page }) => {
+  await page.setViewportSize(LAYOUT_VIEWPORTS.tablet)
+  await page.goto(UI_FIXTURE_ROUTE)
+  await waitForMermaid(page, { requireDiagrams: true })
+
+  const viewport = page.locator('.kpo-mermaid--has-overflow .kpo-mermaid__viewport').first()
+  await expectCentered(viewport)
+
+  await viewport.dispatchEvent('scroll')
+  await page.setViewportSize({ width: 768, height: LAYOUT_VIEWPORTS.tablet.height })
+
+  await expectCentered(viewport)
 })
 
 test('manual mermaid scroll is preserved across zoom and reset recenters', async ({ page }) => {
@@ -269,6 +289,18 @@ test('manual mermaid scroll is preserved across zoom and reset recenters', async
     })
     .toBe(true)
 })
+
+async function expectCentered(viewport: Locator): Promise<void> {
+  await expect
+    .poll(async () => {
+      return viewport.evaluate((node) => {
+        const element = node as HTMLElement
+        const expected = Math.round((element.scrollWidth - element.clientWidth) / 2)
+        return Math.abs(Math.round(element.scrollLeft) - expected)
+      })
+    })
+    .toBeLessThanOrEqual(2)
+}
 
 test('rapid mermaid zoom resize and reset publish only the latest layout', async ({ page }) => {
   await page.setViewportSize(LAYOUT_VIEWPORTS.mobilePhone)

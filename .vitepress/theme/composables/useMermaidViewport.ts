@@ -7,6 +7,7 @@ import {
   resolveScrollLeftForCenterRatio,
   type MermaidViewportMode
 } from '../lib/mermaidLayoutModel'
+import { waitAnimationFrames } from '../lib/viewportAnchor'
 
 export type MermaidLayoutResult = 'applied' | 'stale'
 
@@ -31,9 +32,9 @@ export function useMermaidViewport(options: {
   })
 
   let resizeObserver: ResizeObserver | null = null
-  let programmaticScrollFrame: number | null = null
-  let isProgrammaticScroll = false
   let programmaticScrollLeft: number | null = null
+  let lastObservedScrollLeft: number | null = null
+  let pendingCenterRatio: number | null = null
   let disposed = false
   let layoutGeneration = 0
 
@@ -51,23 +52,31 @@ export function useMermaidViewport(options: {
     layoutGeneration += 1
     resizeObserver?.disconnect()
     resizeObserver = null
-    if (programmaticScrollFrame !== null) window.cancelAnimationFrame(programmaticScrollFrame)
-    programmaticScrollFrame = null
+    programmaticScrollLeft = null
+    lastObservedScrollLeft = null
+    pendingCenterRatio = null
   }
 
   async function syncLayout(
     syncOptions: { forceCenter?: boolean; centerRatio?: number | null } = {}
   ): Promise<MermaidLayoutResult> {
+    if (syncOptions.centerRatio !== undefined && syncOptions.centerRatio !== null) {
+      pendingCenterRatio = syncOptions.centerRatio
+    }
+    const centerRatio = pendingCenterRatio
     const generation = ++layoutGeneration
     await nextTick()
+    if (isStale(generation)) return 'stale'
+    await waitAnimationFrames(2)
     if (isStale(generation)) return 'stale'
     updateMeasurements()
     if (isStale(generation)) return 'stale'
     updateOverflowState()
     if (isStale(generation)) return 'stale'
 
-    if (syncOptions.centerRatio !== undefined && syncOptions.centerRatio !== null) {
-      restoreCenterRatio(syncOptions.centerRatio)
+    if (centerRatio !== null) {
+      restoreCenterRatio(centerRatio)
+      if (pendingCenterRatio === centerRatio) pendingCenterRatio = null
       return isStale(generation) ? 'stale' : 'applied'
     }
     centerIfNeeded(Boolean(syncOptions.forceCenter))
@@ -153,29 +162,31 @@ export function useMermaidViewport(options: {
   function setScrollLeft(scrollLeft: number): void {
     const viewport = options.viewport.value
     if (!viewport) return
-    isProgrammaticScroll = true
     viewport.scrollLeft = scrollLeft
     programmaticScrollLeft = viewport.scrollLeft
-    if (programmaticScrollFrame !== null) window.cancelAnimationFrame(programmaticScrollFrame)
-    programmaticScrollFrame = window.requestAnimationFrame(() => {
-      programmaticScrollFrame = null
-      isProgrammaticScroll = false
-      programmaticScrollLeft = null
-    })
+    lastObservedScrollLeft = viewport.scrollLeft
   }
 
   function onScroll(): void {
     const viewport = options.viewport.value
     if (
-      isProgrammaticScroll &&
       viewport &&
       programmaticScrollLeft !== null &&
       Math.abs(viewport.scrollLeft - programmaticScrollLeft) <= 2
     ) {
+      lastObservedScrollLeft = viewport.scrollLeft
       return
     }
-    isProgrammaticScroll = false
+    if (
+      viewport &&
+      lastObservedScrollLeft !== null &&
+      Math.abs(viewport.scrollLeft - lastObservedScrollLeft) <= 2
+    ) {
+      return
+    }
     programmaticScrollLeft = null
+    lastObservedScrollLeft = viewport?.scrollLeft ?? null
+    pendingCenterRatio = null
     userScrolledViewport.value = true
     layoutGeneration += 1
   }
