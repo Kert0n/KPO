@@ -9,7 +9,6 @@ import { chromium } from 'playwright'
 import { PDFDocument } from 'pdf-lib'
 import { contentPagesFor } from '../.vitepress/shared/content/contentCatalog.ts'
 import { buildPdfPagePlan } from '../.vitepress/shared/content/contentPolicy.ts'
-import { computePdfSourceFingerprint, PDF_FINGERPRINT_PREFIX } from './pdf-source-fingerprint.mts'
 
 const root = resolve(fileURLToPath(new URL('..', import.meta.url)))
 const remote = process.argv.includes('--remote')
@@ -19,7 +18,6 @@ const outputDirectory = join(root, 'output', 'pdf')
 const pagesDirectory = join(outputDirectory, 'pages')
 
 const PDF_ROUTES = buildPdfPagePlan(contentPagesFor('pdf'))
-const sourceFingerprint = await computePdfSourceFingerprint(root)
 
 if (remote && !configuredBaseUrl) {
   throw new Error('KPO_PDF_BASE_URL is required with --remote')
@@ -178,7 +176,6 @@ async function waitForMathJax(page) {
 async function mergePdfFiles(pageFiles, outputFile) {
   const merged = await PDFDocument.create()
   merged.setTitle('КПО — конспект курса')
-  merged.setSubject(`${PDF_FINGERPRINT_PREFIX}${sourceFingerprint}`)
 
   for (const pageFile of pageFiles) {
     const source = await PDFDocument.load(await readFile(pageFile))

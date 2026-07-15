@@ -2,9 +2,7 @@ import { appendFileSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 
-export type CiChangeProfile = 'content' | 'generated' | 'full'
-
-export const GENERATED_PDF_PATH = 'output/pdf/kpo-course.pdf'
+export type CiChangeProfile = 'content' | 'full'
 
 const CONTENT_ROOTS = [
   'content/home/',
@@ -18,10 +16,7 @@ export function classifyChangedPaths(paths: readonly string[]): CiChangeProfile 
   const normalized = [...new Set(paths.map(normalizePath).filter(Boolean))]
   if (normalized.length === 0) return 'full'
 
-  const sourcePaths = normalized.filter((path) => path !== GENERATED_PDF_PATH)
-  if (sourcePaths.length === 0) return 'generated'
-
-  return sourcePaths.every(isContentPath) ? 'content' : 'full'
+  return normalized.every(isContentPath) ? 'content' : 'full'
 }
 
 export function isContentPath(path: string): boolean {

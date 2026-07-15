@@ -1,2 +1,1 @@
 npx lint-staged
-node --experimental-strip-types scripts/sync-pdf-on-commit.mts
