@@ -42,6 +42,7 @@ export function useMermaidViewport(options: {
     disposed = false
     updateMeasurements()
     resizeObserver = new ResizeObserver(() => {
+      reconcileResizeImmediately()
       void syncLayout()
     })
     if (options.root.value) resizeObserver.observe(options.root.value)
@@ -167,6 +168,36 @@ export function useMermaidViewport(options: {
     lastObservedScrollLeft = viewport.scrollLeft
   }
 
+  function reconcileResizeImmediately(): void {
+    const viewport = options.viewport.value
+    if (!viewport) return
+
+    // ResizeObserver runs before paint. Keep an unowned viewport centered for that
+    // paint as well; syncLayout verifies the settled geometry on the following frames.
+    if (lastObservedScrollLeft !== null) {
+      const maxScrollLeft = Math.max(0, viewport.scrollWidth - viewport.clientWidth)
+      const expectedScrollLeft = clamp(lastObservedScrollLeft, 0, maxScrollLeft)
+      if (Math.abs(viewport.scrollLeft - expectedScrollLeft) > 2) {
+        claimUserScroll(viewport)
+        return
+      }
+    }
+
+    if (userScrolledViewport.value) return
+    const overflow = resolveMermaidOverflow({
+      clientWidth: viewport.clientWidth,
+      scrollWidth: viewport.scrollWidth
+    })
+    setScrollLeft(
+      overflow.hasOverflowX
+        ? resolveCenteredScrollLeft({
+            clientWidth: viewport.clientWidth,
+            scrollWidth: viewport.scrollWidth
+          })
+        : 0
+    )
+  }
+
   function onScroll(): void {
     const viewport = options.viewport.value
     if (
@@ -184,8 +215,12 @@ export function useMermaidViewport(options: {
     ) {
       return
     }
+    if (viewport) claimUserScroll(viewport)
+  }
+
+  function claimUserScroll(viewport: HTMLElement): void {
     programmaticScrollLeft = null
-    lastObservedScrollLeft = viewport?.scrollLeft ?? null
+    lastObservedScrollLeft = viewport.scrollLeft
     pendingCenterRatio = null
     userScrolledViewport.value = true
     layoutGeneration += 1
