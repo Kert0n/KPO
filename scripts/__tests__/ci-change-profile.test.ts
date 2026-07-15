@@ -2,9 +2,17 @@ import { describe, expect, it } from 'vitest'
 import { classifyChangedPaths, isContentPath, profileForEvent } from '../ci-change-profile.mts'
 
 describe('CI change profiles', () => {
-  it('classifies lecture text and its generated PDF as content', () => {
+  it('classifies lecture text as content', () => {
+    expect(classifyChangedPaths(['content/lectures/Lec4/vitepress.md'])).toBe('content')
+  })
+
+  it('classifies multiple content paths as content', () => {
     expect(
-      classifyChangedPaths(['content/lectures/Lec4/vitepress.md', 'output/pdf/kpo-course.pdf'])
+      classifyChangedPaths([
+        'content/intro/vitepress.md',
+        'content/lectures/Lec4/assets/slide.png',
+        'content/conclusion/vitepress.md'
+      ])
     ).toBe('content')
   })
 
@@ -32,8 +40,8 @@ describe('CI change profiles', () => {
     expect(classifyChangedPaths([path])).toBe('full')
   })
 
-  it('classifies a PDF-only change as generated', () => {
-    expect(classifyChangedPaths(['output/pdf/kpo-course.pdf'])).toBe('generated')
+  it('classifies unknown paths as full', () => {
+    expect(classifyChangedPaths(['output/unknown.bin'])).toBe('full')
   })
 
   it('fails safely for empty changes and manual runs', () => {
