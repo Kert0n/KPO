@@ -37,6 +37,21 @@ export async function waitForStableUi(page: Page): Promise<void> {
         requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
       })
   )
+  await expect
+    .poll(
+      () =>
+        page.locator('.kpo-mermaid__viewport').evaluateAll((viewports) => {
+          return viewports.flatMap((node, index) => {
+            const viewport = node as HTMLElement
+            if (viewport.scrollWidth <= viewport.clientWidth + 1) return []
+            const centered = (viewport.scrollWidth - viewport.clientWidth) / 2
+            const offset = viewport.scrollLeft - centered
+            return Math.abs(offset) <= 2 ? [] : [{ index, offset }]
+          })
+        }),
+      { message: 'Overflowing Mermaid diagrams must settle within 2 px of center' }
+    )
+    .toEqual([])
 }
 
 export async function hideSidebar(page: Page): Promise<void> {

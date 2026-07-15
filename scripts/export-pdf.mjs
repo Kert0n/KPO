@@ -68,6 +68,8 @@ try {
     await waitForMermaid(page, route)
     await waitForMathJax(page)
     await page.emulateMedia({ media: 'print' })
+    await waitAnimationFrames(page, 2)
+    await waitForMermaid(page, route)
 
     await page.pdf({
       path: pageFile,
@@ -149,7 +151,15 @@ async function waitForMermaid(page, route) {
     () => {
       const diagrams = [...document.querySelectorAll('.kpo-mermaid')]
       return diagrams.every((diagram) => {
-        return diagram.querySelector('svg') || diagram.querySelector('.kpo-mermaid__error')
+        if (diagram.querySelector('.kpo-mermaid__error')) return true
+        if (!diagram.querySelector('svg')) return false
+
+        const viewport = diagram.querySelector('.kpo-mermaid__viewport')
+        if (!(viewport instanceof HTMLElement)) return true
+        if (viewport.scrollWidth <= viewport.clientWidth + 1) return true
+
+        const centered = (viewport.scrollWidth - viewport.clientWidth) / 2
+        return Math.abs(viewport.scrollLeft - centered) <= 2
       })
     },
     null,
@@ -163,6 +173,27 @@ async function waitForMermaid(page, route) {
   if (errors.length > 0) {
     throw new Error(`Mermaid render failed on ${route}: ${errors.join(' | ')}`)
   }
+}
+
+async function waitAnimationFrames(page, frames) {
+  await page.evaluate(
+    (count) =>
+      new Promise((resolvePromise) => {
+        let remaining = Math.max(0, Math.floor(count))
+        if (remaining === 0) {
+          resolvePromise()
+          return
+        }
+
+        const step = () => {
+          remaining -= 1
+          if (remaining === 0) resolvePromise()
+          else requestAnimationFrame(step)
+        }
+        requestAnimationFrame(step)
+      }),
+    frames
+  )
 }
 
 async function waitForMathJax(page) {
