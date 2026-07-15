@@ -27,6 +27,12 @@ export async function setTheme(page: Page, theme: 'light' | 'dark'): Promise<voi
 
 export async function waitForStableUi(page: Page): Promise<void> {
   await page.locator('.vp-doc').first().waitFor({ state: 'attached' })
+  await page.addStyleTag({
+    content: `
+      html { scrollbar-width: none !important; }
+      html::-webkit-scrollbar { display: none !important; }
+    `
+  })
   await page.waitForFunction(() => {
     const diagrams = [...document.querySelectorAll('.kpo-mermaid')]
     return diagrams.every((diagram) => diagram.querySelector('svg, .kpo-mermaid__error'))
