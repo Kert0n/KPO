@@ -45,6 +45,7 @@
     "verify": "npm run typecheck && npm run lint && npm run format:check && npm run workflow:check && npm test && npm run audit && npm run content:check && npm run build",
     "verify:full": "npm run verify && npm run test:ui",
     "pdf": "npm run build && node scripts/export-pdf.mjs",
+    "pdf:check": "node --experimental-strip-types scripts/check-pdf-fingerprint.mts",
     "pdf:published": "KPO_PDF_BASE_URL=https://kert0n.github.io/KPO/ node scripts/export-pdf.mjs --remote"
   },
   "lint-staged": {

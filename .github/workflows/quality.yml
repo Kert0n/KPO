@@ -4,6 +4,8 @@ on:
   pull_request:
   push:
     branches: [master]
+    paths-ignore:
+      - 'output/pdf/**'
   workflow_dispatch:
 
 concurrency:
@@ -17,8 +19,32 @@ env:
   NODE_VERSION: '24'
 
 jobs:
-  quality:
+  changes:
     runs-on: ubuntu-latest
+    outputs:
+      profile: ${{ steps.classify.outputs.profile }}
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - name: Classify changed paths
+        id: classify
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: >-
+          node --experimental-strip-types scripts/ci-change-profile.mts
+          --event "$EVENT_NAME" --base "$BASE_SHA" --head "$HEAD_SHA"
+
+  quality:
+    needs: changes
+    runs-on: ubuntu-latest
+    env:
+      CI_PROFILE: ${{ needs.changes.outputs.profile }}
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
@@ -29,7 +55,7 @@ jobs:
         run: echo "KPO_JOB_STARTED_AT_MS=$(date +%s%3N)" >> "$GITHUB_ENV"
       - run: npm ci
       - name: Auto-format tracked files for master publication
-        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+        if: env.CI_PROFILE == 'full' && github.event_name == 'push' && github.ref == 'refs/heads/master'
         run: |
           npm run format:tracked
           if ! git diff --quiet; then
@@ -46,15 +72,24 @@ jobs:
             } >> "$GITHUB_STEP_SUMMARY"
           fi
       - name: Check tracked formatting
-        if: github.event_name != 'push'
+        if: env.CI_PROFILE == 'full' && github.event_name != 'push'
         run: npm run format:check:tracked
-      - run: npm run typecheck
-      - run: npm run lint
-      - run: npm run workflow:check
-      - run: npm run test:fixture-isolation
-      - run: npm run test:coverage
-      - run: npm run content:check
-      - run: npm run audit
+      - if: env.CI_PROFILE == 'full'
+        run: npm run typecheck
+      - if: env.CI_PROFILE == 'full'
+        run: npm run lint
+      - if: env.CI_PROFILE == 'full'
+        run: npm run workflow:check
+      - if: env.CI_PROFILE == 'full'
+        run: npm run test:fixture-isolation
+      - if: env.CI_PROFILE == 'full'
+        run: npm run test:coverage
+      - if: env.CI_PROFILE != 'generated'
+        run: npm run content:check
+      - name: Check tracked PDF freshness
+        run: npm run pdf:check
+      - if: env.CI_PROFILE == 'full'
+        run: npm run audit
       - name: Record timing
         if: always()
         run: node scripts/record-ci-timing.mjs .ci-artifacts/timing/quality.json quality "$KPO_JOB_STARTED_AT_MS"
@@ -70,22 +105,32 @@ jobs:
           retention-days: 7
 
   kotlin-playground:
+    needs: changes
     runs-on: ubuntu-latest
+    env:
+      CI_PROFILE: ${{ needs.changes.outputs.profile }}
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        if: env.CI_PROFILE != 'generated'
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
       - uses: actions/setup-java@0f481fcb613427c0f801b606911222b5b6f3083a # v5
+        if: env.CI_PROFILE != 'generated'
         with:
           distribution: temurin
           java-version: '21'
           cache: gradle
       - name: Start timer
         run: echo "KPO_JOB_STARTED_AT_MS=$(date +%s%3N)" >> "$GITHUB_ENV"
-      - run: npm ci
-      - run: npm run kotlin:check
+      - if: env.CI_PROFILE != 'generated'
+        run: npm ci
+      - if: env.CI_PROFILE != 'generated'
+        run: npm run kotlin:check
+      - name: Skip generated-only Kotlin checks
+        if: env.CI_PROFILE == 'generated'
+        run: echo "Kotlin checks are not affected by a generated PDF-only change."
       - name: Record timing
         if: always()
         run: node scripts/record-ci-timing.mjs .ci-artifacts/timing/kotlin-playground.json kotlin-playground "$KPO_JOB_STARTED_AT_MS"
@@ -101,24 +146,33 @@ jobs:
           retention-days: 7
 
   build:
-    needs: quality
+    needs: [changes, quality]
     runs-on: ubuntu-latest
+    env:
+      CI_PROFILE: ${{ needs.changes.outputs.profile }}
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        if: env.CI_PROFILE != 'generated'
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
       - name: Start timer
         run: echo "KPO_JOB_STARTED_AT_MS=$(date +%s%3N)" >> "$GITHUB_ENV"
-      - run: npm ci
+      - if: env.CI_PROFILE != 'generated'
+        run: npm ci
       - name: Auto-format master publication inputs
-        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+        if: env.CI_PROFILE == 'full' && github.event_name == 'push' && github.ref == 'refs/heads/master'
         run: npm run format:tracked
-      - run: npm run build
-      - run: npm run budgets:check
+      - if: env.CI_PROFILE != 'generated'
+        run: npm run build
+      - if: env.CI_PROFILE != 'generated'
+        run: npm run budgets:check
+      - name: Skip generated-only site build
+        if: env.CI_PROFILE == 'generated'
+        run: echo "The site is not affected by a generated PDF-only change."
       - name: Upload production artifact
-        if: success()
+        if: success() && env.CI_PROFILE != 'generated'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: production-dist
@@ -138,7 +192,8 @@ jobs:
           retention-days: 7
 
   browser-chromium:
-    needs: build
+    if: needs.changes.outputs.profile == 'full'
+    needs: [changes, build]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -183,7 +238,8 @@ jobs:
           retention-days: 7
 
   browser-smoke:
-    needs: build
+    if: needs.changes.outputs.profile == 'full'
+    needs: [changes, build]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -228,7 +284,8 @@ jobs:
           retention-days: 7
 
   browser-visual:
-    needs: build
+    if: needs.changes.outputs.profile == 'full'
+    needs: [changes, build]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -274,18 +331,26 @@ jobs:
 
   browser:
     if: always()
-    needs: [browser-chromium, browser-smoke, browser-visual]
+    needs: [changes, browser-chromium, browser-smoke, browser-visual]
     runs-on: ubuntu-latest
+    env:
+      CI_PROFILE: ${{ needs.changes.outputs.profile }}
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - name: Start timer
         run: echo "KPO_JOB_STARTED_AT_MS=$(date +%s%3N)" >> "$GITHUB_ENV"
       - name: Require all browser suites
         env:
+          CHANGES_RESULT: ${{ needs.changes.result }}
           CHROMIUM_RESULT: ${{ needs.browser-chromium.result }}
           SMOKE_RESULT: ${{ needs.browser-smoke.result }}
           VISUAL_RESULT: ${{ needs.browser-visual.result }}
         run: |
+          test "$CHANGES_RESULT" = success
+          if [ "$CI_PROFILE" != full ]; then
+            echo "Browser suites are not affected by the $CI_PROFILE CI profile."
+            exit 0
+          fi
           test "$CHROMIUM_RESULT" = success
           test "$SMOKE_RESULT" = success
           test "$VISUAL_RESULT" = success

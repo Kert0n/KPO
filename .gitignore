@@ -41,4 +41,5 @@ content/service-pages/*/*
 !content/service-pages/_internal/
 !content/service-pages/_internal/**
 /.lecture-tree/
-output/pdf/
+output/pdf/*
+!output/pdf/kpo-course.pdf
