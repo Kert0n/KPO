@@ -721,14 +721,3 @@ Simon Willison - про безопасность и агентов, Gergely Oros
 - [Anthropic: Beyond permission prompts](https://www.anthropic.com/engineering/claude-code-sandboxing) - описывает
   filesystem/network sandbox и scoped git-доступ как альтернативу частым approvals; это реализация одного вендора, а не
   универсальный security standard.
-
-### GPT‑5.6: стоимость и признанные проблемы запуска
-
-- [OpenAI: GPT‑5.6 API models and pricing](https://developers.openai.com/api/docs/models) - первичный источник тарифов
-  Sol, Terra и Luna; цена токена не равна стоимости принятой задачи.
-- [Thibault Sottiaux: временное изменение usage limit](https://x.com/thsottiaux/status/2076365965915467978) - первичный
-  продуктовый комментарий о снятии пятичасового лимита и оптимизациях; относится к подписочной квоте, не к API-биллингу.
-- [Thibault Sottiaux: context limit, reasoning и multi-agent](https://x.com/thsottiaux/status/2076495156757577895) -
-  первичное признание конкретных проблем конфигурации запуска; не подтверждает независимый замер output-токенов Terra.
-- [Codex Best Practices](https://learn.chatgpt.com/guides/best-practices) - текущая официальная рекомендация связывает
-  Extra High с длинными agentic-задачами; это общий продуктовый ориентир, который нужно перепроверять собственным eval.
