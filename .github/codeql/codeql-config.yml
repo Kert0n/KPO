@@ -1,0 +1,23 @@
+name: KPO CodeQL config
+
+# security-and-quality — самый широкий встроенный набор: security-extended
+# плюс запросы на качество кода (мёртвый код, недостижимые ветки, кривые
+# сравнения). Результаты попадают во вкладку Security → Code scanning.
+queries:
+  - uses: security-and-quality
+
+# Сканируем только исходники. Всё перечисленное ниже — артефакты сборки,
+# сгенерированный код и вендоренные зависимости: они дают шум, а чинить
+# их всё равно нужно в источнике.
+paths-ignore:
+  - node_modules
+  - .vitepress/cache
+  - .vitepress/dist
+  - .generated
+  - build
+  - coverage
+  - output
+  - report
+  - test-results
+  - analysis
+  - public
