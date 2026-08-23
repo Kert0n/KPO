@@ -65,7 +65,7 @@
     "gray-matter": "4.0.3",
     "husky": "9.1.7",
     "lint-staged": "17.3.0",
-    "markdown-it": "^14.3.0",
+    "markdown-it": "^15.0.0",
     "markdown-it-container": "4.0.0",
     "markdown-it-mathjax3": "^4.3.2",
     "pdf-lib": "^1.17.1",
