@@ -29,7 +29,7 @@ const { svg, failed, errorMessage, rendering, viewBoxWidth, viewBoxHeight } = re
 const root = ref<HTMLElement | null>(null)
 const viewport = ref<HTMLElement | null>(null)
 const viewportController = useMermaidViewport({ root, viewport })
-const { hasOverflowX } = viewportController
+const { hasOverflowX, layoutSettled } = viewportController
 const zoom = useMermaidZoom({ viewBoxWidth, viewBoxHeight, viewport: viewportController })
 const { manualScale, scaleLabel, canvasStyle, zoomOut, zoomIn, resetScale } = zoom
 const hovered = ref(false)
@@ -46,6 +46,14 @@ onBeforeUnmount(() => {
 })
 
 watch(isDark, (value) => void render(value), { flush: 'post' })
+
+/**
+ * Диаграмма занята не только пока её рисует mermaid, но и пока не применена
+ * раскладка: SVG уже в DOM, а масштаб с центровкой ещё пересчитываются.
+ * Класс kpo-mermaid--rendering намеренно оставлен на одном rendering — он
+ * управляет стилями канваса, и расширение дало бы мигание на каждом ресайзе.
+ */
+const busy = computed(() => rendering.value || (Boolean(svg.value) && !layoutSettled.value))
 
 const controlsVisible = computed(() => {
   return shouldShowMermaidToolbar({
@@ -120,7 +128,7 @@ function updateTextRisk(): void {
       'kpo-mermaid--text-risk': textRisk,
       'kpo-mermaid--rendering': rendering
     }"
-    :aria-busy="rendering"
+    :aria-busy="busy"
     @mouseenter="hovered = true"
     @mouseleave="hovered = false"
     @focusin="focusWithin = true"

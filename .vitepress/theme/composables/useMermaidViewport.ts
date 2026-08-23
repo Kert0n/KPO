@@ -19,6 +19,13 @@ export function useMermaidViewport(options: {
   const viewportMode = ref<MermaidViewportMode>('desktop')
   const hasOverflowX = ref(false)
   const userScrolledViewport = ref(false)
+  /**
+   * false, пока хотя бы один syncLayout в полёте. Появления SVG в DOM
+   * недостаточно, чтобы считать диаграмму готовой: между ним и применённой
+   * раскладкой лежат nextTick и два кадра, за которые пересчитываются масштаб
+   * и центровка. Скриншот, снятый в этом окне, поймает промежуточное состояние.
+   */
+  const layoutSettled = ref(false)
   const scaleConfig = ref<{
     desktopMinScale: number
     mobileMinScale: number
@@ -37,6 +44,7 @@ export function useMermaidViewport(options: {
   let pendingCenterRatio: number | null = null
   let disposed = false
   let layoutGeneration = 0
+  let pendingLayouts = 0
 
   function start(): void {
     disposed = false
@@ -61,6 +69,23 @@ export function useMermaidViewport(options: {
   async function syncLayout(
     syncOptions: { forceCenter?: boolean; centerRatio?: number | null } = {}
   ): Promise<MermaidLayoutResult> {
+    // Счётчик, а не флаг: ResizeObserver умеет запустить второй проход, пока
+    // первый ещё идёт. Раскладка считается устоявшейся, когда завершился
+    // последний из них.
+    pendingLayouts += 1
+    layoutSettled.value = false
+    try {
+      return await runLayout(syncOptions)
+    } finally {
+      pendingLayouts -= 1
+      if (pendingLayouts === 0) layoutSettled.value = true
+    }
+  }
+
+  async function runLayout(syncOptions: {
+    forceCenter?: boolean
+    centerRatio?: number | null
+  }): Promise<MermaidLayoutResult> {
     if (syncOptions.centerRatio !== undefined && syncOptions.centerRatio !== null) {
       pendingCenterRatio = syncOptions.centerRatio
     }
@@ -240,6 +265,7 @@ export function useMermaidViewport(options: {
     viewportMode,
     hasOverflowX,
     userScrolledViewport,
+    layoutSettled,
     scaleConfig,
     start,
     dispose,
