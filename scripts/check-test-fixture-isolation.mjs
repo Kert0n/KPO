@@ -5,20 +5,34 @@ const roots = ['tests', '.vitepress']
 const testFiles = roots
   .flatMap(walk)
   .filter((file) => /(?:__tests__\/.*\.test\.ts|\.(?:test|spec)\.ts)$/.test(file))
+// Проверки ищут запрещённое в исходнике теста, поэтому совпадение в любом
+// месте файла — это цель, а не упущение. Продакшн-URL сравнивается как строка:
+// экранировать в регулярке каждую точку и слэш незачем, а регулярка в форме
+// URL вдобавок читается статическим анализом как проверка origin без якорей
+// (CodeQL js/regex/missing-regexp-anchor).
+const PRODUCTION_URL = 'https://kert0n.github.io/kpo/'
 const forbidden = [
-  { name: 'production URL', pattern: /https:\/\/kert0n\.github\.io\/KPO\//i },
-  { name: 'published page browser route', pattern: /page\.goto\(\s*['"](?:intro|lectures\/)/ },
+  { name: 'production URL', matches: (source) => source.toLowerCase().includes(PRODUCTION_URL) },
+  {
+    name: 'published page browser route',
+    matches: (source) => /page\.goto\(\s*['"](?:intro|lectures\/)/.test(source)
+  },
   {
     name: 'real lecture filesystem scan',
-    pattern:
-      /(?:readFileSync|readdirSync|statSync|existsSync)[\s\S]{0,120}content[\\/]['"`, ]*(?:lectures|extras|intro)/
+    matches: (source) =>
+      /(?:readFileSync|readdirSync|statSync|existsSync)[\s\S]{0,120}content[\\/]['"`, ]*(?:lectures|extras|intro)/.test(
+        source
+      )
   },
-  { name: 'production catalog lookup', pattern: /(?:getContentCatalog|contentPagesFor)\(\s*\)/ }
+  {
+    name: 'production catalog lookup',
+    matches: (source) => /(?:getContentCatalog|contentPagesFor)\(\s*\)/.test(source)
+  }
 ]
 const failures = testFiles.flatMap((file) => {
   const source = readFileSync(file, 'utf8')
   return forbidden
-    .filter(({ pattern }) => pattern.test(source))
+    .filter(({ matches }) => matches(source))
     .map(({ name }) => `${relative(process.cwd(), file)}: ${name}`)
 })
 
