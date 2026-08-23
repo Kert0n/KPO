@@ -1,0 +1,63 @@
+name: Security scanning
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+  schedule:
+    # Понедельник, 03:41 UTC — раньше maintenance (04:17), чтобы свежие
+    # advisory успевали появиться до еженедельного прогона dependabot.
+    - cron: '41 3 * * 1'
+  workflow_dispatch:
+
+concurrency:
+  group: security-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  codeql:
+    name: CodeQL (${{ matrix.language }})
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # Обязательно, иначе SARIF не зальётся во вкладку Security.
+      security-events: write
+      # CodeQL читает статусы прогонов, чтобы отличать PR от базовой ветки.
+      actions: read
+    strategy:
+      fail-fast: false
+      matrix:
+        # javascript-typescript покрывает .vitepress, scripts и tests;
+        # actions разбирает сами workflow на предмет инъекций в run-блоки.
+        language: [javascript-typescript, actions]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@db488ddef3bf6cb639b32c2e9a7c0a7ea8271d28 # v4.37.8
+        with:
+          languages: ${{ matrix.language }}
+          config-file: .github/codeql/codeql-config.yml
+      - name: Analyze
+        uses: github/codeql-action/analyze@db488ddef3bf6cb639b32c2e9a7c0a7ea8271d28 # v4.37.8
+        with:
+          category: /language:${{ matrix.language }}
+
+  dependency-review:
+    name: Dependency review
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Review dependency changes
+        uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
+        with:
+          # Тот же порог, что и у `npm run audit`, чтобы PR не проходил
+          # проверку, которую локальный verify завалит.
+          fail-on-severity: moderate
+          comment-summary-in-pr: on-failure
