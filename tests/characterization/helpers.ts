@@ -31,6 +31,16 @@ export async function waitForStableUi(page: Page): Promise<void> {
     const diagrams = [...document.querySelectorAll('.kpo-mermaid')]
     return diagrams.every((diagram) => diagram.querySelector('svg, .kpo-mermaid__error'))
   })
+  // Наличие SVG ещё не значит, что раскладка применена: масштаб и центровку
+  // компонент досчитывает через nextTick и два кадра после рендера. Ждём
+  // явный сигнал готовности, иначе скриншот гонится с этим пересчётом.
+  await page.waitForFunction(() =>
+    [...document.querySelectorAll('.kpo-mermaid')].every(
+      (diagram) => diagram.getAttribute('aria-busy') !== 'true'
+    )
+  )
+  // Шрифты меняют метрики текста внутри диаграмм, а значит и их ширину.
+  await page.evaluate(() => document.fonts.ready.then(() => undefined))
   await page.evaluate(
     () =>
       new Promise<void>((resolve) => {

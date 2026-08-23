@@ -36,6 +36,13 @@ export function useMermaidRenderer(options: { instanceId: string }) {
         const { default: mermaid } = await import('mermaid')
         if (isStale(currentGeneration)) return finish(currentGeneration, 'stale')
 
+        // Mermaid измеряет текст в момент отрисовки и запекает результат в
+        // геометрию SVG — пересчёта потом не будет. Пока веб-шрифт не загружен,
+        // замер идёт по запасному, и диаграмма навсегда остаётся свёрстанной по
+        // чужим метрикам. Отсюда два устойчивых варианта вёрстки вместо одного.
+        await fontsReady()
+        if (isStale(currentGeneration)) return finish(currentGeneration, 'stale')
+
         mermaid.initialize(createMermaidConfig(theme))
         const { svg: rendered } = await mermaid.render(
           `${options.instanceId}-${++renderCounter}`,
@@ -81,6 +88,16 @@ export function useMermaidRenderer(options: { instanceId: string }) {
   }
 
   return { svg, failed, errorMessage, rendering, viewBoxWidth, viewBoxHeight, render, dispose }
+}
+
+async function fontsReady(): Promise<void> {
+  if (typeof document === 'undefined' || !document.fonts) return
+  try {
+    await document.fonts.ready
+  } catch {
+    // Загрузка шрифтов — уточнение вёрстки, а не условие отрисовки: если она
+    // не удалась, диаграмму всё равно надо показать.
+  }
 }
 
 function enqueue<T>(task: () => Promise<T>): Promise<T> {
