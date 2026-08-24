@@ -12,6 +12,15 @@ updates:
       # VitePress 1.6.4 declares markdown-it-mathjax3 ^4 as its peer contract.
       - dependency-name: markdown-it-mathjax3
         update-types: ['version-update:semver-major']
+      # Наши плагины в .vitepress/markdown получают инстанс markdown-it от
+      # VitePress, а он держит @types/markdown-it ^14.1.2 прямой зависимостью.
+      # markdown-it 15 везёт собственные типы: MarkdownIt перестаёт быть типом,
+      # исчезает экспорт Options. Типизировать плагины по 15, когда в рантайме
+      # приходит объект от 14, нельзя — ждём мажор самого VitePress.
+      - dependency-name: markdown-it
+        update-types: ['version-update:semver-major']
+      - dependency-name: '@types/markdown-it'
+        update-types: ['version-update:semver-major']
       # typescript-eslint 8.63 supports TypeScript versions below 6.1.
       - dependency-name: typescript
         update-types: ['version-update:semver-major']
