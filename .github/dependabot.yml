@@ -21,6 +21,13 @@ updates:
         update-types: ['version-update:semver-major']
       - dependency-name: '@types/markdown-it'
         update-types: ['version-update:semver-major']
+      # 14.2.0 собран криво: lib/*.d.mts получили isPunctCharCode, а
+      # dist/index.cjs.d.ts не пересобрали. @types/markdown-it-container
+      # тянет MarkdownIt через require и получает dist-тип, наши плагины —
+      # через import и lib-тип; они больше не совпадают, typecheck падает.
+      # Снять, когда выйдет версия с пересобранным dist.
+      - dependency-name: '@types/markdown-it'
+        versions: ['14.2.0']
       # typescript-eslint 8.63 supports TypeScript versions below 6.1.
       - dependency-name: typescript
         update-types: ['version-update:semver-major']
