@@ -26,6 +26,9 @@ updates:
       # тянет MarkdownIt через require и получает dist-тип, наши плагины —
       # через import и lib-тип; они больше не совпадают, typecheck падает.
       # Снять, когда выйдет версия с пересобранным dist.
+      # Игнор держит только прямое обновление: когда Dependabot поднимает сам
+      # markdown-it, он подтягивает @types/markdown-it «в комплекте» мимо
+      # ignore (так было в #87). Тогда в ветке PR вернуть 14.1.2 руками.
       - dependency-name: '@types/markdown-it'
         versions: ['14.2.0']
       # typescript-eslint 8.63 supports TypeScript versions below 6.1.
