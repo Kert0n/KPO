@@ -267,6 +267,9 @@ function firstParagraph(content: string): string {
   return (
     content
       .replace(/^#\s+.+?$/m, '')
+      // Container markers (`::: warning Title`, `:::`) and code fences are markup, not prose.
+      .replace(/^(`{3,}|~{3,})[^\n]*\n[\s\S]*?^\1[^\n]*$/gm, '')
+      .replace(/^:{3,}.*$/gm, '')
       .split(/\n{2,}/)
       .map((part) =>
         part
