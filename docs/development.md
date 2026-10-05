@@ -106,10 +106,11 @@ preview-файлы, игнорируются через `.gitignore`.
 
 ## CI и публикация на GitHub Pages
 
-При push в `master` workflow `.github/workflows/quality.yml` нормализует tracked-файлы в
-изолированном CI workspace, выполняет все quality gates, собирает сайт и загружает проверенный
-`production-dist`. Если Prettier что-то изменил, список файлов появляется в Job Summary, но CI не
-создаёт скрытый commit и не переписывает историю `master`.
+При push в `master` workflow `.github/workflows/quality.yml` выбирает quality gates по изменённым
+путям (профили описаны ниже), собирает сайт и загружает проверенный `production-dist`. Только в
+профиле `full` он перед проверками нормализует tracked-файлы Prettier в изолированном CI workspace.
+Если Prettier что-то изменил, список файлов появляется в Job Summary, но CI не создаёт скрытый commit
+и не переписывает историю `master`.
 
 Набор gates зависит от изменённых путей:
 
