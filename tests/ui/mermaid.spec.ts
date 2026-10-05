@@ -1,4 +1,4 @@
-import type { Locator } from '@playwright/test'
+import type { Locator, Page } from '@playwright/test'
 import { expect, test } from './fixtures'
 import {
   CONTENT_LAYOUT_TOKENS,
@@ -239,6 +239,24 @@ test('a late programmatic scroll event does not claim viewport ownership', async
   await expectCentered(viewport)
 })
 
+test('layout-driven scroll changes do not claim viewport ownership', async ({ page }) => {
+  // Полностраничный скриншот, поворот телефона или резкий ресайз окна заставляют
+  // браузер самому двигать scrollLeft. Без ввода читателя это не ручная прокрутка.
+  await page.setViewportSize({ width: 768, height: 1000 })
+  await page.goto(UI_FIXTURE_ROUTE)
+  await waitForMermaid(page, { requireDiagrams: true })
+
+  const viewports = page.locator('.kpo-mermaid--has-overflow .kpo-mermaid__viewport')
+  await expect.poll(() => viewports.count()).toBeGreaterThan(1)
+  const count = await viewports.count()
+  for (let index = 0; index < count; index += 1) await expectCentered(viewports.nth(index))
+
+  await page.setViewportSize({ width: 1, height: 1 })
+  await page.setViewportSize({ width: 768, height: 1000 })
+
+  for (let index = 0; index < count; index += 1) await expectCentered(viewports.nth(index))
+})
+
 test('manual mermaid scroll is preserved across zoom and reset recenters', async ({ page }) => {
   await page.setViewportSize(LAYOUT_VIEWPORTS.mobilePhone)
   await page.goto(UI_FIXTURE_ROUTE)
@@ -252,11 +270,7 @@ test('manual mermaid scroll is preserved across zoom and reset recenters', async
     .first()
   const viewport = diagram.locator('.kpo-mermaid__viewport')
 
-  await viewport.evaluate((node) => {
-    const element = node as HTMLElement
-    element.scrollLeft = 0
-    element.dispatchEvent(new Event('scroll', { bubbles: true }))
-  })
+  await scrollViewportToStartByWheel(page, viewport)
 
   const ratioBefore = await viewport.evaluate((node) => {
     const element = node as HTMLElement
@@ -289,6 +303,12 @@ test('manual mermaid scroll is preserved across zoom and reset recenters', async
     })
     .toBe(true)
 })
+
+async function scrollViewportToStartByWheel(page: Page, viewport: Locator): Promise<void> {
+  await viewport.hover()
+  await page.mouse.wheel(-5000, 0)
+  await expect.poll(() => viewport.evaluate((node) => (node as HTMLElement).scrollLeft)).toBe(0)
+}
 
 async function expectCentered(viewport: Locator): Promise<void> {
   await expect
@@ -345,11 +365,7 @@ test('mermaid theme render preserves manual viewport ownership', async ({ page }
 
   const diagram = page.locator('.kpo-mermaid--has-overflow').first()
   const viewport = diagram.locator('.kpo-mermaid__viewport')
-  await viewport.evaluate((node) => {
-    const element = node as HTMLElement
-    element.scrollLeft = 0
-    element.dispatchEvent(new Event('scroll', { bubbles: true }))
-  })
+  await scrollViewportToStartByWheel(page, viewport)
   const ratioBefore = await viewport.evaluate((node) => {
     const element = node as HTMLElement
     return (element.scrollLeft + element.clientWidth / 2) / element.scrollWidth
