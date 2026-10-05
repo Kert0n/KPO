@@ -267,6 +267,11 @@ function firstParagraph(content: string): string {
   return (
     content
       .replace(/^#\s+.+?$/m, '')
+      // Container markers (`::: warning Title`, `:::`) and code fences are markup, not prose.
+      // CommonMark fences: up to three leading spaces; a closing fence is at least as long as
+      // the opening one and may be followed only by spaces or tabs.
+      .replace(/^ {0,3}((`|~)\2{2,})[^\n]*\n[\s\S]*?^ {0,3}\1\2*[ \t]*$/gm, '')
+      .replace(/^:{3,}.*$/gm, '')
       .split(/\n{2,}/)
       .map((part) =>
         part

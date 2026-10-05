@@ -15,6 +15,7 @@ tasks.named("compileKotlin") { dependsOn("extractKotlinSnippets") }
 tasks.register<Exec>("extractKotlinSnippets") {
     commandLine("node", "--experimental-strip-types", "scripts/extract-kotlin-snippets.mts")
     inputs.files(fileTree("content") { include("**/*.md") })
-    inputs.file("kotlin-snippets.count")
+    inputs.file("scripts/extract-kotlin-snippets.mts")
+    inputs.files(fileTree(".vitepress/shared"))
     outputs.dir(".generated/kotlin-snippets")
 }

@@ -13,6 +13,7 @@ const publicSiteFiles = new Set([
 
 const internalFiles = new Set([
   'README.md',
+  'CONTRIBUTING.md',
   'content/lectures/_template/README.md',
   'content/lectures/_template/vitepress.md',
   'content/extras/_template/README.md',

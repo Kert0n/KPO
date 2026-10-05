@@ -36,6 +36,52 @@ describe('content catalog', () => {
     expect(lectures.map((page) => page.route)).toEqual(['/lectures/02', '/lectures/01'])
   })
 
+  it('derives the description from prose, not from container or fence markup', () => {
+    const root = fixtureRoot()
+    writePage(
+      root,
+      'content/extras/01/vitepress.md',
+      [
+        '# Extra',
+        '',
+        '::: warning Дисклеймер',
+        'Это мнение команды, а не учебник: текст для description.',
+        ':::',
+        '',
+        '```kotlin',
+        'fun main() = println("this code is long enough to be picked up")',
+        '```'
+      ].join('\n')
+    )
+
+    const [extra] = getContentCatalog({ root, fresh: true }).filter((page) => page.kind === 'extra')
+
+    expect(extra.description).toBe('Это мнение команды, а не учебник: текст для description.')
+  })
+
+  it('ends a fenced block only at a CommonMark closing fence', () => {
+    const root = fixtureRoot()
+    writePage(
+      root,
+      'content/extras/01/vitepress.md',
+      [
+        '# Extra',
+        '',
+        '  ```kotlin',
+        '``` not a closing fence',
+        '',
+        'val insideTheFenceAndLongEnough = "still code, not a description"',
+        '   ````  ',
+        '',
+        'Настоящий первый абзац страницы после блока кода.'
+      ].join('\n')
+    )
+
+    const [extra] = getContentCatalog({ root, fresh: true }).filter((page) => page.kind === 'extra')
+
+    expect(extra.description).toBe('Настоящий первый абзац страницы после блока кода.')
+  })
+
   it('rejects duplicate section order', () => {
     const root = fixtureRoot()
     writePage(root, 'content/lectures/Fixture1/vitepress.md', '# First')
