@@ -11,6 +11,23 @@ import { waitAnimationFrames } from '../lib/viewportAnchor'
 
 export type MermaidLayoutResult = 'applied' | 'stale'
 
+/**
+ * Сколько миллисекунд после колеса, касания или клавиши прокрутка вьюпорта
+ * считается пользовательской. Покрывает инерционную и плавную прокрутку.
+ */
+const USER_SCROLL_INTENT_MS = 1000
+const SCROLL_KEYS = new Set([
+  'ArrowLeft',
+  'ArrowRight',
+  'ArrowUp',
+  'ArrowDown',
+  'Home',
+  'End',
+  'PageUp',
+  'PageDown',
+  ' '
+])
+
 export function useMermaidViewport(options: {
   root: Ref<HTMLElement | null>
   viewport: Ref<HTMLElement | null>
@@ -45,6 +62,16 @@ export function useMermaidViewport(options: {
   let disposed = false
   let layoutGeneration = 0
   let pendingLayouts = 0
+  /**
+   * Браузер сам двигает scrollLeft, когда меняется раскладка: при ресайзе окна,
+   * повороте телефона, полностраничном скриншоте. Такой scroll event неотличим
+   * от пользовательского по самому событию, поэтому владение вьюпортом отдаём
+   * только при недавнем вводе внутри диаграммы: колесо, касание, указатель
+   * (в том числе на полосе прокрутки) или клавиша прокрутки.
+   */
+  let lastUserIntentAt = Number.NEGATIVE_INFINITY
+  let pointerActive = false
+  let intentRoot: HTMLElement | null = null
 
   function start(): void {
     disposed = false
@@ -54,6 +81,7 @@ export function useMermaidViewport(options: {
       void syncLayout()
     })
     if (options.root.value) resizeObserver.observe(options.root.value)
+    listenForUserIntent(options.root.value)
   }
 
   function dispose(): void {
@@ -61,6 +89,7 @@ export function useMermaidViewport(options: {
     layoutGeneration += 1
     resizeObserver?.disconnect()
     resizeObserver = null
+    listenForUserIntent(null)
     programmaticScrollLeft = null
     lastObservedScrollLeft = null
     pendingCenterRatio = null
@@ -199,7 +228,7 @@ export function useMermaidViewport(options: {
 
     // ResizeObserver runs before paint. Keep an unowned viewport centered for that
     // paint as well; syncLayout verifies the settled geometry on the following frames.
-    if (lastObservedScrollLeft !== null) {
+    if (lastObservedScrollLeft !== null && hasRecentUserIntent()) {
       const maxScrollLeft = Math.max(0, viewport.scrollWidth - viewport.clientWidth)
       const expectedScrollLeft = clamp(lastObservedScrollLeft, 0, maxScrollLeft)
       if (Math.abs(viewport.scrollLeft - expectedScrollLeft) > 2) {
@@ -240,7 +269,60 @@ export function useMermaidViewport(options: {
     ) {
       return
     }
-    if (viewport) claimUserScroll(viewport)
+    if (!viewport) return
+    if (!hasRecentUserIntent()) {
+      // Сдвиг от раскладки, а не от читателя: центровку вернёт ближайший syncLayout.
+      lastObservedScrollLeft = viewport.scrollLeft
+      return
+    }
+    claimUserScroll(viewport)
+  }
+
+  function hasRecentUserIntent(): boolean {
+    return pointerActive || performance.now() - lastUserIntentAt <= USER_SCROLL_INTENT_MS
+  }
+
+  function markUserIntent(): void {
+    lastUserIntentAt = performance.now()
+  }
+
+  function onPointerDown(): void {
+    pointerActive = true
+    markUserIntent()
+    window.addEventListener('pointerup', onPointerEnd, { once: true })
+    window.addEventListener('pointercancel', onPointerEnd, { once: true })
+  }
+
+  function onPointerEnd(): void {
+    pointerActive = false
+    markUserIntent()
+    window.removeEventListener('pointerup', onPointerEnd)
+    window.removeEventListener('pointercancel', onPointerEnd)
+  }
+
+  function onKeydown(event: KeyboardEvent): void {
+    if (SCROLL_KEYS.has(event.key)) markUserIntent()
+  }
+
+  function listenForUserIntent(root: HTMLElement | null): void {
+    if (intentRoot) {
+      intentRoot.removeEventListener('wheel', markUserIntent)
+      intentRoot.removeEventListener('touchstart', markUserIntent)
+      intentRoot.removeEventListener('touchmove', markUserIntent)
+      intentRoot.removeEventListener('pointerdown', onPointerDown)
+      intentRoot.removeEventListener('keydown', onKeydown)
+      // Отвязка не ввод читателя: сбрасываем нажатие, не обновляя отметку намерения.
+      pointerActive = false
+      window.removeEventListener('pointerup', onPointerEnd)
+      window.removeEventListener('pointercancel', onPointerEnd)
+    }
+    intentRoot = root
+    if (!root) return
+    root.addEventListener('wheel', markUserIntent, { passive: true })
+    root.addEventListener('touchstart', markUserIntent, { passive: true })
+    root.addEventListener('touchmove', markUserIntent, { passive: true })
+    root.addEventListener('pointerdown', onPointerDown, { passive: true })
+    root.addEventListener('keydown', onKeydown)
   }
 
   function claimUserScroll(viewport: HTMLElement): void {
