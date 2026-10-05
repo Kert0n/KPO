@@ -47,12 +47,11 @@ function extractPage(sourcePath: string): void {
     const fenceStart = index
     const code: string[] = []
     index += 1
-    while (index < lines.length && lines[index] !== fence[1]) {
+    while (index < lines.length && !closesFence(lines[index], fence[1])) {
       code.push(lines[index])
       index += 1
     }
-    if (index >= lines.length)
-      throw new Error(`Unclosed Kotlin fence: ${sourcePath}:${fenceStart + 1}`)
+    if (index >= lines.length) throw new Error(`Unclosed fence: ${sourcePath}:${fenceStart + 1}`)
     if (!runnable || disabled) continue
     const number = manifest.length + 1
     const id = `Snippet${String(number).padStart(3, '0')}`
@@ -69,4 +68,10 @@ function extractPage(sourcePath: string): void {
 function isPlaygroundFenceInfo(info: string): boolean {
   const parts = info.trim().toLowerCase().split(/\s+/)
   return normalizeLanguage(info) === 'kotlin' && parts.includes('playground')
+}
+
+// CommonMark: a closing fence may be longer than the opening one and carry trailing spaces.
+function closesFence(line: string, opening: string): boolean {
+  const closing = line.match(/^(`{3,})\s*$/)
+  return closing !== null && closing[1].length >= opening.length
 }

@@ -45,9 +45,6 @@ npm run dev
 - [`docs/dependency-maintenance.md`](docs/dependency-maintenance.md) — сопровождение зависимостей и
   Dependabot.
 
-Папка `report/` содержит материалы учебной практики: индивидуальное задание, план-график, полный
-отчёт и черновик отзыва руководителя. В сборку сайта они не попадают.
-
 ## Лицензия
 
 Проект распространяется по GNU General Public License v3.0 or later (`GPL-3.0-or-later`). См.
