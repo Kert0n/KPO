@@ -46,6 +46,9 @@ export default defineConfig({
     const canonical = siteUrl(page.route)
     const existingHead = Array.isArray(pageData.frontmatter.head) ? pageData.frontmatter.head : []
     return {
+      // В браузере VitePress обновляет meta description из pageData.description;
+      // без этого поля после загрузки подставлялось общее описание сайта.
+      description: page.description || SITE.description,
       frontmatter: {
         ...pageData.frontmatter,
         search: page.inclusion.search,
@@ -64,18 +67,11 @@ export default defineConfig({
     }
   },
 
+  // При сборке тег выводим сами: встроенный рендер VitePress не экранирует кавычки
+  // в description и обрывает атрибут (лекции 7 и 10), а head экранируется.
   transformHead({ pageData }) {
-    const page = findContentPageByOutputPath(pageData.relativePath)
-    if (!page) return []
-    return [
-      [
-        'meta',
-        {
-          name: 'description',
-          content: pageData.description || page.description || SITE.description
-        }
-      ]
-    ]
+    if (!findContentPageByOutputPath(pageData.relativePath)) return []
+    return [['meta', { name: 'description', content: pageData.description || SITE.description }]]
   },
 
   transformHtml(code) {
