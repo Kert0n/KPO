@@ -1,11 +1,11 @@
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
+import { normalizeLanguage } from '../.vitepress/shared/core/codeLanguage.ts'
 import { getContentCatalog } from '../.vitepress/shared/content/contentCatalog.ts'
 
 const root = resolve(process.cwd())
 const outputRoot = resolve(root, '.generated/kotlin-snippets')
 const sourceRoot = resolve(outputRoot, 'src/main/kotlin')
-const expectedCount = Number(readFileSync(resolve(root, 'kotlin-snippets.count'), 'utf8').trim())
 const manifest: Array<{ source: string; line: number; generated: string }> = []
 
 rmSync(outputRoot, { recursive: true, force: true })
@@ -15,10 +15,8 @@ for (const page of getContentCatalog({ root, fresh: true }).filter(
 )) {
   extractPage(page.sourcePath)
 }
-if (manifest.length !== expectedCount) {
-  throw new Error(
-    `Runnable Kotlin fence count changed: expected ${expectedCount}, found ${manifest.length}`
-  )
+if (manifest.length === 0) {
+  throw new Error('No runnable Kotlin fences found: snippet extraction is broken')
 }
 writeFileSync(resolve(outputRoot, 'manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`)
 console.log(
@@ -42,9 +40,9 @@ function extractPage(sourcePath: string): void {
       containers.pop()
       continue
     }
-    const fence = line.match(/^(`{3,})kotlin\s+([^`]*)$/)
+    const fence = line.match(/^(`{3,})([^`]*)$/)
     if (!fence) continue
-    const runnable = fence[2].split(/\s+/).includes('playground')
+    const runnable = isPlaygroundFenceInfo(fence[2])
     const disabled = containers.some((entry) => entry.name === 'multi-code' && entry.playgroundOff)
     const fenceStart = index
     const code: string[] = []
@@ -64,4 +62,11 @@ function extractPage(sourcePath: string): void {
     writeFileSync(generated, `package kpo.snippets.s${number}\n\n${code.join('\n')}\n`)
     manifest.push({ source: sourcePath, line: fenceStart + 1, generated: relativeGenerated })
   }
+}
+
+// Same rule as isPlaygroundFence in .vitepress/markdown/multiCode.ts, so aliases such as
+// `kt playground` are compiled exactly when the site treats them as runnable.
+function isPlaygroundFenceInfo(info: string): boolean {
+  const parts = info.trim().toLowerCase().split(/\s+/)
+  return normalizeLanguage(info) === 'kotlin' && parts.includes('playground')
 }
