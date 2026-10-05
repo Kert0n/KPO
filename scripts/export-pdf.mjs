@@ -18,6 +18,14 @@ const outputDirectory = join(root, 'output', 'pdf')
 const pagesDirectory = join(outputDirectory, 'pages')
 
 const PDF_ROUTES = buildPdfPagePlan(contentPagesFor('pdf'))
+const A4_MM = { width: 210, height: 297 }
+const MARGIN_MM = { top: 14, right: 12, bottom: 14, left: 12 }
+// Печатная область страницы в CSS-пикселях (96 dpi): на этой ширине Chrome
+// раскладывает текст при печати, по этой высоте делит его на страницы.
+const PRINT_AREA = {
+  width: Math.floor(mmToPx(A4_MM.width - MARGIN_MM.left - MARGIN_MM.right)),
+  height: Math.floor(mmToPx(A4_MM.height - MARGIN_MM.top - MARGIN_MM.bottom))
+}
 
 if (remote && !configuredBaseUrl) {
   throw new Error('KPO_PDF_BASE_URL is required with --remote')
@@ -64,22 +72,24 @@ try {
     await waitForMermaid(page, route)
     await waitForMathJax(page)
     await page.emulateMedia({ media: 'print' })
-    // Печатные стили меняют ширину колонки: ResizeObserver диаграмм срабатывает
-    // в следующем кадре и снова выставляет aria-busy до конца пересчёта.
+    // Раскладываем страницу на ширине печатной области, чтобы диаграммы и
+    // измерения блоков совпадали с тем, что Chrome положит на бумагу.
+    // Печатные стили и новая ширина меняют колонку: ResizeObserver диаграмм
+    // срабатывает в следующем кадре и снова выставляет aria-busy до конца пересчёта.
+    await page.setViewportSize({ width: PRINT_AREA.width, height: PRINT_AREA.height })
     await waitForNextFrames(page)
     await waitForMermaid(page, route)
+    await markPrintBlocks(page)
 
     await page.pdf({
       path: pageFile,
       format: 'A4',
       printBackground: true,
-      margin: {
-        top: '14mm',
-        right: '12mm',
-        bottom: '14mm',
-        left: '12mm'
-      }
+      margin: Object.fromEntries(
+        Object.entries(MARGIN_MM).map(([side, value]) => [side, `${value}mm`])
+      )
     })
+    await page.setViewportSize({ width: 1440, height: 1400 })
 
     pageFiles.push(pageFile)
   }
@@ -177,6 +187,69 @@ async function openDetailsBlocks(page) {
   })
 }
 
+// Блок от заголовка h2/h3 до следующего такого же заголовка печатается с новой
+// страницы, если не помещается в её остаток. Сам перенос делает Chrome по
+// правилам 27-print.css; здесь блоки только оборачиваются и помечаются:
+// помещается на страницу -> break-inside: avoid, длиннее страницы -> break-before: page.
+// Элементы, которые print CSS держит целиком, но которые выше страницы,
+// помечаются kpo-print-oversize и печатаются в потоке.
+// Первый h3 в разделе, который сам начался с новой страницы, не переносится,
+// иначе заголовок раздела с коротким вступлением остался бы на странице один.
+async function markPrintBlocks(page) {
+  await page.evaluate((pageHeight) => {
+    const root = document.querySelector('.vp-doc > div')
+    if (!root) return
+
+    const wrap = (container, tagName) => {
+      const blocks = []
+      let current = null
+      for (const node of [...container.children]) {
+        if (node.tagName === tagName) {
+          current = document.createElement('section')
+          current.className = 'kpo-print-block'
+          node.before(current)
+          blocks.push(current)
+        }
+        if (current) current.append(node)
+      }
+      return blocks
+    }
+    const mark = (block, keepInFlow) => {
+      const tall = block.getBoundingClientRect().height > pageHeight
+      block.classList.add(tall ? 'kpo-print-block--tall' : 'kpo-print-block--fits')
+      if (tall && keepInFlow) block.classList.add('kpo-print-block--flow')
+      return tall
+    }
+
+    for (const section of wrap(root, 'H2')) {
+      const startsNewPage = mark(section, false)
+      wrap(section, 'H3').forEach((subsection, index) => {
+        mark(subsection, index === 0 && startsNewPage)
+      })
+    }
+
+    // break-inside: avoid на элементе выше страницы Chromium исполняет разрывом
+    // перед ним: блок уезжает на новую страницу и всё равно режется, а над ним
+    // остаётся пустое место. Такие элементы (и почти такие, если над ними
+    // заголовок) печатаются в потоке.
+    const avoidSelector = 'pre, table, .kpo-content-block, .kpo-mermaid, .custom-block'
+    const avoidCandidates = root.querySelectorAll(avoidSelector)
+    // Запас на заголовок над элементом: break-after: avoid держит заголовок
+    // вместе с элементом, и вдвоём они должны поместиться на страницу.
+    const headingAllowance = 120
+    for (const element of avoidCandidates) {
+      if (element.getBoundingClientRect().height > pageHeight - headingAllowance) {
+        element.classList.add('kpo-print-oversize')
+        // Иначе вложенный блок, который сам помещается, уедет от своего заголовка.
+        for (const nested of element.querySelectorAll(avoidSelector)) {
+          nested.classList.add('kpo-print-oversize')
+        }
+      }
+    }
+  }, PRINT_AREA.height)
+  await waitForNextFrames(page)
+}
+
 async function waitForNextFrames(page) {
   await page.evaluate(
     () =>
@@ -233,4 +306,8 @@ function normalizeBaseUrl(value) {
 
 function delay(ms) {
   return new Promise((resolvePromise) => setTimeout(resolvePromise, ms))
+}
+
+function mmToPx(mm) {
+  return (mm * 96) / 25.4
 }
