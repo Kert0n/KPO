@@ -70,6 +70,14 @@ export function lintMermaidCode(code: string): MermaidLintDiagnostic[] {
   const isFlowchart = /^(flowchart|graph)\b/.test(firstDirective)
 
   for (const [lineIndex, line] of code.split('\n').entries()) {
+    if (/^\s*flowchart-elk\b/.test(line) || /["']?layout["']?\s*:\s*["']?elk\b/.test(line)) {
+      diagnostics.push({
+        line: lineIndex + 1,
+        snippet: line.trim(),
+        message: 'ELK layout is not bundled on this site; remove it to use the default dagre layout'
+      })
+    }
+
     if (isFlowchart && /<\||\|>/.test(line)) {
       diagnostics.push({
         line: lineIndex + 1,
