@@ -247,8 +247,8 @@ test('layout-driven scroll changes do not claim viewport ownership', async ({ pa
   await waitForMermaid(page, { requireDiagrams: true })
 
   const viewports = page.locator('.kpo-mermaid--has-overflow .kpo-mermaid__viewport')
+  await expect.poll(() => viewports.count()).toBeGreaterThan(1)
   const count = await viewports.count()
-  expect(count).toBeGreaterThan(1)
   for (let index = 0; index < count; index += 1) await expectCentered(viewports.nth(index))
 
   await page.setViewportSize({ width: 1, height: 1 })

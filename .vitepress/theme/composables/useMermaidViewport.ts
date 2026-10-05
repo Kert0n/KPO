@@ -311,7 +311,10 @@ export function useMermaidViewport(options: {
       intentRoot.removeEventListener('touchmove', markUserIntent)
       intentRoot.removeEventListener('pointerdown', onPointerDown)
       intentRoot.removeEventListener('keydown', onKeydown)
-      onPointerEnd()
+      // Отвязка не ввод читателя: сбрасываем нажатие, не обновляя отметку намерения.
+      pointerActive = false
+      window.removeEventListener('pointerup', onPointerEnd)
+      window.removeEventListener('pointercancel', onPointerEnd)
     }
     intentRoot = root
     if (!root) return
