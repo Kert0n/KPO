@@ -23,6 +23,19 @@ describe('mermaid lint', () => {
     ])
   })
 
+  it('rejects ELK layouts, which are not bundled', () => {
+    expect(lintMermaidCode('---\nconfig:\n  layout: elk\n---\nflowchart LR\n  A --> B')).toEqual([
+      expect.objectContaining({ line: 3, message: expect.stringContaining('ELK') })
+    ])
+    expect(lintMermaidCode('flowchart-elk TD\n  A --> B')).toEqual([
+      expect.objectContaining({ line: 1, message: expect.stringContaining('ELK') })
+    ])
+    expect(
+      lintMermaidCode('%%{init: {"layout": "elk.stress"}}%%\nflowchart LR\n  A --> B')
+    ).toEqual([expect.objectContaining({ line: 1 })])
+    expect(lintMermaidCode('flowchart LR\n  A["layout: dagre"] --> B')).toEqual([])
+  })
+
   it('accepts quoted labels with parens', () => {
     expect(lintMermaidCode('flowchart TD\n  Node["Method(x)"] --> Other[Ok]')).toEqual([])
   })

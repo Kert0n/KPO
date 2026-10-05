@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url'
 import { defineConfig } from 'vitepress'
 import { askAiContextPlugin } from './lib/askAiContextPlugin'
 import { assertAskAiContextParity } from './lib/askAiContext'
@@ -126,6 +127,14 @@ export default defineConfig({
       // 1.5 MiB; scripts/check-performance-budgets.mjs still keeps ordinary
       // runtime JS chunks under the stricter 1 MiB limit.
       chunkSizeWarningLimit: 1536
+    },
+    resolve: {
+      alias: {
+        // Mermaid 12 bundles a lazy ELK chunk; the site renders with dagre only.
+        'elkjs/lib/elk.bundled.js': fileURLToPath(
+          new URL('./theme/lib/elkUnavailable.ts', import.meta.url)
+        )
+      }
     },
     plugins: [
       askAiContextPlugin({
