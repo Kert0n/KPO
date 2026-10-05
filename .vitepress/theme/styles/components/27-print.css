@@ -11,6 +11,20 @@
     break-inside: avoid;
   }
 
+  /* Блоки от заголовка и элементы выше страницы размечает scripts/export-pdf.mjs (markPrintBlocks). */
+  .kpo-print-block--fits {
+    break-inside: avoid;
+  }
+
+  .kpo-print-block--tall:not(.kpo-print-block--flow) {
+    break-before: page;
+  }
+
+  .kpo-print-oversize {
+    page-break-inside: auto;
+    break-inside: auto;
+  }
+
   .kpo-content-block--wide,
   .kpo-wide-block {
     max-width: 100% !important;

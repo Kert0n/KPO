@@ -18,7 +18,8 @@
   .kpo-switcher__playground-toggle,
   .kpo-playground .run-button,
   .kpo-playground .compiler-info,
-  .kpo-playground .output-wrapper {
+  .kpo-playground .output-wrapper,
+  .VPDocFooter {
     display: none !important;
   }
 

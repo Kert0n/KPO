@@ -16,6 +16,21 @@
     overflow-wrap: anywhere;
   }
 
+  /*
+   * Контейнер с прокруткой Chromium при печати не делит между страницами:
+   * блок кода длиннее страницы уезжал целиком на следующую, оставляя заголовок
+   * переключателя на пустой странице. Строки и так переносятся, прокрутка не нужна.
+   */
+  .vp-doc div[class*='language-'],
+  .vp-doc pre {
+    overflow: visible !important;
+  }
+
+  /* overflow: hidden тоже делает блок неделимым; clip обрезает углы так же, но делится. */
+  .kpo-switcher {
+    overflow: clip !important;
+  }
+
   .kpo-content-block--table,
   .vp-doc > table {
     overflow: visible !important;
