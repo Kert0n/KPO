@@ -57,19 +57,16 @@ try {
     const pageFile = join(pagesDirectory, `${fileBase}.pdf`)
 
     process.stdout.write(`Exporting ${route || '/'} -> ${pageFile}\n`)
+    // Язык кода и выключенный Playground выставляет init-скрипт контекста перед каждой навигацией.
     await page.goto(url, { waitUntil: 'networkidle' })
-    await page.evaluate(() => {
-      window.localStorage.setItem('kpo:code-language', 'kotlin')
-      window.localStorage.removeItem('kpo:playground-mode')
-      document.documentElement.dataset.kpoLang = 'kotlin'
-    })
-
     await page.locator('.vp-doc').first().waitFor({ state: 'attached', timeout: 30_000 })
     await openDetailsBlocks(page)
     await waitForMermaid(page, route)
     await waitForMathJax(page)
     await page.emulateMedia({ media: 'print' })
-    await waitAnimationFrames(page, 2)
+    // Печатные стили меняют ширину колонки: ResizeObserver диаграмм срабатывает
+    // в следующем кадре и снова выставляет aria-busy до конца пересчёта.
+    await waitForNextFrames(page)
     await waitForMermaid(page, route)
 
     await page.pdf({
@@ -147,22 +144,17 @@ async function waitForHttp(url) {
   throw new Error(`Timed out waiting for ${url}: ${lastError?.message ?? 'no response'}`)
 }
 
+// MermaidDiagram держит aria-busy, пока рисует диаграмму и пока не применена
+// раскладка (масштаб и центровка). Это тот же сигнал готовности, которого ждут
+// эталонные снимки в tests/characterization/helpers.ts.
 async function waitForMermaid(page, route) {
   await page.waitForFunction(
-    () => {
-      const diagrams = [...document.querySelectorAll('.kpo-mermaid')]
-      return diagrams.every((diagram) => {
-        if (diagram.querySelector('.kpo-mermaid__error')) return true
-        if (!diagram.querySelector('svg')) return false
-
-        const viewport = diagram.querySelector('.kpo-mermaid__viewport')
-        if (!(viewport instanceof HTMLElement)) return true
-        if (viewport.scrollWidth <= viewport.clientWidth + 1) return true
-
-        const centered = (viewport.scrollWidth - viewport.clientWidth) / 2
-        return Math.abs(viewport.scrollLeft - centered) <= 2
-      })
-    },
+    () =>
+      [...document.querySelectorAll('.kpo-mermaid')].every(
+        (diagram) =>
+          diagram.querySelector('svg, .kpo-mermaid__error') &&
+          diagram.getAttribute('aria-busy') !== 'true'
+      ),
     null,
     { timeout: 30_000 }
   )
@@ -185,24 +177,12 @@ async function openDetailsBlocks(page) {
   })
 }
 
-async function waitAnimationFrames(page, frames) {
+async function waitForNextFrames(page) {
   await page.evaluate(
-    (count) =>
+    () =>
       new Promise((resolvePromise) => {
-        let remaining = Math.max(0, Math.floor(count))
-        if (remaining === 0) {
-          resolvePromise()
-          return
-        }
-
-        const step = () => {
-          remaining -= 1
-          if (remaining === 0) resolvePromise()
-          else requestAnimationFrame(step)
-        }
-        requestAnimationFrame(step)
-      }),
-    frames
+        requestAnimationFrame(() => requestAnimationFrame(() => resolvePromise()))
+      })
   )
 }
 
