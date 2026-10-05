@@ -24,6 +24,7 @@ describe('content contract', () => {
 
   it('accepts documented internal markdown', () => {
     expect(classifyMarkdownPath('README.md')).toBe('internal')
+    expect(classifyMarkdownPath('CONTRIBUTING.md')).toBe('internal')
     expect(classifyMarkdownPath('content/lectures/_template/README.md')).toBe('internal')
     expect(classifyMarkdownPath('content/lectures/_template/vitepress.md')).toBe('internal')
     expect(classifyMarkdownPath('content/extras/_template/README.md')).toBe('internal')
