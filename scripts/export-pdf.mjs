@@ -65,6 +65,7 @@ try {
     })
 
     await page.locator('.vp-doc').first().waitFor({ state: 'attached', timeout: 30_000 })
+    await openDetailsBlocks(page)
     await waitForMermaid(page, route)
     await waitForMathJax(page)
     await page.emulateMedia({ media: 'print' })
@@ -173,6 +174,15 @@ async function waitForMermaid(page, route) {
   if (errors.length > 0) {
     throw new Error(`Mermaid render failed on ${route}: ${errors.join(' | ')}`)
   }
+}
+
+// На бумаге свёрнутый блок ::: details не открыть, поэтому в PDF они раскрыты.
+// Раскрываем до ожидания Mermaid: диаграммы внутри блока получают ширину и
+// пересчитывают раскладку, а waitForMermaid дожидается её центровки.
+async function openDetailsBlocks(page) {
+  await page.evaluate(() => {
+    for (const details of document.querySelectorAll('.vp-doc details')) details.open = true
+  })
 }
 
 async function waitAnimationFrames(page, frames) {
