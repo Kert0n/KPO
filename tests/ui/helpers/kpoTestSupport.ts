@@ -19,7 +19,8 @@ export const UI_FIXTURE_ROUTE = 'service-pages/ui-contract'
 export const SIDEBAR_FIXTURE_ROUTE = 'service-pages/sidebar-contract'
 export const ASK_AI_FIXTURE_ROUTE = 'service-pages/ask-ai-contract'
 export const PLAYGROUND_MODULE_REQUEST =
-  /(?:kotlin-playground|playground\.min\.[^/]+\.js)(?:\?.*)?$/
+  // dev: .vitepress/cache/deps/kotlin-playground.js?v=…; build: playground.min.<hash>.js
+  /(?:kotlin-playground(?:\.js)?|playground\.min\.[^/]+\.js)(?:\?.*)?$/
 export const SELECTION_TERMINAL_TEXT =
   'Terminal boundary paragraph belongs only to the learning content and must open Ask AI when selected fully.'
 export const SELECTION_FIRST_TEXT =

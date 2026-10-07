@@ -38,6 +38,7 @@ export function usePlaygroundController(options: {
   })
   const title = computed(() => {
     if (options.displayLanguage.value !== 'kotlin') return 'Playground доступен для Kotlin'
+    if (options.kotlinCode.value === '') return 'У этого примера нет запускаемой версии'
     if (failed.value) return 'Playground недоступен'
     return options.mode.value ? 'Выключить интерактивный режим' : 'Включить интерактивный режим'
   })
