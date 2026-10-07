@@ -46,6 +46,17 @@ Major-обновление принимается только когда все
 
 Эти ограничения относятся к version updates и не должны скрывать security updates. При обновлении VitePress или `typescript-eslint` соответствующее правило нужно удалить и прогнать полный gate.
 
+## Security overrides
+
+`overrides` в `package.json` закрывают уязвимости транзитивных зависимостей, которые нельзя поднять
+обычным обновлением. Каждый override снимается, как только родительский пакет сам перейдёт на
+исправленную версию:
+
+- `mermaid → katex 0.18.9` — mermaid 12.1.0 требует `katex ^0.16.47`, а GHSA-238p-pmpm-9mq7 исправлена
+  только с 0.18.2; mermaid вызывает katex лишь через `renderToString` для формул в диаграммах;
+- `gray-matter → js-yaml → argparse 2.0.1` — GHSA-hp3w-g68c-fv3c в `sprintf-js` не исправлена ни в
+  одной версии; js-yaml 3 использует argparse только в своей CLI, а argparse 2 не зависит от sprintf-js.
+
 ## Как разбирать пакет PR
 
 1. Зафиксировать SHA `master` и heads всех PR.
