@@ -18,6 +18,21 @@ The catalog automatically supplies rewrites, sidebar entries, Ask AI context,
 PDF export, UI coverage and sitemap metadata. Override `order` in frontmatter
 when filesystem numbering must not control presentation order.
 
+## Lecture dependencies
+
+Lecture frontmatter `requires` and `recommends` feeds the course map on the home
+page: `.vitepress/shared/content/courseMap.ts`, loaded at build time by
+`.vitepress/theme/data/courseMap.data.ts`. Each item is a lecture number or
+`{ lecture, reason }`. Dependencies point only to earlier lectures and name each
+lecture once, so the graph stays acyclic and the reading order follows the
+course numbering. `requires` is resolved transitively.
+
+`content:check` and the build reject malformed items and unknown, forward or
+duplicated references, reporting the source path. The course parts shown as map
+columns are the `COURSE_GROUPS` constant in the same module; a lecture missing
+from every part is shown in an extra «Другие лекции» column. The authoring rules are in
+[`authoring.md`](authoring.md#что-прочитать-до-лекции).
+
 ## Additional readings
 
 `/extras/02` is generated from the same catalog. Every lecture or extra that

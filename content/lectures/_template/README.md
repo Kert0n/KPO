@@ -6,6 +6,7 @@ cp -R content/lectures/_template content/lectures/Lec15
 # - H1
 # - ссылки
 # - примеры
+# - requires и recommends: что прочитать до лекции
 # - группы и ссылки в разделе «Дополнительное чтение»
 ```
 

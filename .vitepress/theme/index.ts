@@ -1,6 +1,6 @@
 import type { Theme } from 'vitepress'
 import DefaultTheme from 'vitepress/theme'
-import { h } from 'vue'
+import { defineAsyncComponent, h } from 'vue'
 import AskAiContextMenu from './components/AskAiContextMenu.vue'
 import AskAiProviderSelect from './components/AskAiProviderSelect.vue'
 import CodeSwitcher from './components/CodeSwitcher.vue'
@@ -36,6 +36,12 @@ export default {
     app.component('CodeSwitcher', CodeSwitcher)
     app.component('LangOnly', LangOnly)
     app.component('MermaidDiagram', MermaidDiagram)
+    // Лейаут главной (`layout: KpoHome`): асинхронно, чтобы карта курса не попадала
+    // в JS остальных страниц.
+    app.component(
+      'KpoHome',
+      defineAsyncComponent(() => import('./components/KpoHome.vue'))
+    )
     installAdaptiveTables(router)
   }
 } satisfies Theme

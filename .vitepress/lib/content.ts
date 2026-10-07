@@ -38,8 +38,7 @@ export function buildNav(pages: ContentPage[]): DefaultTheme.NavItem[] {
   return [
     { text: 'Введение', link: '/intro' },
     { text: 'Лекции', link: firstLectureLink(pages), activeMatch: '^/lectures/' },
-    { text: 'Дополнения', link: page(pages, '/extras/').route, activeMatch: '^/extras/' },
-    { text: 'Заключение', link: '/conclusion' }
+    { text: 'Дополнения', link: page(pages, '/extras/').route, activeMatch: '^/extras/' }
   ]
 }
 

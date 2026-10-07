@@ -30,7 +30,9 @@ test('desktop ask ai provider uses vitepress flyout pattern', async ({ page }) =
   await expect(page.locator('.VPNavBar .VPNavBarMenuLink', { hasText: 'Введение' })).toBeVisible()
   await expect(page.locator('.VPNavBar .VPNavBarMenuLink', { hasText: 'Лекции' })).toBeVisible()
   await expect(page.locator('.VPNavBar .VPNavBarMenuLink', { hasText: 'Дополнения' })).toBeVisible()
-  await expect(page.locator('.VPNavBar .VPNavBarMenuLink', { hasText: 'Заключение' })).toBeVisible()
+  await expect(page.locator('.VPNavBar .VPNavBarMenuLink', { hasText: 'Заключение' })).toHaveCount(
+    0
+  )
   await expect(page.locator('.VPNavBar .KpoAskAiProvider')).toBeVisible()
   await expect(page.locator('.VPNavBar .kpo-ai-provider__trigger')).toHaveCount(0)
 
@@ -225,7 +227,7 @@ test('mobile nav uses default vitepress screen and includes ask ai provider', as
   await expect(page.locator('.VPNavScreen')).toContainText('Введение')
   await expect(page.locator('.VPNavScreen')).toContainText('Лекции')
   await expect(page.locator('.VPNavScreen')).toContainText('Дополнения')
-  await expect(page.locator('.VPNavScreen')).toContainText('Заключение')
+  await expect(page.locator('.VPNavScreen .VPNavScreenMenu')).not.toContainText('Заключение')
 
   const provider = page.locator('.VPNavScreen .KpoAskAiProviderScreen')
   await expect(provider).toBeVisible()

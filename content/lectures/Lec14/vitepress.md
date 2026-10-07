@@ -1,3 +1,17 @@
+---
+recommends:
+  - lecture: 3
+    reason: "тесты в pipeline"
+  - lecture: 9
+    reason: "Docker и контейнеры"
+  - lecture: 11
+    reason: "очереди и DLQ в эксплуатации"
+  - lecture: 12
+    reason: "наблюдаемость Saga и Outbox"
+  - lecture: 13
+    reason: "метрики кэша и lag read model"
+---
+
 # Лекция 14. DevOps, SRE и Observability
 
 Заключительная лекция связывает несколько тем, которые обычно оказываются рядом с разработкой: поставка изменений,
