@@ -34,5 +34,8 @@ describe('appearance switch label', () => {
       transform(switchSource, '/x/components/VPSwitchAppearance.vue?vue&type=style')
     ).toBeNull()
     expect(transform(switchSource, '/x/components/VPSwitch.vue')).toBeNull()
+    expect(transform(switchSource, 'C:\\x\\components\\VPSwitchAppearance.vue')).toContain(
+      'aria-label'
+    )
   })
 })

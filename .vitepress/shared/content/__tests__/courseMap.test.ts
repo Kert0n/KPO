@@ -19,6 +19,16 @@ describe('course map', () => {
     expect(map.extras).toEqual([{ title: 'Песочница', route: '/extras/01' }])
   })
 
+  it('rejects a lecture listed in two parts', () => {
+    const pages = [1, 2].map((n) => lecture(n, `Лекция ${n}. Тема`, ''))
+    expect(() =>
+      buildCourseMap(pages, () => '', [
+        { id: 'a', title: 'A', summary: '', lectures: [1, 2] },
+        { id: 'b', title: 'B', summary: '', lectures: [2] }
+      ])
+    ).toThrow(/lecture 2 is in "a" and "b"/)
+  })
+
   it('puts lectures missing from every part into an extra column', () => {
     const pages = [1, 2, 3].map((n) => lecture(n, `Лекция ${n}. Тема`, ''))
     const map = buildCourseMap(pages, () => '', [

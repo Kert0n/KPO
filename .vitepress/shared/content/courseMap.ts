@@ -109,7 +109,7 @@ export function buildCourseMap(
     })
 
   const linked = applyDependencies(parsed, sourcePaths)
-  problems.push(...linked.problems)
+  problems.push(...linked.problems, ...duplicateGroupLectures(groups))
   if (problems.length > 0) {
     throw new Error(`Lecture dependency violations:\n${problems.map((p) => `  - ${p}`).join('\n')}`)
   }
@@ -246,4 +246,23 @@ export function readingPaths(lectures: CourseLecture[]): ReadingPath[] {
           candidate.path.every((number) => other.path.includes(number))
       )
   )
+}
+
+/** Лекция может стоять только в одной части: иначе на карте у неё две строки и дуги к одной из них */
+function duplicateGroupLectures(groups: CourseGroup[]): string[] {
+  const owners = new Map<number, string>()
+  const problems: string[] = []
+  for (const group of groups) {
+    for (const number of group.lectures) {
+      const owner = owners.get(number)
+      if (owner !== undefined) {
+        problems.push(
+          `COURSE_GROUPS (.vitepress/shared/content/courseMap.ts): lecture ${number} is in "${owner}" and "${group.id}"`
+        )
+      } else {
+        owners.set(number, group.id)
+      }
+    }
+  }
+  return problems
 }

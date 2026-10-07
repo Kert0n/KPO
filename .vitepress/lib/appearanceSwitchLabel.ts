@@ -24,7 +24,7 @@ export function appearanceSwitchLabelPlugin(): Plugin {
     name: 'kpo-appearance-switch-label',
     enforce: 'pre',
     transform(code, id) {
-      const [file, query] = id.split('?')
+      const [file, query] = id.replace(/\\/g, '/').split('?')
       if (query || !file.endsWith('/VPSwitchAppearance.vue')) return null
       return labelAppearanceSwitch(code)
     }
