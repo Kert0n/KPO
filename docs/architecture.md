@@ -1,42 +1,39 @@
-# Architecture
+# Архитектура
 
-Build-time and browser code depend on `.vitepress/shared`, which must not import
-theme components or composables. Compatibility re-exports may remain at old
-internal paths while callers migrate, but the implementation has one owner.
+Код сборки и браузерный код зависят от `.vitepress/shared`, а `.vitepress/shared` не должен
+импортировать компоненты и composables темы. Пока вызывающий код переезжает, по старым внутренним
+путям могут оставаться реэкспорты для совместимости, но у реализации один владелец.
 
-Browser features that allocate observers, animation frames or route hooks use
-an explicit controller lifecycle. A controller owns everything it allocates
-and provides `dispose()`; reinstalling a controller disposes the earlier owner.
-Route-hook cleanup restores the preceding hook only while the controller still
-owns the router slot, so later integrations are not overwritten.
+Браузерные возможности, которые заводят observers, animation frames или route hooks, работают через
+явный жизненный цикл контроллера. Контроллер владеет всем, что выделил, и предоставляет `dispose()`;
+повторная установка контроллера освобождает предыдущего владельца. При очистке route hook
+восстанавливается предыдущий обработчик, только пока контроллер ещё владеет этим слотом роутера, —
+так более поздние интеграции не перезаписываются.
 
-Adaptive tables follow this rule through `AdaptiveTablesController`:
+Адаптивные таблицы следуют этому правилу через `AdaptiveTablesController`:
 
-- `scan()` schedules discovery and layout of current table blocks;
-- `disposeDisconnected()` removes controllers for detached route DOM;
-- `dispose()` disconnects every observer, cancels scan/layout/verification RAFs
-  and restores the previous VitePress route hook.
+- `scan()` планирует поиск и раскладку текущих блоков таблиц;
+- `disposeDisconnected()` убирает контроллеры для DOM, отсоединённого при смене маршрута;
+- `dispose()` отключает все observers, отменяет RAF сканирования, раскладки и проверки и
+  восстанавливает предыдущий route hook VitePress.
 
-The controller changes lifecycle ownership only. Table markup, CSS and the
-fit/wrap/scroll geometry policy remain separate stable contracts.
+Контроллер меняет только владение жизненным циклом. Разметка таблиц, CSS и политика геометрии
+fit/wrap/scroll остаются отдельными стабильными контрактами.
 
-Code language and Playground transitions own a viewport-anchor transaction.
-The transaction observes the interacted switcher and document geometry,
-restores the anchor while it owns scrolling, and releases ownership immediately
-after wheel, touch or later keyboard scroll intent. The initiating Home/End
-event is explicitly excluded from interruption.
+Переключения языка кода и Playground владеют транзакцией якоря viewport. Транзакция наблюдает за
+геометрией переключателя, с которым взаимодействовали, и документа, восстанавливает якорь, пока владеет
+прокруткой, и сразу отдаёт владение после намерения прокрутить колесом, касанием или последующей
+клавишей. Исходное событие Home/End явно не считается прерыванием.
 
-Each Kotlin Playground exposes a ready/failed/disposed settlement signal and
-waits for its own ResizeObserver-backed geometry quiet period. Global language
-or Playground mode changes use a lifecycle registry of actually pending
-initializations; they never discover state through global DOM queries. Unmount
-settles the registry entry, invalidates the async generation and destroys any
-instance attached after the component became disconnected.
+Каждый Kotlin Playground отдаёт сигнал завершения ready/failed/disposed и ждёт собственного периода
+затишья геометрии на основе ResizeObserver. Глобальная смена языка или режима Playground опирается на
+реестр жизненных циклов реально ожидающих инициализаций и никогда не выясняет состояние глобальными
+запросами к DOM. Размонтирование закрывает запись в реестре, делает недействительным асинхронное
+поколение и уничтожает экземпляр, подключённый после того, как компонент был отсоединён.
 
-Ask AI follows the same ownership model. Context loading owns an abortable
-request and prefetch timer; route invalidation aborts both and advances a
-generation token. Action preparation has a separate generation token so a
-slower earlier selection cannot overwrite the latest one. The manual clipboard
-fallback traps focus inside the existing dialog and restores it to the visible
-provider control when the dialog closes. Component unmount removes every
-document/window listener and disposes both loaders.
+Ask AI следует той же модели владения. Загрузка контекста владеет отменяемым запросом и таймером
+предзагрузки; инвалидация маршрута отменяет оба и продвигает токен поколения. У подготовки действия
+свой токен поколения, поэтому более медленное раннее выделение не может перезаписать последнее.
+Ручной fallback через буфер обмена удерживает фокус внутри существующего диалога и при закрытии
+возвращает его на видимый элемент выбора провайдера. Размонтирование компонента снимает все
+обработчики document/window и освобождает оба загрузчика.

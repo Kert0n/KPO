@@ -69,7 +69,7 @@ cp -R content/extras/_template content/extras/NN
 
 Раздел `## Дополнительное чтение` в любой лекции или extra автоматически попадает в общий список на
 `/extras/02`. Формат ссылок и правила проверки описаны в
-[`content-catalog.md`](content-catalog.md#additional-readings).
+[`content-catalog.md`](content-catalog.md#дополнительное-чтение).
 
 ## Что прочитать до лекции
 
