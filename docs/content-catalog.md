@@ -1,47 +1,44 @@
-# Content Catalog
+# Каталог контента
 
-`.vitepress/shared/content/contentCatalog.ts` is the only source of page routes,
-ordering and channel inclusion. It discovers public `vitepress.md` files and
-applies the policy from `contentPolicy.ts`.
+`.vitepress/shared/content/contentCatalog.ts` — единственный источник маршрутов страниц, их порядка и
+участия в каналах. Каталог находит публичные файлы `vitepress.md` и применяет к ним политику из
+`contentPolicy.ts`.
 
-Page titles use frontmatter `title`, then the first H1, then a section fallback.
-Ordering uses numeric frontmatter `order`, then the number in the directory
-name. Routes and section order values must be unique.
+Заголовок страницы берётся из `title` во frontmatter, затем из первого H1, затем из запасного названия
+раздела. Порядок задаёт числовой `order` во frontmatter, а без него — номер в имени папки. Маршруты и
+значения порядка внутри раздела должны быть уникальными.
 
-Each page explicitly opts into navigation, sidebar, search, Ask AI, PDF, UI
-sweep and sitemap channels. `_template`, `_internal` and service pages never
-enter public channels. Service fixtures may participate only in the internal UI
-sweep.
+Каждая страница явно включается в каналы: навигация, sidebar, поиск, Ask AI, PDF, UI sweep и
+sitemap. `_template`, `_internal` и служебные страницы никогда не попадают в публичные каналы.
+Служебные фикстуры могут участвовать только во внутреннем UI sweep.
 
-To add a lecture or extra, create its numbered directory and `vitepress.md`.
-The catalog automatically supplies rewrites, sidebar entries, Ask AI context,
-PDF export, UI coverage and sitemap metadata. Override `order` in frontmatter
-when filesystem numbering must not control presentation order.
+Чтобы добавить лекцию или дополнение, создайте пронумерованную папку и `vitepress.md`. Каталог сам
+подставит rewrites, пункты sidebar, контекст Ask AI, экспорт в PDF, покрытие UI-тестами и метаданные
+sitemap. Если порядок показа не должен совпадать с нумерацией папок, задайте `order` во frontmatter.
 
-## Lecture dependencies
+## Зависимости между лекциями
 
-Lecture frontmatter `requires` and `recommends` feeds the course map on the home
-page: `.vitepress/shared/content/courseMap.ts`, loaded at build time by
-`.vitepress/theme/data/courseMap.data.ts`. Each item is a lecture number or
-`{ lecture, reason }`. Dependencies point only to earlier lectures and name each
-lecture once, so the graph stays acyclic and the reading order follows the
-course numbering. `requires` is resolved transitively.
+Поля `requires` и `recommends` во frontmatter лекции питают карту курса на главной:
+`.vitepress/shared/content/courseMap.ts`, который при сборке загружает
+`.vitepress/theme/data/courseMap.data.ts`. Элемент списка — номер лекции или `{ lecture, reason }`.
+Зависимости указывают только на более ранние лекции и называют каждую лекцию один раз, поэтому граф
+остаётся ацикличным, а порядок чтения совпадает с нумерацией курса. `requires` разворачивается
+транзитивно.
 
-`content:check` and the build reject malformed items and unknown, forward or
-duplicated references, reporting the source path. The course parts shown as map
-columns are the `COURSE_GROUPS` constant in the same module; a lecture missing
-from every part is shown in an extra «Другие лекции» column. The authoring rules are in
+`content:check` и сборка отклоняют некорректные элементы, а также неизвестные, указывающие вперёд и
+повторяющиеся ссылки, и сообщают путь к файлу. Части курса, которые на карте служат колонками, заданы
+константой `COURSE_GROUPS` в том же модуле; лекция, не попавшая ни в одну часть, показывается в
+дополнительной колонке «Другие лекции». Правила для авторов — в
 [`authoring.md`](authoring.md#что-прочитать-до-лекции).
 
-## Additional readings
+## Дополнительное чтение
 
-`/extras/02` is generated from the same catalog. Every lecture or extra that
-contains a recognized H2 reading section is included automatically; no loader
-or component change is required for a new numbered page. Service pages,
-templates and index pages are excluded.
+`/extras/02` собирается из того же каталога. Каждая лекция или дополнение с распознанным H2-разделом
+чтения попадает в список автоматически: для новой пронумерованной страницы не нужно менять ни
+загрузчик, ни компонент. Служебные страницы, заготовки и индексные страницы исключены.
 
-Use the canonical heading and top-level Markdown bullets whose first element is
-an external HTTP(S) link:
+Используйте канонический заголовок и Markdown-пункты верхнего уровня, первый элемент которых — внешняя
+HTTP(S)-ссылка:
 
 ```md
 ## Дополнительное чтение
@@ -51,12 +48,10 @@ an external HTTP(S) link:
 - [Название источника](https://example.com/article) — необязательное пояснение
 ```
 
-Links before the first H3 are placed in the `Материалы` group. Notes may
-continue on an indented next line. The compatible H2
-`Источники для дальнейшего чтения` is supported for existing material, but new
-pages should use `Дополнительное чтение`.
+Ссылки до первого H3 попадают в группу `Материалы`. Пояснение можно продолжить на следующей строке с
+отступом. Совместимый заголовок H2 `Источники для дальнейшего чтения` поддерживается для уже
+написанных материалов, но новые страницы должны использовать `Дополнительное чтение`.
 
-The content gate rejects recognized sections that are empty, contain empty H3
-groups, malformed links, non-HTTP(S) URLs or duplicate recognized sections. A
-diagnostic includes the source path and line so a newly copied template cannot
-silently disappear from the index.
+Проверка контента отклоняет распознанные разделы, которые пусты, содержат пустые H3-группы,
+некорректные ссылки, не-HTTP(S) URL или повторяются. Диагностика указывает путь к файлу и строку,
+чтобы только что скопированная заготовка не могла молча пропасть из списка.
