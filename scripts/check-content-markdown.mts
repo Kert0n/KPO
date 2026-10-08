@@ -2,6 +2,7 @@ import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { join, relative } from 'node:path'
 import { parseContentAdditionalReadings } from '../.vitepress/shared/content/additionalReadings.ts'
 import { getContentCatalog } from '../.vitepress/shared/content/contentCatalog.ts'
+import { buildCourseMap } from '../.vitepress/shared/content/courseMap.ts'
 const roots = ['content/lectures', 'content/extras', 'content/intro', 'README.md']
 const failures: string[] = []
 
@@ -25,6 +26,16 @@ for (const page of getContentCatalog({ fresh: true })) {
     if (!(error instanceof Error)) throw error
     failures.push(error.message)
   }
+}
+
+// Frontmatter `requires` / `recommends` лекций: карта курса на главной
+try {
+  buildCourseMap(getContentCatalog({ fresh: true }), (page) =>
+    readFileSync(page.sourcePath, 'utf8')
+  )
+} catch (error) {
+  if (!(error instanceof Error)) throw error
+  failures.push(error.message)
 }
 
 function redundantMultiCodeDefaults(source: string): Array<{ line: number; header: string }> {

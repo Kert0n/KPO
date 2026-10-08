@@ -1,5 +1,6 @@
 import { fileURLToPath } from 'node:url'
 import { defineConfig } from 'vitepress'
+import { appearanceSwitchLabelPlugin } from './lib/appearanceSwitchLabel'
 import { askAiContextPlugin } from './lib/askAiContextPlugin'
 import { assertAskAiContextParity } from './lib/askAiContext'
 import { getNav, getRewrites, getSidebar } from './lib/content'
@@ -74,13 +75,6 @@ export default defineConfig({
     return [['meta', { name: 'description', content: pageData.description || SITE.description }]]
   },
 
-  transformHtml(code) {
-    return code.replace(/<button([^>]*\bVPSwitchAppearance\b[^>]*)>/g, (button, attributes) => {
-      if (/\baria-label=/.test(attributes)) return button
-      return `<button${attributes} aria-label="Переключить тему">`
-    })
-  },
-
   // В папках лекций/дополнений публикуется только vitepress.md;
   // остальные .md — материалы редактора (черновики, заметки)
   srcExclude: [
@@ -133,6 +127,7 @@ export default defineConfig({
       }
     },
     plugins: [
+      appearanceSwitchLabelPlugin(),
       askAiContextPlugin({
         base: SITE.base,
         courseTitle: SITE.title,

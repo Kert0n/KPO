@@ -2,6 +2,8 @@ import { defineConfig, devices } from '@playwright/test'
 
 export default defineConfig({
   testDir: './tests/ui',
+  // Дев-сервер VitePress не делает SSR: тесты серверной разметки идут в prebuilt-конфиге
+  grepInvert: /@ssr/,
   timeout: 60_000,
   expect: {
     timeout: 15_000

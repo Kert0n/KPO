@@ -1,0 +1,630 @@
+/**
+ * Главная (KpoHome): hero с примером кода и карта «что прочитать до лекции».
+ * Узкая раскладка — плитки частей курса; переключение по ширине секции (container query).
+ * Правило формы: панели 14px, кнопки — пилюли.
+ */
+
+.kpo-home {
+  max-width: 1240px;
+  margin: 0 auto;
+  padding: 48px 32px 112px;
+}
+
+.kpo-home__hero {
+  display: grid;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+  gap: 56px;
+  align-items: center;
+  padding-top: 24px;
+}
+
+.kpo-home h1 {
+  margin: 0;
+  font-size: 50px;
+  font-weight: 700;
+  line-height: 1.04;
+  letter-spacing: -0.03em;
+  color: var(--vp-c-text-1);
+}
+
+.kpo-home__lede {
+  max-width: 30em;
+  margin: 22px 0 0;
+  font-size: 17px;
+  line-height: 1.6;
+  color: var(--vp-c-text-2);
+}
+
+.kpo-home__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 32px 0 0;
+}
+
+.kpo-home__button {
+  display: inline-flex;
+  align-items: center;
+  height: 42px;
+  padding: 0 22px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  font-size: 15px;
+  font-weight: 600;
+  white-space: nowrap;
+  text-decoration: none;
+  transition:
+    background-color 0.2s,
+    border-color 0.2s;
+}
+
+.kpo-home__button--brand {
+  background: var(--vp-c-brand-3);
+  color: var(--vp-c-white);
+}
+
+.kpo-home__button--brand:hover {
+  background: var(--vp-c-brand-2);
+}
+
+.kpo-home__button--alt {
+  border-color: var(--vp-c-border);
+  color: var(--vp-c-text-1);
+}
+
+.kpo-home__button--alt:hover {
+  border-color: var(--vp-c-brand-1);
+}
+
+.kpo-home__specimen {
+  min-width: 0;
+  margin: 0;
+}
+
+.kpo-home__code > :first-child {
+  margin-top: 0;
+}
+
+.kpo-home__specimen figcaption {
+  margin-top: 12px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--vp-c-text-2);
+}
+
+.kpo-home__specimen figcaption a,
+.kpo-home__need a {
+  color: var(--vp-c-brand-1);
+  text-decoration: none;
+}
+
+.kpo-home__specimen figcaption a:hover,
+.kpo-home__need a:hover {
+  text-decoration: underline;
+}
+
+/*
+ * Карта курса. Широкая раскладка — список лекций с дугами и боковая панель;
+ * узкая — плитки частей. Переключение по ширине самой секции, а не окна.
+ * Высоты строк задаёт COURSE_LIST_METRICS (lib/courseListLayout.ts) через
+ * --kpo-home-row / --kpo-home-part: по ним считаются координаты дуг.
+ */
+.kpo-home__map-section {
+  margin-top: 96px;
+  container: kpo-home-map / inline-size;
+}
+
+.kpo-home__map-section h2 {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  font-size: 30px;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  color: var(--vp-c-text-1);
+}
+
+.kpo-home__lede-wide,
+.kpo-home__lede-narrow {
+  max-width: 46em;
+  margin: 10px 0 0;
+  font-size: 16px;
+  line-height: 1.55;
+  color: var(--vp-c-text-2);
+}
+
+.kpo-home__lede-narrow {
+  display: none;
+}
+
+.kpo-home__explorer {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: 40px;
+  align-items: start;
+  margin-top: 28px;
+}
+
+/* Список лекций: слева поле дуг, справа строки фиксированной высоты */
+.kpo-home__course {
+  position: relative;
+  padding-left: var(--kpo-home-gutter);
+}
+
+.kpo-home__arcs {
+  position: absolute;
+  top: 0;
+  left: 0;
+  overflow: visible;
+}
+
+.kpo-home__arc {
+  fill: none;
+  stroke: var(--vp-c-text-3);
+  stroke-width: 1.4;
+  transition:
+    opacity 0.15s,
+    stroke 0.15s;
+}
+
+.kpo-home__arc--recommends {
+  stroke-dasharray: 4 4;
+}
+
+.kpo-home__arc.is-on {
+  stroke: var(--vp-c-brand-1);
+  stroke-width: 2.2;
+}
+
+.kpo-home__arc.is-hint {
+  stroke: var(--vp-c-text-2);
+  stroke-width: 1.5;
+}
+
+.kpo-home__arc.is-off {
+  opacity: 0.15;
+}
+
+.kpo-home__arc.is-hidden {
+  opacity: 0;
+}
+
+.kpo-home__arrow {
+  fill: var(--vp-c-text-3);
+}
+
+.kpo-home__arrow--on {
+  fill: var(--vp-c-brand-1);
+}
+
+.kpo-home__part-header {
+  display: flex;
+  gap: 12px;
+  align-items: baseline;
+  box-sizing: border-box;
+  height: var(--kpo-home-part);
+  margin: 0;
+  padding: 18px 0 0 12px;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.kpo-home__part-title {
+  font-size: 15px;
+  font-weight: 650;
+  color: var(--kpo-home-part-color);
+}
+
+.kpo-home__part-summary {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--vp-c-text-3);
+}
+
+.kpo-home__rows {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.kpo-home__row {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  box-sizing: border-box;
+  height: var(--kpo-home-row);
+  padding: 0 12px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  color: var(--vp-c-text-1);
+  text-decoration: none;
+  transition:
+    background-color 0.15s,
+    border-color 0.15s,
+    opacity 0.15s;
+}
+
+.kpo-home__row-number {
+  font-family: var(--vp-font-family-mono);
+  font-size: 14px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--kpo-home-part-color);
+}
+
+/* До двух строк: строка высокая, длинные названия не обрезаются */
+.kpo-home__row-title {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 20px;
+}
+
+.kpo-home__row-need {
+  font-size: 13px;
+  white-space: nowrap;
+  color: var(--vp-c-text-3);
+}
+
+.kpo-home__row:hover,
+.kpo-home__row:focus-visible,
+.kpo-home__row.is-current {
+  border-color: var(--vp-c-divider);
+  background: var(--vp-c-bg-soft);
+}
+
+.kpo-home__row.is-required {
+  border-color: var(--vp-c-brand-1);
+  background: var(--vp-c-brand-soft);
+}
+
+.kpo-home__row.is-required .kpo-home__row-need,
+.kpo-home__row.is-current .kpo-home__row-need {
+  color: var(--vp-c-text-2);
+}
+
+.kpo-home__row.is-recommended {
+  border-color: var(--vp-c-text-3);
+  border-style: dashed;
+}
+
+.kpo-home__row.is-off {
+  opacity: 0.4;
+}
+
+/* Панель держится рядом со списком при прокрутке и не влияет на его раскладку */
+.kpo-home__panel {
+  position: sticky;
+  top: calc(var(--vp-nav-height) + 24px);
+  max-height: calc(100vh - var(--vp-nav-height) - 48px);
+  overflow-y: auto;
+  box-sizing: border-box;
+  padding: 22px 24px;
+  border-radius: 14px;
+  background: var(--vp-c-bg-soft);
+}
+
+.kpo-home__panel-title {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 650;
+  line-height: 1.35;
+  color: var(--vp-c-text-1);
+}
+
+.kpo-home__panel-note {
+  margin: 6px 0 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--vp-c-text-2);
+}
+
+.kpo-home__panel-label {
+  margin: 20px 0 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--vp-c-text-2);
+}
+
+.kpo-home__panel-empty {
+  margin: 0;
+  font-size: 14px;
+  color: var(--vp-c-text-2);
+}
+
+.kpo-home__steps,
+.kpo-home__paths {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.kpo-home__steps li {
+  display: grid;
+  grid-template-columns: 26px minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--vp-c-text-1);
+}
+
+.kpo-home__step {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 22px;
+  border-radius: 6px;
+  background: var(--vp-c-brand-3);
+  font-family: var(--vp-font-family-mono);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--vp-c-white);
+}
+
+.kpo-home__step--soft {
+  box-sizing: border-box;
+  border: 1.5px dashed var(--vp-c-text-3);
+  background: transparent;
+  color: var(--vp-c-text-2);
+}
+
+.kpo-home__step-text {
+  display: grid;
+  gap: 2px;
+}
+
+.kpo-home__reason {
+  font-size: 13px;
+  color: var(--vp-c-text-2);
+}
+
+.kpo-home__paths {
+  margin-top: 16px;
+}
+
+.kpo-home__paths li {
+  display: grid;
+  gap: 2px;
+  padding: 8px 12px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: var(--vp-c-bg);
+  transition: border-color 0.15s;
+}
+
+/* Наведённая цепочка подсвечивается и здесь, и на карте */
+.kpo-home__paths li.is-active {
+  border-color: var(--vp-c-brand-1);
+}
+
+.kpo-home__path-target {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--vp-c-text-1);
+  text-decoration: none;
+}
+
+.kpo-home__path-target:hover {
+  color: var(--vp-c-brand-1);
+}
+
+.kpo-home__path-steps {
+  font-family: var(--vp-font-family-mono);
+  font-size: 12.5px;
+  color: var(--vp-c-text-2);
+}
+
+.kpo-home__start {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--vp-c-text-2);
+}
+
+.kpo-home__start a {
+  font-weight: 600;
+  color: var(--vp-c-brand-1);
+  text-decoration: none;
+}
+
+.kpo-home__start a:hover {
+  text-decoration: underline;
+}
+
+.kpo-home__legend {
+  display: grid;
+  gap: 6px;
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--vp-c-divider);
+  font-size: 12.5px;
+  color: var(--vp-c-text-2);
+}
+
+.kpo-home__legend span {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.kpo-home__legend-arc {
+  fill: none;
+  stroke: var(--vp-c-text-2);
+  stroke-width: 1.5;
+}
+
+.kpo-home__legend-arc--soft {
+  stroke-dasharray: 3 3;
+}
+
+/* Узкая раскладка — плитки частей (вариант B); число частей не ограничено */
+.kpo-home__bento {
+  display: none;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr));
+  gap: 16px;
+  margin-top: 24px;
+}
+
+.kpo-home__cell {
+  padding: 24px;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 14px;
+  background: var(--vp-c-bg);
+}
+
+.kpo-home__cell--tint-0 {
+  border-color: transparent;
+  background: var(--vp-c-brand-soft);
+}
+
+.kpo-home__cell--tint-1 {
+  border-color: transparent;
+  background: var(--vp-c-bg-soft);
+}
+
+.kpo-home__cell h3 {
+  margin: 0;
+  font-size: 19px;
+  font-weight: 650;
+  color: var(--vp-c-text-1);
+}
+
+.kpo-home__summary {
+  margin: 6px 0 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--vp-c-text-2);
+}
+
+.kpo-home__lectures {
+  display: grid;
+  gap: 10px;
+  margin: 16px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.kpo-home__lectures li > a {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 1.4;
+  color: var(--vp-c-text-1);
+  text-decoration: none;
+}
+
+.kpo-home__lectures li > a:hover {
+  color: var(--vp-c-brand-1);
+}
+
+.kpo-home__n {
+  font-variant-numeric: tabular-nums;
+  color: var(--vp-c-text-3);
+}
+
+.kpo-home__need,
+.kpo-home__soft {
+  display: block;
+  margin: 2px 0 0 28px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--vp-c-text-2);
+}
+
+.kpo-home__need {
+  font-weight: 600;
+  color: var(--vp-c-text-1);
+}
+
+@container kpo-home-map (max-width: 959px) {
+  .kpo-home__lede-wide,
+  .kpo-home__explorer {
+    display: none;
+  }
+
+  .kpo-home__lede-narrow {
+    display: block;
+  }
+
+  .kpo-home__bento {
+    display: grid;
+  }
+}
+
+.kpo-home__more {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 40px;
+  margin-top: 56px;
+  padding-top: 20px;
+  border-top: 1px solid var(--vp-c-divider);
+}
+
+.kpo-home__more a {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--vp-c-text-1);
+  text-decoration: none;
+}
+
+.kpo-home__more a:hover {
+  color: var(--vp-c-brand-1);
+}
+
+@media (max-width: 959px) {
+  .kpo-home {
+    padding: 32px 24px 88px;
+  }
+
+  .kpo-home__hero {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 32px;
+    padding-top: 0;
+  }
+
+  .kpo-home h1 {
+    font-size: 38px;
+  }
+}
+
+@media (max-width: 767px) {
+  .kpo-home {
+    padding: 24px 16px 72px;
+  }
+
+  .kpo-home h1 {
+    font-size: 31px;
+  }
+
+  .kpo-home__map-section {
+    margin-top: 64px;
+  }
+
+  .kpo-home__map-section h2 {
+    font-size: 24px;
+  }
+
+  .kpo-home__more {
+    flex-direction: column;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kpo-home__button,
+  .kpo-home__arc,
+  .kpo-home__row,
+  .kpo-home__paths li {
+    transition: none;
+  }
+}

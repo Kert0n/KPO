@@ -1,3 +1,12 @@
+---
+requires:
+  - lecture: 7
+    reason: "domain-first, ограниченные контексты и агрегаты из DDD"
+recommends:
+  - lecture: 6
+    reason: "паттерн Adapter за Ports and Adapters"
+---
+
 # Лекция 8. Эволюция Enterprise-архитектур
 
 Эта лекция начинает архитектурный блок курса. До этого мы в основном разбирали локальные решения: как связать два

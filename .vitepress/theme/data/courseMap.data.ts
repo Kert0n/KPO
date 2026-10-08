@@ -1,22 +1,15 @@
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { defineLoader } from 'vitepress'
-import {
-  collectAdditionalReadings,
-  type ContentAdditionalReadings
-} from '../../shared/content/additionalReadings'
 import { getContentCatalog } from '../../shared/content/contentCatalog'
+import { buildCourseMap, type CourseMap } from '../../shared/content/courseMap'
 
-export type {
-  AdditionalReadingGroup,
-  AdditionalReadingItem,
-  ContentAdditionalReadings
-} from '../../shared/content/additionalReadings'
+export declare const data: CourseMap
 
 export default defineLoader({
   watch: ['../../../content/lectures/*/vitepress.md', '../../../content/extras/*/vitepress.md'],
-  load(): ContentAdditionalReadings[] {
-    return collectAdditionalReadings(getContentCatalog({ fresh: true }), (page) => {
+  load(): CourseMap {
+    return buildCourseMap(getContentCatalog({ fresh: true }), (page) => {
       return readFileSync(resolve(process.cwd(), page.sourcePath), 'utf8')
     })
   }

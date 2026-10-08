@@ -1,36 +1,60 @@
 ---
-layout: home
-
-hero:
-  name: КПО
-  text: Конструирование программного обеспечения
-  tagline: Практический конспект по архитектуре, тестированию, данным и production-практикам
-  image:
-    light: /logo-light.svg
-    dark: /logo-dark.svg
-    alt: КПО
-  actions:
-    - theme: brand
-      text: Начать с введения
-      link: /intro
-    - theme: alt
-      text: Первая лекция
-      link: /lectures/01
-    - theme: alt
-      text: Песочница
-      link: /extras/01
-
-features:
-  - icon: 🧭
-    title: 14 лекций-компаньонов
-    details: Курс ведёт от базовых принципов проектирования к DDD, API, данным, отказоустойчивости и эксплуатации.
-  - icon: 🔀
-    title: 4 языка
-    details: Примеры можно сравнивать на Kotlin, C#, Java и Go. Выбранный язык запоминается для всего конспекта.
-  - icon: ⚡️
-    title: Kotlin Playground
-    details: Kotlin-примеры можно менять и запускать прямо на странице, не уходя из материала.
-  - icon: 🛠️
-    title: Production-oriented финал
-    details: Последние темы связывают архитектуру с надежностью, наблюдаемостью, DevOps и сопровождением.
+layout: KpoHome
+sidebar: false
 ---
+
+:::: multi-code "Первые темы курса"
+
+```kotlin
+fun main() {
+    val topics = listOf("SOLID", "DI", "Тесты")
+    for ((index, topic) in topics.withIndex()) {
+        println("Лекция ${index + 1}: $topic")
+    }
+}
+```
+
+```kotlin playground
+fun main() {
+    val topics = listOf("SOLID", "DI", "Тесты")
+    for ((index, topic) in topics.withIndex()) {
+        println("Лекция ${index + 1}: $topic")
+    }
+}
+```
+
+```csharp
+var topics = new[] { "SOLID", "DI", "Тесты" };
+for (var i = 0; i < topics.Length; i++)
+{
+    Console.WriteLine($"Лекция {i + 1}: {topics[i]}");
+}
+```
+
+```java
+import java.util.List;
+
+public class Main {
+    public static void main(String[] args) {
+        var topics = List.of("SOLID", "DI", "Тесты");
+        for (int i = 0; i < topics.size(); i++) {
+            System.out.println("Лекция " + (i + 1) + ": " + topics.get(i));
+        }
+    }
+}
+```
+
+```go
+package main
+
+import "fmt"
+
+func main() {
+    topics := []string{"SOLID", "DI", "Тесты"}
+    for i, topic := range topics {
+        fmt.Printf("Лекция %d: %s\n", i+1, topic)
+    }
+}
+```
+
+::::

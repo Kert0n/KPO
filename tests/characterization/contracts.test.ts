@@ -15,8 +15,7 @@ describe('fixture-backed public contracts', () => {
     expect(buildNav(pages)).toEqual([
       { text: 'Введение', link: '/intro' },
       { text: 'Лекции', link: '/lectures/01', activeMatch: '^/lectures/' },
-      { text: 'Дополнения', link: '/extras/', activeMatch: '^/extras/' },
-      { text: 'Заключение', link: '/conclusion' }
+      { text: 'Дополнения', link: '/extras/', activeMatch: '^/extras/' }
     ])
     expect(buildSidebar(pages)).toEqual(
       expect.arrayContaining([

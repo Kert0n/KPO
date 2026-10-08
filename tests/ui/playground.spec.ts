@@ -27,6 +27,10 @@ test('illustrative Kotlin remains visible but cannot start Playground', async ({
   await expectActiveTab(illustrative, 'Kotlin')
   await expect(illustrative.locator('.language-kotlin')).toBeVisible()
   await expect(illustrative.getByRole('button', { name: /Playground/ })).toBeDisabled()
+  await expect(illustrative.getByRole('button', { name: /Playground/ })).toHaveAttribute(
+    'title',
+    'У этого примера нет запускаемой версии'
+  )
 
   const runnable = page.locator('.kpo-switcher').filter({ hasText: 'Fixture Kotlin Playground' })
   await expect(runnable.getByRole('button', { name: /Playground/ })).toBeEnabled()
@@ -250,59 +254,64 @@ test('playground toggle keeps stable geometry and availability follows the activ
   await expect(playgroundOff.locator('.kpo-switcher__playground-toggle')).toHaveCount(0)
 })
 
-test('persisted language hydration keeps switcher controls geometrically stable', async ({
-  browser,
-  page
-}, testInfo) => {
-  await page.goto(UI_FIXTURE_ROUTE)
-  const scenarios = [
-    { viewport: { width: 390, height: 844 }, language: 'java', playgroundMode: '1' },
-    { viewport: { width: 768, height: 900 }, language: 'go', playgroundMode: '0' },
-    { viewport: { width: 800, height: 900 }, language: 'java', playgroundMode: '0' },
-    { viewport: { width: 1440, height: 1000 }, language: 'kotlin', playgroundMode: '1' }
-  ] as const
-
-  for (const scenario of scenarios) {
-    const ssrContext = await browser.newContext({
-      javaScriptEnabled: false,
-      viewport: scenario.viewport
-    })
-    const ssrPage = await ssrContext.newPage()
-    await ssrPage.goto(new URL(UI_FIXTURE_ROUTE, String(testInfo.project.use.baseURL)).href)
-    await ssrPage.evaluate(() => document.fonts.ready)
-    const ssrGeometry = await measureSwitcherControlGeometry(
-      ssrPage.locator('.kpo-switcher').first()
-    )
-    await ssrContext.close()
-
-    await page.setViewportSize(scenario.viewport)
-    await page.evaluate(({ language, playgroundMode }) => {
-      localStorage.setItem('kpo:code-language', language)
-      localStorage.setItem('kpo:playground-mode', playgroundMode)
-    }, scenario)
+// Сравнивает серверную разметку с гидратированной: нужен собранный сайт с SSR,
+// поэтому тест помечен @ssr и идёт только в playwright.prebuilt.config.ts.
+test(
+  'persisted language hydration keeps switcher controls geometrically stable',
+  { tag: '@ssr' },
+  async ({ browser, page }, testInfo) => {
     await page.goto(UI_FIXTURE_ROUTE)
+    const scenarios = [
+      { viewport: { width: 390, height: 844 }, language: 'java', playgroundMode: '1' },
+      { viewport: { width: 768, height: 900 }, language: 'go', playgroundMode: '0' },
+      { viewport: { width: 800, height: 900 }, language: 'java', playgroundMode: '0' },
+      { viewport: { width: 1440, height: 1000 }, language: 'kotlin', playgroundMode: '1' }
+    ] as const
 
-    const switcher = page.locator('.kpo-switcher').first()
-    const runnable = page.locator('.kpo-switcher').filter({ hasText: 'Fixture Kotlin Playground' })
-    await expectActiveTab(
-      switcher,
-      scenario.language === 'kotlin' ? 'Kotlin' : scenario.language === 'java' ? 'Java' : 'Go'
-    )
-    if (scenario.language === 'kotlin' && scenario.playgroundMode === '1') {
-      await expect(switcher.locator('.kpo-switcher__playground-toggle')).toBeDisabled()
-      await waitForScopedPlayground(runnable)
-    } else {
-      await expect(page.locator('.kpo-playground:visible')).toHaveCount(0)
-      const toggle = switcher.locator('.kpo-switcher__playground-toggle')
-      await expect(toggle).toBeVisible()
-      await expect(toggle).toBeDisabled()
+    for (const scenario of scenarios) {
+      const ssrContext = await browser.newContext({
+        javaScriptEnabled: false,
+        viewport: scenario.viewport
+      })
+      const ssrPage = await ssrContext.newPage()
+      await ssrPage.goto(new URL(UI_FIXTURE_ROUTE, String(testInfo.project.use.baseURL)).href)
+      await ssrPage.evaluate(() => document.fonts.ready)
+      const ssrGeometry = await measureSwitcherControlGeometry(
+        ssrPage.locator('.kpo-switcher').first()
+      )
+      await ssrContext.close()
+
+      await page.setViewportSize(scenario.viewport)
+      await page.evaluate(({ language, playgroundMode }) => {
+        localStorage.setItem('kpo:code-language', language)
+        localStorage.setItem('kpo:playground-mode', playgroundMode)
+      }, scenario)
+      await page.goto(UI_FIXTURE_ROUTE)
+
+      const switcher = page.locator('.kpo-switcher').first()
+      const runnable = page
+        .locator('.kpo-switcher')
+        .filter({ hasText: 'Fixture Kotlin Playground' })
+      await expectActiveTab(
+        switcher,
+        scenario.language === 'kotlin' ? 'Kotlin' : scenario.language === 'java' ? 'Java' : 'Go'
+      )
+      if (scenario.language === 'kotlin' && scenario.playgroundMode === '1') {
+        await expect(switcher.locator('.kpo-switcher__playground-toggle')).toBeDisabled()
+        await waitForScopedPlayground(runnable)
+      } else {
+        await expect(page.locator('.kpo-playground:visible')).toHaveCount(0)
+        const toggle = switcher.locator('.kpo-switcher__playground-toggle')
+        await expect(toggle).toBeVisible()
+        await expect(toggle).toBeDisabled()
+      }
+
+      await expectNoPageOverflowFromVpDoc(page)
+      const hydratedGeometry = await measureSwitcherControlGeometry(switcher)
+      expect(hydratedGeometry, JSON.stringify(scenario)).toEqual(ssrGeometry)
     }
-
-    await expectNoPageOverflowFromVpDoc(page)
-    const hydratedGeometry = await measureSwitcherControlGeometry(switcher)
-    expect(hydratedGeometry, JSON.stringify(scenario)).toEqual(ssrGeometry)
   }
-})
+)
 
 async function measureSwitcherControlGeometry(switcher: import('@playwright/test').Locator) {
   return switcher.evaluate((node) => {

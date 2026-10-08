@@ -27,7 +27,7 @@ export function inclusionForKind(kind: ContentPageKind): ContentPageInclusion {
       sitemap: false
     }
   }
-  return { ...publicPage, nav: ['intro', 'lecture', 'extras-index', 'conclusion'].includes(kind) }
+  return { ...publicPage, nav: ['intro', 'lecture', 'extras-index'].includes(kind) }
 }
 
 export function isPublicKind(kind: ContentPageKind): boolean {

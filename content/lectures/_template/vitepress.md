@@ -1,6 +1,13 @@
 ---
 title: Лекция NN. Название
 order: NN
+# Что прочитать до лекции (docs/authoring.md); уберите ненужное
+requires:
+  - lecture: 1
+    reason: без чего эту лекцию не понять
+recommends:
+  - lecture: 2
+    reason: какой контекст поможет
 ---
 
 # Лекция NN. Название
