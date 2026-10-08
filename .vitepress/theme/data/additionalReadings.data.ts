@@ -14,7 +14,7 @@ export type {
 } from '../../shared/content/additionalReadings'
 
 export default defineLoader({
-  watch: ['../../../content/lectures/Lec*/vitepress.md', '../../../content/extras/*/vitepress.md'],
+  watch: ['../../../content/lectures/*/vitepress.md', '../../../content/extras/*/vitepress.md'],
   load(): ContentAdditionalReadings[] {
     return collectAdditionalReadings(getContentCatalog({ fresh: true }), (page) => {
       return readFileSync(resolve(process.cwd(), page.sourcePath), 'utf8')

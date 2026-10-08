@@ -7,7 +7,7 @@ import { buildCourseMap, type CourseMap } from '../../shared/content/courseMap'
 export declare const data: CourseMap
 
 export default defineLoader({
-  watch: ['../../../content/lectures/Lec*/vitepress.md', '../../../content/extras/*/vitepress.md'],
+  watch: ['../../../content/lectures/*/vitepress.md', '../../../content/extras/*/vitepress.md'],
   load(): CourseMap {
     return buildCourseMap(getContentCatalog({ fresh: true }), (page) => {
       return readFileSync(resolve(process.cwd(), page.sourcePath), 'utf8')
