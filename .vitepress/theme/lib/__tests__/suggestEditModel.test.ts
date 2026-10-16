@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 import {
   contributingGuideUrl,
@@ -32,10 +34,10 @@ describe('suggestEditModel', () => {
     expect(contributingGuideUrl(repository)).toBe('https://github.com/Kert0n/KPO#как-помочь-курсу')
   })
 
-  it('prefills an issue with the page, source lines and quoted fragment', () => {
+  it('opens the content-error template with the «Где» section filled in', () => {
     const url = new URL(
       githubIssueUrl(repository, {
-        pageTitle: 'Лекция 3',
+        pageTitle: 'Лекция 3. Принципы эффективного юнит-тестирования',
         pageUrl: 'https://course.example.test/KPO/lectures/03#kinds',
         quote: 'первая строка\nвторая строка',
         sourcePath: 'content/lectures/Lec3/vitepress.md',
@@ -44,23 +46,32 @@ describe('suggestEditModel', () => {
     )
 
     expect(url.pathname).toBe('/Kert0n/KPO/issues/new')
+    expect(url.searchParams.get('template')).toBe('content-error.md')
     expect(url.searchParams.get('title')).toBe('Лекция 3: «первая строка вторая строка»')
     const body = url.searchParams.get('body') ?? ''
-    expect(body).toContain('**Страница:** https://course.example.test/KPO/lectures/03#kinds')
+    expect(body).toContain('Страница: https://course.example.test/KPO/lectures/03#kinds')
     expect(body).toContain('vitepress.md#L40-L42')
     expect(body).toContain('> первая строка\n> вторая строка')
+    // Ссылка с сайта и шаблон в репозитории должны предлагать одни и те же разделы.
+    const template = readFileSync(
+      fileURLToPath(
+        new URL('../../../../.github/ISSUE_TEMPLATE/content-error.md', import.meta.url)
+      ),
+      'utf8'
+    )
+    expect(body.match(/^## .+$/gm)).toEqual(template.match(/^## .+$/gm))
   })
 
-  it('keeps long quotes inside a reasonable issue URL', () => {
+  it('keeps long Cyrillic quotes inside the GitHub URL limit', () => {
     const url = githubIssueUrl(repository, {
       pageTitle: 'Лекция 1',
       pageUrl: 'https://course.example.test/KPO/lectures/01',
       quote: 'слово '.repeat(2000),
-      sourcePath: 'content/lectures/Lec1/vitepress.md'
+      sourcePath: 'content/lectures/Lec1/vitepress.md',
+      lines: { start: 100, end: 140 }
     })
-    const params = new URL(url).searchParams
-    expect(params.get('title')?.length).toBeLessThan(80)
-    expect(params.get('body')?.length).toBeLessThan(900)
+    expect(new URL(url).searchParams.get('title')?.length).toBeLessThan(80)
+    expect(url.length).toBeLessThan(8000)
   })
 
   it('picks the longest run that exists verbatim in the source', () => {

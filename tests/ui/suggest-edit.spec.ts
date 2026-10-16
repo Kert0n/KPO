@@ -70,6 +70,7 @@ test('selection menu reports a problem with the quote and source lines', async (
     .toBeTruthy()
   const issueUrl = (await openedUrls(page)).find((url) => url.includes('/issues/new'))!
   const params = new URL(issueUrl).searchParams
+  expect(params.get('template')).toBe('content-error.md')
   expect(params.get('title')).toBe(`UI Contract Fixtures: «${FIXTURE_TEXT}»`)
   const body = params.get('body') ?? ''
   expect(body).toContain(`> ${FIXTURE_TEXT}`)

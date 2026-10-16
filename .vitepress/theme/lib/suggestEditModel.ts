@@ -24,8 +24,10 @@ export type IssueDraft = {
 /** Анонс кнопки показывается до этой даты включительно (две недели после релиза). */
 export const SUGGEST_EDIT_ANNOUNCEMENT_UNTIL = '2026-10-31'
 
+const ISSUE_TEMPLATE = 'content-error.md'
 const ISSUE_TITLE_QUOTE_LIMIT = 60
-const ISSUE_QUOTE_LIMIT = 600
+// Кириллица в URL занимает 6 символов на букву, а GitHub не принимает адреса длиннее ~8 КБ.
+const ISSUE_QUOTE_LIMIT = 400
 const SEARCH_FRAGMENT_LIMIT = 80
 
 /** VitePress отдаёт filePath относительно srcDir (`content`). */
@@ -53,24 +55,49 @@ export function contributingGuideUrl(repository: RepositoryRef): string {
   return `${repository.url}#как-помочь-курсу`
 }
 
+/**
+ * Issue по шаблону «Ошибка в конспекте» (.github/ISSUE_TEMPLATE/content-error.md).
+ * Тело повторяет разделы шаблона: «Где» заполнен, остальное — подсказки читателю.
+ */
 export function githubIssueUrl(repository: RepositoryRef, draft: IssueDraft): string {
   const flatQuote = normalizeSpaces(draft.quote)
-  const title = `${draft.pageTitle}: «${clip(flatQuote, ISSUE_TITLE_QUOTE_LIMIT)}»`
+  // «Лекция 3. Принципы …» → «Лекция 3»: заголовок issue и так длинный из-за цитаты.
+  const page = draft.pageTitle.split('. ')[0]
+  const title = `${page}: «${clip(flatQuote, ISSUE_TITLE_QUOTE_LIMIT)}»`
   const quoteLines = clip(draft.quote.trim(), ISSUE_QUOTE_LIMIT)
     .split('\n')
     .map((line) => `> ${line}`.trimEnd())
   const body = [
-    `**Страница:** ${draft.pageUrl}`,
-    `**Исходник:** ${githubSourceUrl(repository, draft.sourcePath, draft.lines)}`,
+    '## Где',
     '',
-    '**Фрагмент:**',
+    `Страница: ${draft.pageUrl}`,
+    `Исходник: ${githubSourceUrl(repository, draft.sourcePath, draft.lines)}`,
+    '',
     ...quoteLines,
     '',
-    '**Что не так:**',
-    '<!-- Опишите ошибку или как объяснить понятнее -->',
+    '## Что не так',
+    '',
+    '<!--',
+    'Наблюдаемое, а не «как-то неудачно». Для опечатки достаточно одной строки.',
+    'Для фактической ошибки — что утверждается и что на самом деле.',
+    'Для примера кода — язык переключателя, что ожидали и что получили.',
+    'Для объяснения — на каком шаге теряется мысль.',
+    '-->',
+    '',
+    '## Как должно быть',
+    '',
+    '<!-- Ваш вариант формулировки или кода, если он есть. -->',
+    '',
+    '## Чем подтверждается',
+    '',
+    '<!-- Ссылка на источник или вывод компилятора. Для опечатки раздел можно удалить. -->',
     ''
   ].join('\n')
-  const query = `title=${encodeURIComponent(title)}&body=${encodeURIComponent(body)}`
+  const query = [
+    `template=${ISSUE_TEMPLATE}`,
+    `title=${encodeURIComponent(title)}`,
+    `body=${encodeURIComponent(body)}`
+  ].join('&')
   return `${repository.url}/issues/new?${query}`
 }
 
