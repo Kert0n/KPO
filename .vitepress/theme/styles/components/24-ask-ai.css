@@ -139,6 +139,10 @@
   transform: translate(-50%, -100%);
 }
 
+.kpo-ai-menu--mobile.kpo-ai-menu--below {
+  transform: translateX(-50%);
+}
+
 .kpo-ai-menu__item {
   display: flex;
   align-items: center;
@@ -164,6 +168,82 @@
 .kpo-ai-menu__item:disabled {
   cursor: wait;
   opacity: 0.65;
+}
+
+/* «Предложить правку»: свой класс, чтобы .kpo-ai-menu__item оставался единственным пунктом Ask AI */
+.kpo-ai-menu__action {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 34px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--vp-c-text-1);
+  font-size: 13px;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+}
+
+.kpo-ai-menu__action:hover,
+.kpo-ai-menu__action:focus-visible {
+  background: var(--vp-c-bg-soft);
+  color: var(--vp-c-brand-1);
+  outline: 0;
+}
+
+.kpo-ai-menu__divider {
+  height: 1px;
+  margin: 4px 6px;
+  background: var(--vp-c-divider);
+}
+
+.kpo-ai-menu--tour {
+  width: min(300px, calc(100vw - 16px));
+  border-color: var(--vp-c-brand-1);
+}
+
+.kpo-ai-menu--tour .kpo-ai-menu__action {
+  background: var(--vp-c-brand-soft);
+  margin-top: 2px;
+}
+
+.kpo-ai-menu__tour {
+  margin: 6px 2px 2px;
+  padding: 10px 8px 4px;
+  border-top: 1px solid var(--vp-c-divider);
+  color: var(--vp-c-text-1);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.kpo-ai-menu__tour p {
+  margin: 0 0 6px;
+}
+
+.kpo-ai-menu__tour .kpo-ai-menu__tour-sub {
+  color: var(--vp-c-text-2);
+}
+
+.kpo-ai-menu__tour-close {
+  min-height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 6px;
+  background: var(--vp-c-bg);
+  color: var(--vp-c-text-1);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.kpo-ai-menu__tour-close:hover,
+.kpo-ai-menu__tour-close:focus-visible {
+  border-color: var(--vp-c-brand-1);
+  color: var(--vp-c-brand-1);
+  outline: 0;
 }
 
 .kpo-ai-toast {

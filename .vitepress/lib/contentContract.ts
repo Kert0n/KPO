@@ -30,6 +30,9 @@ export function classifyMarkdownPath(path: string): ContentContractKind {
   if (/^content\/service-pages\/_internal\/[^/]+\/vitepress\.md$/.test(normalized))
     return 'internal'
   if (/^docs\/[^/]+\.md$/.test(normalized)) return 'internal'
+  // Шаблоны issue и PR читает GitHub, сайт их не публикует.
+  if (/^\.github\/ISSUE_TEMPLATE\/[^/]+\.md$/.test(normalized)) return 'internal'
+  if (normalized === '.github/pull_request_template.md') return 'internal'
   if (/^report\/[^/]+\.md$/.test(normalized)) return 'internal'
 
   return 'unexpected'

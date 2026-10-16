@@ -7,6 +7,8 @@ type KotlinPlaygroundInstance = {
 
 type PlaygroundEntry = {
   code: string
+  /** Код из исходника страницы, до правок читателя */
+  initialCode?: string
   instance?: KotlinPlaygroundInstance
 }
 
@@ -18,7 +20,7 @@ export function registerPlayground(
   instance?: KotlinPlaygroundInstance
 ): void {
   if (!id) return
-  playgrounds.set(id, { code: instance?.getCode() ?? initialCode, instance })
+  playgrounds.set(id, { code: instance?.getCode() ?? initialCode, initialCode, instance })
 }
 
 export function updatePlaygroundCode(id: string, code: string): void {
@@ -41,6 +43,10 @@ export function readPlaygroundCode(id: string): string {
   } catch {
     return entry.code
   }
+}
+
+export function readPlaygroundInitialCode(id: string): string {
+  return playgrounds.get(id)?.initialCode ?? ''
 }
 
 export function readPlaygroundSelection(id: string): string {

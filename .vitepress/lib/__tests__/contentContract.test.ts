@@ -34,6 +34,9 @@ describe('content contract', () => {
     ).toBe('internal')
     expect(classifyMarkdownPath('docs/architecture.md')).toBe('internal')
     expect(classifyMarkdownPath('report/individualnoe-zadanie.md')).toBe('internal')
+    expect(classifyMarkdownPath('.github/ISSUE_TEMPLATE/content-error.md')).toBe('internal')
+    expect(classifyMarkdownPath('.github/pull_request_template.md')).toBe('internal')
+    expect(classifyMarkdownPath('.github/notes.md')).toBe('unexpected')
   })
 
   it('rejects old root and flat content locations', () => {

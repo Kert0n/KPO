@@ -1,0 +1,252 @@
+/**
+ * «Предложить правку»: кнопка «Помочь курсу» в шапке, её анонс и подсказка под статьёй.
+ * Жест зависит от устройства так же, как меню Ask AI: на узком экране или под пальцем
+ * меню появляется само после выделения, с мышью — по правому клику.
+ */
+
+.KpoHelpCourse {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.KpoHelpCourse__link {
+  display: none;
+  align-items: center;
+  gap: 6px;
+  height: var(--kpo-control-height);
+  padding: 0 8px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: var(--vp-c-text-1);
+  font-size: 14px;
+  font-weight: 500;
+  white-space: nowrap;
+  transition:
+    color 0.25s,
+    border-color 0.25s;
+}
+
+.KpoHelpCourse__link:hover,
+.KpoHelpCourse__link:focus-visible {
+  color: var(--vp-c-brand-1);
+}
+
+.KpoHelpCourse__link--highlight {
+  border-color: var(--vp-c-brand-1);
+  color: var(--vp-c-brand-1);
+  box-shadow: 0 0 0 3px var(--vp-c-brand-soft);
+}
+
+.KpoHelpCourse__icon {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* Между 768 и 1280 шапка тесная: остаётся только иконка */
+.KpoHelpCourse__label {
+  display: none;
+}
+
+@media (min-width: 768px) {
+  .KpoHelpCourse {
+    margin-left: 8px;
+  }
+
+  .KpoHelpCourse__link {
+    display: inline-flex;
+  }
+}
+
+@media (min-width: 1280px) {
+  .KpoHelpCourse__label {
+    display: inline;
+  }
+}
+
+.KpoHelpCourse__coach {
+  position: absolute;
+  top: calc(100% + 14px);
+  right: 0;
+  z-index: 40;
+  width: 300px;
+  padding: 14px 16px;
+  border: 1px solid var(--vp-c-brand-1);
+  border-radius: 8px;
+  background: var(--vp-c-bg);
+  box-shadow: var(--vp-shadow-3);
+  color: var(--vp-c-text-1);
+  font-size: 14px;
+  line-height: 1.5;
+  /* Навбар не переносит строки; карточке это нужно */
+  white-space: normal;
+  text-align: left;
+}
+
+.KpoHelpCourse__coach::before {
+  content: '';
+  position: absolute;
+  top: -7px;
+  right: 18px;
+  width: 12px;
+  height: 12px;
+  border-top: 1px solid var(--vp-c-brand-1);
+  border-left: 1px solid var(--vp-c-brand-1);
+  background: var(--vp-c-bg);
+  transform: rotate(45deg);
+}
+
+.KpoHelpCourse__coach-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 4px;
+  font-weight: 600;
+}
+
+.KpoHelpCourse__badge {
+  padding: 0 7px;
+  border-radius: 6px;
+  background: var(--vp-c-brand-soft);
+  color: var(--vp-c-brand-1);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 20px;
+}
+
+.KpoHelpCourse__coach-text {
+  margin: 0;
+  color: var(--vp-c-text-2);
+}
+
+.KpoHelpCourse__coach-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.KpoHelpCourse__coach-primary,
+.KpoHelpCourse__coach-secondary {
+  min-height: 30px;
+  padding: 0 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.KpoHelpCourse__coach-primary {
+  border: 1px solid var(--vp-c-brand-1);
+  background: var(--vp-c-brand-1);
+  color: var(--vp-c-white);
+}
+
+.KpoHelpCourse__coach-primary:hover,
+.KpoHelpCourse__coach-primary:focus-visible {
+  border-color: var(--vp-c-brand-2);
+  background: var(--vp-c-brand-2);
+}
+
+.KpoHelpCourse__coach-secondary {
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--vp-c-text-2);
+}
+
+.KpoHelpCourse__coach-secondary:hover,
+.KpoHelpCourse__coach-secondary:focus-visible {
+  color: var(--vp-c-brand-1);
+}
+
+/* Без кнопки в шапке анонс — карточка внизу экрана */
+@media (max-width: 767px) {
+  .KpoHelpCourse__coach {
+    position: fixed;
+    top: auto;
+    right: 12px;
+    bottom: 12px;
+    left: 12px;
+    width: auto;
+  }
+
+  .KpoHelpCourse__coach::before {
+    display: none;
+  }
+}
+
+.KpoHelpCourseScreen__link {
+  display: block;
+  padding: 12px 0 11px;
+  border-bottom: 1px solid var(--vp-c-divider);
+  color: var(--vp-c-text-1);
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 24px;
+}
+
+.KpoHelpCourseScreen__link:hover {
+  color: var(--vp-c-brand-1);
+}
+
+/* ---------- Подсказка под статьёй ---------- */
+
+.KpoSuggestEditHint {
+  margin-bottom: 24px;
+  padding: 12px 16px;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 8px;
+  background: var(--vp-c-bg-alt);
+  color: var(--vp-c-text-2);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.KpoSuggestEditHint p {
+  margin: 0;
+}
+
+.KpoSuggestEditHint .KpoSuggestEditHint__links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.KpoSuggestEditHint__links a,
+.KpoSuggestEditHint__tour {
+  color: var(--vp-c-brand-1);
+  font-weight: 500;
+}
+
+.KpoSuggestEditHint__tour {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font-size: inherit;
+  cursor: pointer;
+}
+
+.KpoSuggestEditHint__tour:hover,
+.KpoSuggestEditHint__tour:focus-visible,
+.KpoSuggestEditHint__links a:hover {
+  text-decoration: underline;
+}
+
+.KpoSuggestEditHint__gesture--touch {
+  display: none;
+}
+
+@media (max-width: 767px), (pointer: coarse) {
+  .KpoSuggestEditHint__gesture--pointer {
+    display: none;
+  }
+
+  .KpoSuggestEditHint__gesture--touch {
+    display: inline;
+  }
+}
