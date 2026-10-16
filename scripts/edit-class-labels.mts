@@ -8,9 +8,8 @@
  *
  *   node --experimental-strip-types scripts/edit-class-labels.mts sync   — создать и обновить метки
  *   node --experimental-strip-types scripts/edit-class-labels.mts apply  — разметить issue или PR
- *                                                                          из GITHUB_EVENT_PATH
+ *                                         (EVENT_KIND, EVENT_NUMBER, EVENT_BODY из workflow)
  */
-import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 
 export type LabelDefinition = { name: string; color: string; description: string }
@@ -102,9 +101,24 @@ export function labelsForNew(kind: 'issue' | 'pull_request', body: string): stri
   return kind === 'issue' ? [...classes, NEEDS_TRIAGE.name] : classes
 }
 
-type GitHubEvent = {
-  issue?: { number: number; body?: string | null; pull_request?: unknown }
-  pull_request?: { number: number; body?: string | null }
+export type LabelTarget = { kind: 'issue' | 'pull_request'; number: number; body: string }
+
+/**
+ * Что размечать. Workflow передаёт номер, тип и тело через env, а не через файл события:
+ * так в запрос к API попадают только проверенный номер и метки из списка выше.
+ */
+export function labelTargetFromEnv(env: NodeJS.ProcessEnv): LabelTarget {
+  const kind = env.EVENT_KIND
+  if (kind !== 'issue' && kind !== 'pull_request') {
+    throw new Error(`EVENT_KIND должен быть issue или pull_request, а не «${kind ?? ''}»`)
+  }
+  const number = Number(env.EVENT_NUMBER)
+  if (!Number.isSafeInteger(number) || number <= 0) {
+    throw new Error(
+      `EVENT_NUMBER должен быть номером issue или PR, а не «${env.EVENT_NUMBER ?? ''}»`
+    )
+  }
+  return { kind, number, body: env.EVENT_BODY ?? '' }
 }
 
 async function github(path: string, init: RequestInit = {}): Promise<Response> {
@@ -144,11 +158,8 @@ async function syncLabels(): Promise<void> {
 }
 
 async function applyLabels(): Promise<void> {
-  const event = JSON.parse(readFileSync(requireEnv('GITHUB_EVENT_PATH'), 'utf8')) as GitHubEvent
-  const target = event.pull_request ?? event.issue
-  if (!target) throw new Error('Событие без issue и pull_request')
-  const kind = event.pull_request || event.issue?.pull_request ? 'pull_request' : 'issue'
-  const labels = labelsForNew(kind, target.body ?? '')
+  const target = labelTargetFromEnv(process.env)
+  const labels = labelsForNew(target.kind, target.body)
   if (labels.length === 0) {
     console.log('Класс не отмечен, метки не нужны')
     return
