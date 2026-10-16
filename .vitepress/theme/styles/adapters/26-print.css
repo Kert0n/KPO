@@ -9,6 +9,8 @@
   .kpo-sidebar-toggle,
   .KpoAskAiProvider,
   .KpoNavBarExtra,
+  .KpoHelpCourse,
+  .KpoSuggestEditHint,
   .KpoAskAiContextMenu,
   [class*='AskAi'],
   .copy,

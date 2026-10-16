@@ -1,10 +1,13 @@
 import { readPlaygroundSelection } from '../lib/playgroundRegistry'
 import { playgroundOverride } from '../lib/askAiSelectionSnapshot'
+import { searchableFragment } from '../lib/suggestEditModel'
 import type { AskAiBlockKind } from '../../shared/core/askAiIds'
 import type { AskAiCurrentOverride } from '../lib/askAiModel'
 
 export type SelectionSnapshot = {
   selectedText: string
+  /** Кусок выделения, который дословно есть в исходнике: для поиска в редакторе GitHub */
+  searchText?: string
   blockIds: string[]
   currentBlockId: string
   currentBlockKind?: AskAiBlockKind
@@ -28,6 +31,7 @@ export function useTextSelection() {
       const currentOverride = playgroundOverride(playgroundBlockId)
       return {
         selectedText: playgroundSelection,
+        searchText: searchableFragment([playgroundSelection]),
         blockIds: [playgroundBlockId],
         currentBlockId: playgroundBlockId,
         currentBlockKind: 'playground',
@@ -51,6 +55,7 @@ export function useTextSelection() {
     const currentOverride = captureCodeOverride(currentElement)
     return {
       selectedText: contentSelection.selectedText,
+      searchText: searchableFragment(contentSelection.ranges.flatMap(textRuns)),
       blockIds: contentSelection.blockIds,
       currentBlockId,
       currentBlockKind: currentOverride?.kind ?? contentBlockKind(currentElement),
@@ -203,6 +208,31 @@ function rangesOverlap(range: Range, bounds: Range): boolean {
     range.compareBoundaryPoints(Range.END_TO_START, bounds) < 0 &&
     range.compareBoundaryPoints(Range.START_TO_END, bounds) > 0
   )
+}
+
+/**
+ * Непрерывные куски текста внутри выделения. В блоках кода Shiki режет строку
+ * на токены, поэтому там кусок — вся выделенная часть строки `.line`.
+ */
+function textRuns(range: Range): string[] {
+  const root = range.commonAncestorContainer
+  if (root.nodeType === Node.TEXT_NODE) return [range.toString()]
+
+  const runs: string[] = []
+  let previousLine: Element | null = null
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT)
+  for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+    if (!range.intersectsNode(node)) continue
+    const text = node.textContent ?? ''
+    const start = node === range.startContainer ? range.startOffset : 0
+    const end = node === range.endContainer ? range.endOffset : text.length
+    const part = text.slice(start, end)
+    const line = node.parentElement?.closest('pre .line') ?? null
+    if (line && line === previousLine) runs[runs.length - 1] += part
+    else runs.push(part)
+    previousLine = line
+  }
+  return runs
 }
 
 function closestPlaygroundBlockId(element: Element | null): string {

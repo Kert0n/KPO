@@ -72,6 +72,8 @@ export function buildAskAiPageContext(
   const content = parsed.content.replace(/\r\n?/g, '\n')
   const lines = content.split('\n')
   const tokens = markdown.parse(content, {})
+  // Тело — хвост файла, поэтому разница в числе строк и есть высота frontmatter.
+  const sourceLineOffset = source.replace(/\r\n?/g, '\n').split('\n').length - lines.length
 
   const context: AskAiPageContext = {
     courseTitle: options.courseTitle,
@@ -79,6 +81,7 @@ export function buildAskAiPageContext(
     pageTitle: pageTitle(parsed.data, content),
     pageDescription: pageDescription(parsed.data, content),
     sourcePath: entry.sourcePath,
+    sourceLineOffset,
     blocks: collectBlocks(tokens, lines, entry.sourcePath)
   }
 

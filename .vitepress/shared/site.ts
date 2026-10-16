@@ -11,8 +11,13 @@ export type SiteIdentity = {
     playgroundMode: string
     askAiProvider: string
     appearance: string
+    suggestEditAnnouncement: string
   }
   askAiContextBasePath: string
+  repository: {
+    url: string
+    branch: string
+  }
 }
 
 export const SITE: SiteIdentity = {
@@ -27,9 +32,14 @@ export const SITE: SiteIdentity = {
     codeLanguage: 'kpo:code-language',
     playgroundMode: 'kpo:playground-mode',
     askAiProvider: 'kpo:ask-ai-provider',
-    appearance: 'vitepress-theme-appearance'
+    appearance: 'vitepress-theme-appearance',
+    suggestEditAnnouncement: 'kpo:suggest-edit-announcement-seen'
   },
-  askAiContextBasePath: '/__ask-ai-context/'
+  askAiContextBasePath: '/__ask-ai-context/',
+  repository: {
+    url: 'https://github.com/Kert0n/KPO',
+    branch: 'master'
+  }
 }
 
 export function siteUrl(route = '/'): string {

@@ -5,7 +5,9 @@ import AskAiContextMenu from './components/AskAiContextMenu.vue'
 import AskAiProviderSelect from './components/AskAiProviderSelect.vue'
 import CodeSwitcher from './components/CodeSwitcher.vue'
 import AdditionalReadingsIndex from './components/AdditionalReadingsIndex.vue'
+import KpoHelpCourse from './components/KpoHelpCourse.vue'
 import KpoNavBarExtra from './components/KpoNavBarExtra.vue'
+import KpoSuggestEditHint from './components/KpoSuggestEditHint.vue'
 import LangOnly from './components/LangOnly.vue'
 import MermaidDiagram from './components/MermaidDiagram.vue'
 import SidebarToggle from './components/SidebarToggle.vue'
@@ -25,8 +27,12 @@ export default {
       // по кнопке проваливался в ссылку и уводил на главную.
       // Позиционируется абсолютно над границей сайдбара (layout.css).
       'nav-bar-content-before': () => h(SidebarToggle),
-      'nav-bar-content-after': () => [h(AskAiProviderSelect), h(KpoNavBarExtra)],
-      'nav-screen-content-after': () => h(AskAiProviderSelect, { screenMenu: true }),
+      'nav-bar-content-after': () => [h(KpoHelpCourse), h(AskAiProviderSelect), h(KpoNavBarExtra)],
+      'nav-screen-content-after': () => [
+        h(AskAiProviderSelect, { screenMenu: true }),
+        h(KpoHelpCourse, { screenMenu: true })
+      ],
+      'doc-footer-before': () => h(KpoSuggestEditHint),
       'layout-bottom': () => h(AskAiContextMenu)
     })
   },

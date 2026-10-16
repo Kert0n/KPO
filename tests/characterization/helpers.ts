@@ -4,15 +4,21 @@ import { openAskAiMenuWhenReady } from '../helpers/askAi'
 export const UI_FIXTURE_ROUTE = 'service-pages/ui-contract'
 export const BREAKPOINTS = [390, 767, 768, 769, 800, 959, 960, 1279, 1280, 1440] as const
 
+/** Анонс «Предложить правку» живёт до даты: эталоны не должны от неё зависеть */
+const STABLE_STORAGE = { 'kpo:suggest-edit-announcement-seen': '1' }
+
 export async function resetBrowserState(
   page: Page,
   entries: Record<string, string> = {}
 ): Promise<void> {
-  await page.addInitScript((stored) => {
-    localStorage.clear()
-    sessionStorage.clear()
-    for (const [key, value] of Object.entries(stored)) localStorage.setItem(key, value)
-  }, entries)
+  await page.addInitScript(
+    (stored) => {
+      localStorage.clear()
+      sessionStorage.clear()
+      for (const [key, value] of Object.entries(stored)) localStorage.setItem(key, value)
+    },
+    { ...STABLE_STORAGE, ...entries }
+  )
 }
 
 export async function setTheme(page: Page, theme: 'light' | 'dark'): Promise<void> {

@@ -32,7 +32,8 @@ export const SELECTION_MIDDLE_TEXT =
 export const COMPONENT_STORAGE_BASELINE = {
   'kpo:playground-mode': '0',
   'kpo:code-language': 'kotlin',
-  'kpo:ask-ai-provider': 'chatgpt'
+  'kpo:ask-ai-provider': 'chatgpt',
+  'kpo:suggest-edit-announcement-seen': '1'
 } as const
 export type AdaptiveTableMode = 'fit' | 'wrap' | 'scroll'
 export async function resetComponentStorage(page: Page): Promise<void> {

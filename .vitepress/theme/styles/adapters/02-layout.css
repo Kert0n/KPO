@@ -44,6 +44,10 @@
     gap: 4px;
   }
 
+  .VPNavBar .KpoHelpCourse {
+    order: 20;
+  }
+
   .VPNavBar .KpoAskAiProvider {
     order: 25;
   }

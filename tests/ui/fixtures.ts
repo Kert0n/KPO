@@ -1,9 +1,11 @@
 import { expect, test as base } from '@playwright/test'
 
+// Анонс «Предложить правку» привязан к дате и перекрывает шапку; его проверяет отдельный тест.
 const componentStorageBaseline = {
   'kpo:playground-mode': '0',
   'kpo:code-language': 'kotlin',
-  'kpo:ask-ai-provider': 'chatgpt'
+  'kpo:ask-ai-provider': 'chatgpt',
+  'kpo:suggest-edit-announcement-seen': '1'
 } as const
 
 export const test = base.extend({

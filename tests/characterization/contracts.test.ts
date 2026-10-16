@@ -75,7 +75,8 @@ describe('fixture-backed public contracts', () => {
       codeLanguage: 'kpo:code-language',
       playgroundMode: 'kpo:playground-mode',
       askAiProvider: 'kpo:ask-ai-provider',
-      appearance: 'vitepress-theme-appearance'
+      appearance: 'vitepress-theme-appearance',
+      suggestEditAnnouncement: 'kpo:suggest-edit-announcement-seen'
     })
   })
 })

@@ -68,6 +68,26 @@ describe('askAiContext', () => {
     expect(buildAskAiPageContext(entry, options).pageTitle).toBe('Updated title')
   })
 
+  it('reports the frontmatter height so block lines map to file lines', () => {
+    const root = mkdtempSync(join(tmpdir(), 'kpo-ask-ai-offset-'))
+    temporaryRoots.push(root)
+    const sourcePath = 'content/service-pages/offset-fixture/vitepress.md'
+    const absolutePath = join(root, sourcePath)
+    mkdirSync(dirname(absolutePath), { recursive: true })
+    const source =
+      '---\ntitle: Offset\nsearch: false\n---\n\n# Offset\n\nTarget paragraph with text.\n'
+    writeFileSync(absolutePath, source, 'utf8')
+
+    const context = buildAskAiPageContext(
+      { routeKey: 'service-pages/offset-fixture', sourcePath },
+      { root, courseTitle: 'Course', courseDescription: 'Description' }
+    )
+    const paragraph = context.blocks.find((block) => block.kind === 'paragraph')
+    const fileLine = source.split('\n').indexOf('Target paragraph with text.') + 1
+    expect(paragraph).toBeDefined()
+    expect((context.sourceLineOffset ?? 0) + paragraph!.lineStart).toBe(fileLine)
+  })
+
   it('keeps multi-code as one context block without duplicating inner fences', () => {
     const root = mkdtempSync(join(tmpdir(), 'kpo-ask-ai-multi-code-'))
     temporaryRoots.push(root)

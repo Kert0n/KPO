@@ -20,6 +20,8 @@ export type AskAiPageContext = {
   pageTitle: string
   pageDescription: string
   sourcePath: string
+  /** lineStart/lineEnd считаются от начала тела без frontmatter; это смещение до строк файла */
+  sourceLineOffset?: number
   blocks: AskAiBlock[]
 }
 
