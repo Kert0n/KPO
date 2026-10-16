@@ -191,3 +191,27 @@
     padding-left: 0 !important;
   }
 }
+
+/* ---- Мобильное меню (VPNavScreen) ----
+   VitePress выводит слот nav-screen-content-after последним, под «Темой». «Помочь курсу» —
+   такой же раздел, как «Лекции», поэтому встаёт сразу за основными пунктами меню. */
+
+.VPNavScreen .container {
+  display: flex;
+  flex-direction: column;
+}
+
+.VPNavScreen .menu {
+  order: 1;
+}
+
+.VPNavScreen .KpoHelpCourseScreen {
+  order: 2;
+}
+
+.VPNavScreen .translations,
+.VPNavScreen .appearance,
+.VPNavScreen .social-links,
+.VPNavScreen .KpoAskAiProviderScreen {
+  order: 3;
+}
