@@ -31,7 +31,9 @@ describe('suggestEditModel', () => {
     )
     expect(githubSourceUrl(repository, source, { start: 12, end: 12 })).toMatch(/#L12$/)
     expect(githubSourceUrl(repository, source, { start: 0, end: 0 })).not.toContain('#')
-    expect(contributingGuideUrl(repository)).toBe('https://github.com/Kert0n/KPO#как-помочь-курсу')
+    expect(contributingGuideUrl(repository)).toBe(
+      'https://github.com/Kert0n/KPO/blob/master/CONTRIBUTING.md'
+    )
   })
 
   it('opens the content-error template with the «Где» section filled in', () => {

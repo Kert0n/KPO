@@ -65,8 +65,9 @@ export function githubSourceUrl(
     : `${base}#L${lines.start}`
 }
 
+/** «Как помочь курсу» ведёт в саму инструкцию, а не в краткую сводку в README. */
 export function contributingGuideUrl(repository: RepositoryRef): string {
-  return `${repository.url}#как-помочь-курсу`
+  return `${repository.url}/blob/${repository.branch}/CONTRIBUTING.md`
 }
 
 /**
