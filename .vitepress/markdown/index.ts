@@ -1,6 +1,7 @@
 import type MarkdownIt from 'markdown-it'
 import { askAiAnchorsPlugin } from './askAiAnchors'
 import { contentBlocksPlugin } from './contentBlocks'
+import { discussionPlugin } from './discussion'
 import { mermaidPlugin } from './mermaid'
 import { langOnlyPlugin, multiCodePlugin } from './multiCode'
 
@@ -18,6 +19,7 @@ export function applyMarkdownExtensions(md: MarkdownIt): void {
 
   md.use(multiCodePlugin)
   md.use(langOnlyPlugin)
+  md.use(discussionPlugin)
   md.use(mermaidPlugin)
   md.use(askAiAnchorsPlugin)
   md.use(contentBlocksPlugin)

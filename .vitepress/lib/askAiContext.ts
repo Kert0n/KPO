@@ -8,6 +8,7 @@ import { contentPagesFor, getContentCatalog } from '../shared/content/contentCat
 import { createAskAiBlockIdAllocator, type AskAiBlockKind } from '../shared/core/askAiIds'
 import type { AskAiBlock, AskAiPageContext } from '../shared/core/askAiModel'
 import { classifyMarkdownToken, findMatchingMultiCodeClose } from '../shared/core/markdownStructure'
+import { parseDiscussionInfo } from '../markdown/discussion'
 
 export type AskAiContextEntry = {
   routeKey: string
@@ -230,7 +231,8 @@ function createContextMarkdownParser(): MarkdownIt {
     'v-pre',
     'raw',
     'only',
-    'multi-code'
+    'multi-code',
+    'discussion'
   ]) {
     parser.use(container, name)
   }
@@ -247,6 +249,7 @@ function findMatchingContainerClose(tokens: Token[], openIndex: number): number 
 }
 
 function containerTitle(token: Token): string | undefined {
+  if (token.type === 'container_discussion_open') return parseDiscussionInfo(token.info).title
   const value = token.info.replace(/^\S+/, '').trim().replace(/^"|"$/g, '')
   return value || undefined
 }
