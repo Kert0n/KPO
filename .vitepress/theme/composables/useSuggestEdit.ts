@@ -56,8 +56,8 @@ export function useSuggestEdit(): {
     announcementVisible,
     tourRequest,
     dismissAnnouncement: () => announcementSeen.set(true),
+    // Анонс закрывает само меню, когда демонстрация действительно началась.
     requestTour: () => {
-      announcementSeen.set(true)
       tourRequest.value += 1
     }
   }

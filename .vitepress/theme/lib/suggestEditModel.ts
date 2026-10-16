@@ -80,13 +80,14 @@ export function githubIssueUrl(repository: RepositoryRef, draft: IssueDraft): st
  * Выделение на странице — это отрендеренный текст: в исходнике между его
  * кусками стоят `**`, ссылки и обратные кавычки, и целиком он не найдётся.
  * Самый длинный непрерывный текстовый узел почти всегда есть в исходнике
- * дословно, поэтому ищем по нему.
+ * дословно, поэтому ищем по нему. Пробелы внутри строки не трогаем: в коде
+ * выравнивание значимо, и сжатая строка в исходнике уже не найдётся.
  */
 export function searchableFragment(runs: readonly string[]): string {
   let best = ''
   for (const run of runs) {
     for (const line of run.split('\n')) {
-      const candidate = normalizeSpaces(line)
+      const candidate = line.trim()
       if (candidate.length > best.length) best = candidate
     }
   }

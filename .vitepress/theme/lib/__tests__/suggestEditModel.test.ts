@@ -71,6 +71,9 @@ describe('suggestEditModel', () => {
       'самая длинная строка здесь'
     )
     expect(searchableFragment(['слово '.repeat(40)]).length).toBeLessThanOrEqual(80)
+    expect(searchableFragment(['    val total  =  price * count  '])).toBe(
+      'val total  =  price * count'
+    )
     expect(searchableFragment([])).toBe('')
   })
 

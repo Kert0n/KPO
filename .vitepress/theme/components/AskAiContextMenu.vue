@@ -32,7 +32,7 @@ const actionPreparation = useAskAiActionPreparation({
 })
 const { preparedAction, prepareError, preparing } = actionPreparation
 
-const { editableSourcePath, tourRequest } = useSuggestEdit()
+const { editableSourcePath, tourRequest, dismissAnnouncement } = useSuggestEdit()
 /** Ширина меню с подписью демонстрации; совпадает с .kpo-ai-menu--tour в CSS */
 const TOUR_MENU_WIDTH = 300
 
@@ -113,7 +113,9 @@ watch(
 watch(tourRequest, () => {
   clearTourTimer()
   const phrase = tourPhraseRange()
+  // Без подходящего абзаца показывать нечего: анонс остаётся на месте.
   if (!phrase) return
+  dismissAnnouncement()
   // Меню на мобильном встаёт над фразой, на десктопе — под ней: оставляем ему место.
   const anchor = isMobileLike() ? 0.6 : 0.3
   window.scrollTo({
@@ -268,16 +270,19 @@ async function suggestFix(): Promise<void> {
   closeMenuWithoutRestore()
   if (!current || !sourcePath) return
 
+  const fragment = current.searchText ?? current.selectedText
   // Копирование стартует до открытия вкладки: после window.open документ
   // теряет фокус, и Clipboard API отказывает.
-  const copied = copyPromptToClipboard(current.searchText || current.selectedText)
+  const copied = fragment ? copyPromptToClipboard(fragment) : null
   const openedWindow = openBlankWindow()
-  const { ok } = await copied
+  const ok = copied ? (await copied).ok : false
   navigateOpenedWindow(openedWindow, githubEditUrl(SITE.repository, sourcePath))
   showToast(
-    ok
-      ? 'Фрагмент скопирован: найдите его в редакторе через Ctrl+F'
-      : 'Найдите фрагмент в редакторе через Ctrl+F',
+    !fragment
+      ? 'Код изменён в Playground: найдите исходный пример в редакторе'
+      : ok
+        ? 'Фрагмент скопирован: найдите его в редакторе через Ctrl+F'
+        : 'Найдите фрагмент в редакторе через Ctrl+F',
     5000
   )
 }

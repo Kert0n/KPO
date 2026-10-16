@@ -1,4 +1,4 @@
-import { readPlaygroundSelection } from '../lib/playgroundRegistry'
+import { readPlaygroundInitialCode, readPlaygroundSelection } from '../lib/playgroundRegistry'
 import { playgroundOverride } from '../lib/askAiSelectionSnapshot'
 import { searchableFragment } from '../lib/suggestEditModel'
 import type { AskAiBlockKind } from '../../shared/core/askAiIds'
@@ -6,7 +6,10 @@ import type { AskAiCurrentOverride } from '../lib/askAiModel'
 
 export type SelectionSnapshot = {
   selectedText: string
-  /** Кусок выделения, который дословно есть в исходнике: для поиска в редакторе GitHub */
+  /**
+   * Кусок выделения, который дословно есть в исходнике: для поиска в редакторе GitHub.
+   * Пустая строка — такого куска нет (код изменён в Playground).
+   */
   searchText?: string
   blockIds: string[]
   currentBlockId: string
@@ -31,7 +34,7 @@ export function useTextSelection() {
       const currentOverride = playgroundOverride(playgroundBlockId)
       return {
         selectedText: playgroundSelection,
-        searchText: searchableFragment([playgroundSelection]),
+        searchText: playgroundSearchText(playgroundBlockId, playgroundSelection),
         blockIds: [playgroundBlockId],
         currentBlockId: playgroundBlockId,
         currentBlockKind: 'playground',
@@ -208,6 +211,12 @@ function rangesOverlap(range: Range, bounds: Range): boolean {
     range.compareBoundaryPoints(Range.END_TO_START, bounds) < 0 &&
     range.compareBoundaryPoints(Range.START_TO_END, bounds) > 0
   )
+}
+
+/** Читатель мог изменить код в Playground: его правок в исходнике нет, искать их бессмысленно. */
+function playgroundSearchText(blockId: string, selection: string): string {
+  const fragment = searchableFragment([selection])
+  return readPlaygroundInitialCode(blockId).includes(fragment) ? fragment : ''
 }
 
 /**

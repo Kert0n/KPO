@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   readPlaygroundCode,
+  readPlaygroundInitialCode,
   readPlaygroundSelection,
   registerPlayground,
   unregisterPlayground,
@@ -27,6 +28,7 @@ describe('playgroundRegistry', () => {
     updatePlaygroundCode('block-2', 'cached edit')
 
     expect(readPlaygroundCode('block-2')).toBe('cached edit')
+    expect(readPlaygroundInitialCode('block-2')).toBe('initial')
 
     unregisterPlayground('block-2')
   })
