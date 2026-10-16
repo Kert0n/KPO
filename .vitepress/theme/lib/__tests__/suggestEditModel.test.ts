@@ -60,6 +60,9 @@ describe('suggestEditModel', () => {
       'utf8'
     )
     expect(body.match(/^## .+$/gm)).toEqual(template.match(/^## .+$/gm))
+    const classLetters = (text: string) =>
+      [...text.matchAll(/^- \[ \] ([А-ЯЁ])\./gm)].map((match) => match[1])
+    expect(classLetters(body)).toEqual(classLetters(template))
   })
 
   it('keeps long Cyrillic quotes inside the GitHub URL limit', () => {
