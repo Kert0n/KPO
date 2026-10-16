@@ -1,0 +1,19 @@
+/**
+ * Блок «Дискуссионно» (`::: discussion`): место, где лекция сама говорит, что мнения расходятся.
+ * Цвета — от блока VitePress `important`; здесь только свёрнутый вариант (`collapsed`),
+ * которому нужен тот же заголовок, что у `::: details`.
+ */
+
+.vp-doc .custom-block.discussion summary {
+  margin: 0 0 8px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.vp-doc .custom-block.discussion summary + p {
+  margin: 8px 0;
+}
+
+.vp-doc details.custom-block.discussion:not([open]) summary {
+  margin-bottom: 0;
+}
