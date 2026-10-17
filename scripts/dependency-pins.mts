@@ -229,7 +229,8 @@ export function locationKey(location: PinLocation): string {
 
 const npmRegistry: PackageRegistry = {
   async packument(name) {
-    const response = await fetch(`https://registry.npmjs.org/${name.replace('/', '%2F')}`)
+    // Имя целиком в один сегмент пути: @scope/name → %40scope%2Fname
+    const response = await fetch(`https://registry.npmjs.org/${encodeURIComponent(name)}`)
     if (!response.ok) throw new Error(`npm ${name}: HTTP ${response.status}`)
     return (await response.json()) as Packument
   }
