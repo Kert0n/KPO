@@ -37,25 +37,25 @@ workflow assertions: сначала исправляется сам candidate tr
 
 Visual baseline не обновляется только потому, что изменился toolchain. Сначала проверяется actual/diff artifact и воспроизводимость; изменение baseline допустимо лишь при подтверждённом изменении интерфейса.
 
-## Major-версии
+## Пины: что держим и когда снимать
 
-Major-обновление принимается только когда все прямые peer-контракты его поддерживают. В конфигурации временно зафиксированы два ограничения:
+Major-обновление принимается только когда все прямые peer-контракты его поддерживают, а
+`overrides` в `package.json` закрывают проблемы транзитивных зависимостей, которые нельзя поднять
+обычным обновлением. Каждый пин ниже держится до конкретного условия; ignore в Dependabot
+относятся к version updates и не скрывают security updates.
 
-- следующая major-версия `markdown-it-mathjax3` отложена, пока VitePress 1.6.4 требует `markdown-it-mathjax3 ^4`;
-- следующая major-версия TypeScript отложена, пока `typescript-eslint` 8.63 поддерживает TypeScript только до версии 6.0 включительно.
+| Что держим                                 | Где              | Почему                                                                                                                                                       | Когда снимать                                                    |
+| ------------------------------------------ | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------- |
+| `markdown-it` и `@types/markdown-it` на 14 | `dependabot.yml` | VitePress 1.6.4 отдаёт плагинам инстанс markdown-it 14; типы 15 с ним не совпадают                                                                           | VitePress перейдёт на markdown-it 15                             |
+| `@types/markdown-it` не 14.2.0             | `dependabot.yml` | 14.2.0 собран криво: `lib/*.d.mts` и `dist/index.cjs.d.ts` расходятся, typecheck падает                                                                      | выйдет версия новее 14.2.0                                       |
+| `markdown-it-mathjax3` на 4                | `dependabot.yml` | VitePress 1.6.4 требует `markdown-it-mathjax3 ^4`                                                                                                            | VitePress перейдёт на 5                                          |
+| TypeScript на 6                            | `dependabot.yml` | `typescript-eslint` 8.71 поддерживает TypeScript `<6.1`                                                                                                      | `typescript-eslint` разрешит TypeScript 7                        |
+| `vitepress → vite 6.4.4`                   | `overrides`      | VitePress 1.6.4 просит `vite ^5.4.14` (последняя 5.x — 5.4.21), а vitest 5 требует `^6.4`; override держит одну поддерживаемую копию vite для сайта и тестов | выйдет стабильная VitePress 2 со своим vite 6+                   |
+| `@xmldom/xmldom 0.9.12`                    | `overrides`      | MathJax 3 → `speech-rule-engine` 4.1.4 жёстко требует уязвимую 0.9.10; 4.1.4 — последний выпуск ветки 4.x                                                    | `speech-rule-engine` 4.x или MathJax перейдут на xmldom ≥ 0.9.12 |
+| `gray-matter → js-yaml → argparse 2.0.1`   | `overrides`      | GHSA-hp3w-g68c-fv3c в `sprintf-js` не исправлена ни в одной версии; js-yaml 3 использует argparse только в CLI, а argparse 2 не зависит от sprintf-js        | gray-matter перейдёт на js-yaml 4                                |
 
-Эти ограничения относятся к version updates и не должны скрывать security updates. При обновлении VitePress или `typescript-eslint` соответствующее правило нужно удалить и прогнать полный gate.
-
-## Security overrides
-
-`overrides` в `package.json` закрывают уязвимости транзитивных зависимостей, которые нельзя поднять
-обычным обновлением. Каждый override снимается, как только родительский пакет сам перейдёт на
-исправленную версию:
-
-- `mermaid → katex 0.18.9` — mermaid 12.1.0 требует `katex ^0.16.47`, а GHSA-238p-pmpm-9mq7 исправлена
-  только с 0.18.2; mermaid вызывает katex лишь через `renderToString` для формул в диаграммах;
-- `gray-matter → js-yaml → argparse 2.0.1` — GHSA-hp3w-g68c-fv3c в `sprintf-js` не исправлена ни в
-  одной версии; js-yaml 3 использует argparse только в своей CLI, а argparse 2 не зависит от sprintf-js.
+Снятый пин удаляется и из таблицы, и из конфигурации в одном PR, с полным gate. История: override
+`mermaid → katex 0.18.9` снят в октябре 2026, когда mermaid 12.2.0 сам перешёл на `katex ^0.18`.
 
 ## Как разбирать пакет PR
 
