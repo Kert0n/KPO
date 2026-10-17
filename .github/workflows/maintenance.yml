@@ -25,3 +25,22 @@ jobs:
         run: |
           curl --fail --location --retry 2 https://kert0n.github.io/KPO/ >/dev/null
           curl --fail --location --retry 2 https://play.kotlinlang.org/api/compiler/latest >/dev/null
+
+  # Сверяет каждый пин зависимостей (scripts/dependency-pins.mts) с npm-реестром и открывает
+  # issue «Можно снять пин: …», когда условие снятия выполнилось. Дубли не открывает.
+  dependency-pins:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - name: Check whether any dependency pin can be lifted
+        run: node --experimental-strip-types scripts/dependency-pins.mts report
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
