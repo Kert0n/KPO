@@ -1395,7 +1395,7 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-    Controller["Humble controller<br/>принимает запрос и вызывает сервис"] --> Service["Domain service<br/>сложная логика без тяжелого окружения"]
+    Controller["Humble controller<br/>принимает запрос<br/>и вызывает сервис"] --> Service["Domain service<br/>сложная логика<br/>без тяжелого окружения"]
     Controller --> Db[(Repository)]
     Controller --> Http[External client]
     Service --> Rules[Бизнес-правила]
