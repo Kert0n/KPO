@@ -110,14 +110,14 @@ export const PINS: readonly Pin[] = [
   },
   {
     id: 'vite-override',
-    title: '`vitepress → vite 6.4.4`',
-    locations: [{ kind: 'override', path: ['vitepress', 'vite'], version: '6.4.4' }],
+    title: '`vitepress → vite 6.4.5`',
+    locations: [{ kind: 'override', path: ['vitepress', 'vite'], version: '6.4.5' }],
     liftWhen: 'стабильная VitePress сама примет vite 6.4+',
     async check(registry) {
       const vitepress = await latestManifest(registry, 'vitepress')
       const range = vitepress.manifest.dependencies?.vite ?? ''
       return {
-        ready: Boolean(range) && semver.satisfies('6.4.4', range),
+        ready: Boolean(range) && semver.satisfies('6.4.5', range),
         evidence: `vitepress@${vitepress.version}: vite ${range || '(нет)'}`
       }
     }
