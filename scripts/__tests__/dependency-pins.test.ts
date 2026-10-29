@@ -158,10 +158,10 @@ describe('dependency pin checks', () => {
 
   it('writes an actionable issue', () => {
     const vite = pin('vite-override')
-    expect(issueTitle(vite)).toBe('Можно снять пин: vitepress → vite 6.4.4')
+    expect(issueTitle(vite)).toBe('Можно снять пин: vitepress → vite 6.4.5')
     const body = issueBody(vite, { ready: true, evidence: 'vitepress@2.0.0: vite ^6.4.0' })
     expect(body).toContain(vite.liftWhen)
-    expect(body).toContain('vitepress → vite = 6.4.4')
+    expect(body).toContain('vitepress → vite = 6.4.5')
     expect(body).toContain('docs/dependency-maintenance.md')
   })
 })
