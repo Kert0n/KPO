@@ -3,6 +3,7 @@ import { expect, test } from './fixtures'
 import {
   CONTENT_LAYOUT_TOKENS,
   LAYOUT_VIEWPORTS,
+  MERMAID_FIXTURE_ROUTE,
   MIN_READABLE_MERMAID_HEIGHT_PX,
   SCALE_TOLERANCE,
   UI_FIXTURE_ROUTE,
@@ -13,7 +14,8 @@ import {
   getMermaidMetrics,
   hideSidebar,
   setStorage,
-  waitForMermaid
+  waitForMermaid,
+  waitForMermaidSettled
 } from './helpers/kpoTestSupport'
 
 test('fixture renders mermaid and keeps playground disabled for marked blocks', async ({
@@ -534,3 +536,21 @@ test('wide mermaid diagrams keep readable size and scroll locally on mobile', as
 
   expect(checkedWideDiagrams).toBeGreaterThan(0)
 })
+
+for (const [name, viewport] of Object.entries({
+  desktop: LAYOUT_VIEWPORTS.desktop,
+  tablet: LAYOUT_VIEWPORTS.tablet,
+  mobilePhone: LAYOUT_VIEWPORTS.mobilePhone
+})) {
+  test(`wrapped Cyrillic mermaid labels are not clipped on ${name}`, async ({ page }) => {
+    await page.setViewportSize(viewport)
+    await page.goto(MERMAID_FIXTURE_ROUTE)
+    await waitForMermaidSettled(page)
+
+    const issues = await getMermaidClipIssues(page)
+    expect(
+      issues,
+      JSON.stringify({ route: MERMAID_FIXTURE_ROUTE, viewport, issues }, null, 2)
+    ).toEqual([])
+  })
+}
