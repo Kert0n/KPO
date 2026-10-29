@@ -99,6 +99,17 @@ const staticPages: Array<{
     order: 3,
     fallbackTitle: 'Sidebar Contract Fixture',
     uiSweep: false
+  },
+  {
+    kind: 'service',
+    section: 'service',
+    sourcePath: 'content/service-pages/mermaid-contract/vitepress.md',
+    outputPath: 'service-pages/mermaid-contract.md',
+    route: '/service-pages/mermaid-contract',
+    routeKey: 'service-pages/mermaid-contract',
+    order: 4,
+    fallbackTitle: 'Mermaid Contract Fixture',
+    uiSweep: false
   }
 ]
 
