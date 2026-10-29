@@ -18,6 +18,7 @@ export const MIN_READABLE_MERMAID_HEIGHT_PX = CONTENT_LAYOUT_TOKENS.mermaidMinHe
 export const UI_FIXTURE_ROUTE = 'service-pages/ui-contract'
 export const SIDEBAR_FIXTURE_ROUTE = 'service-pages/sidebar-contract'
 export const ASK_AI_FIXTURE_ROUTE = 'service-pages/ask-ai-contract'
+export const MERMAID_FIXTURE_ROUTE = 'service-pages/mermaid-contract'
 export const PLAYGROUND_MODULE_REQUEST =
   // dev: .vitepress/cache/deps/kotlin-playground.js?v=…; build: playground.min.<hash>.js
   /(?:kotlin-playground(?:\.js)?|playground\.min\.[^/]+\.js)(?:\?.*)?$/
@@ -82,6 +83,19 @@ export async function waitForMermaid(
       return rect.width > 0 && rect.height > 0
     })
   }, options.requireDiagrams ?? false)
+}
+/**
+ * Диаграммы отрисованы, раскладка (масштаб и центровка) применена, шрифты
+ * загружены: дальше геометрия подписей меняться уже не должна.
+ */
+export async function waitForMermaidSettled(page: Page): Promise<void> {
+  await waitForMermaid(page, { requireDiagrams: true })
+  await page.waitForFunction(() =>
+    [...document.querySelectorAll('.kpo-mermaid')].every(
+      (diagram) => diagram.getAttribute('aria-busy') !== 'true'
+    )
+  )
+  await page.evaluate(() => document.fonts.ready.then(() => undefined))
 }
 export async function waitForAdaptiveTables(page: Page): Promise<void> {
   await page.locator('.vp-doc').first().waitFor({ state: 'attached' })
