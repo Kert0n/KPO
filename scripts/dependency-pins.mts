@@ -227,7 +227,7 @@ export function locationKey(location: PinLocation): string {
 
 // ---------- Отчёт и issues ----------
 
-const npmRegistry: PackageRegistry = {
+export const npmRegistry: PackageRegistry = {
   async packument(name) {
     // Имя целиком в один сегмент пути: @scope/name → %40scope%2Fname
     const response = await fetch(`https://registry.npmjs.org/${encodeURIComponent(name)}`)
@@ -303,7 +303,7 @@ async function openIssueTitles(): Promise<Set<string>> {
   return new Set(issues.map((issue) => issue.title))
 }
 
-async function github(path: string, init: RequestInit = {}): Promise<Response> {
+export async function github(path: string, init: RequestInit = {}): Promise<Response> {
   const repository = requireEnv('GITHUB_REPOSITORY')
   const response = await fetch(`https://api.github.com/repos/${repository}${path}`, {
     ...init,
