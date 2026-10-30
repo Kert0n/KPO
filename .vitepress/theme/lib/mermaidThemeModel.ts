@@ -19,6 +19,9 @@ export type MermaidConfig = {
   flowchart: {
     wrappingWidth: number
     minNodeWidth: number
+    nodeSpacing: number
+    rankSpacing: number
+    padding: number
   }
   state: {
     minNodeWidth: number
@@ -64,9 +67,14 @@ export function createMermaidConfig(tokens: MermaidThemeTokens): MermaidConfig {
     themeVariables: createMermaidThemeVariables(tokens),
     fontFamily: tokens.fontFamily,
     htmlLabels: true,
+    // Компактная раскладка: при штатных 50 px между узлами и переносе на 180 px
+    // широкие схемы не помещались в колонку текста даже при масштабе 0.72.
     flowchart: {
-      wrappingWidth: 180,
-      minNodeWidth: 0
+      wrappingWidth: 140,
+      minNodeWidth: 0,
+      nodeSpacing: 28,
+      rankSpacing: 40,
+      padding: 10
     },
     state: {
       minNodeWidth: 0

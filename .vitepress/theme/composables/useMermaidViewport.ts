@@ -2,10 +2,11 @@ import { nextTick, ref, type Ref } from 'vue'
 import { clamp } from '../../shared/core/math'
 import { CONTENT_LAYOUT_TOKENS } from '../lib/contentLayoutTokens'
 import {
+  type MermaidScaleConfig,
+  type MermaidViewportMode,
   resolveCenteredScrollLeft,
   resolveMermaidOverflow,
-  resolveScrollLeftForCenterRatio,
-  type MermaidViewportMode
+  resolveScrollLeftForCenterRatio
 } from '../lib/mermaidLayoutModel'
 import { waitAnimationFrames } from '../lib/viewportAnchor'
 
@@ -43,12 +44,7 @@ export function useMermaidViewport(options: {
    * и центровка. Скриншот, снятый в этом окне, поймает промежуточное состояние.
    */
   const layoutSettled = ref(false)
-  const scaleConfig = ref<{
-    desktopMinScale: number
-    mobileMinScale: number
-    wideDiagramMinWidth: number
-    minHeight: number
-  }>({
+  const scaleConfig = ref<MermaidScaleConfig>({
     desktopMinScale: CONTENT_LAYOUT_TOKENS.mermaidDesktopMinScale,
     mobileMinScale: CONTENT_LAYOUT_TOKENS.mermaidMobileMinScale,
     wideDiagramMinWidth: CONTENT_LAYOUT_TOKENS.mermaidWideDiagramMinWidth,
