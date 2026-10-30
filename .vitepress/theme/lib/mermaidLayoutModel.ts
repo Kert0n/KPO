@@ -13,6 +13,18 @@ export type ResolveMermaidAutoScaleInput = {
   wideDiagramMinWidth?: number
 }
 
+export type MermaidScaleConfig = {
+  desktopMinScale: number
+  mobileMinScale: number
+  wideDiagramMinWidth: number
+  minHeight: number
+}
+
+export type MermaidScaleLimits = Pick<
+  ResolveMermaidAutoScaleInput,
+  'minScale' | 'minHeight' | 'wideDiagramMinWidth'
+>
+
 export type ResolveMermaidManualScaleInput = {
   currentScale: number
   delta: number
@@ -70,6 +82,26 @@ export function resolveMermaidAutoScale(input: ResolveMermaidAutoScaleInput): nu
   }
 
   return roundScale(Math.min(1, scale))
+}
+
+/**
+ * Пороги авто-масштаба для режима вьюпорта. Минимальная ширина широкой
+ * диаграммы защищает читаемость на телефоне, где минимальный масштаб 0.4.
+ * На десктопе читаемость держит минимальный масштаб, а колонка текста уже
+ * этого порога: там он только выталкивал диаграмму под прокрутку.
+ */
+export function resolveMermaidScaleLimits(
+  mode: MermaidViewportMode,
+  config: MermaidScaleConfig
+): MermaidScaleLimits {
+  if (mode === 'mobile') {
+    return {
+      minScale: config.mobileMinScale,
+      minHeight: config.minHeight,
+      wideDiagramMinWidth: config.wideDiagramMinWidth
+    }
+  }
+  return { minScale: config.desktopMinScale, minHeight: config.minHeight }
 }
 
 export function resolveMermaidManualScale(input: ResolveMermaidManualScaleInput): number {

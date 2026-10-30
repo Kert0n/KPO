@@ -8,6 +8,7 @@ import {
   resolveMermaidRenderedHeight,
   resolveMermaidOverflow,
   resolveMermaidRenderedWidth,
+  resolveMermaidScaleLimits,
   resolveScrollLeftForCenterRatio,
   shouldShowMermaidToolbar
 } from '../mermaidLayoutModel'
@@ -86,6 +87,49 @@ describe('mermaidLayoutModel', () => {
         wideDiagramMinWidth: CONTENT_LAYOUT_TOKENS.mermaidWideDiagramMinWidth
       })
     ).toBe(1)
+  })
+
+  const scaleConfig = {
+    desktopMinScale: CONTENT_LAYOUT_TOKENS.mermaidDesktopMinScale,
+    mobileMinScale: CONTENT_LAYOUT_TOKENS.mermaidMobileMinScale,
+    wideDiagramMinWidth: CONTENT_LAYOUT_TOKENS.mermaidWideDiagramMinWidth,
+    minHeight: CONTENT_LAYOUT_TOKENS.mermaidMinHeight
+  }
+
+  it('keeps the wide-diagram minimum width for phones only', () => {
+    expect(resolveMermaidScaleLimits('mobile', scaleConfig)).toEqual({
+      minScale: CONTENT_LAYOUT_TOKENS.mermaidMobileMinScale,
+      minHeight: CONTENT_LAYOUT_TOKENS.mermaidMinHeight,
+      wideDiagramMinWidth: CONTENT_LAYOUT_TOKENS.mermaidWideDiagramMinWidth
+    })
+    expect(resolveMermaidScaleLimits('desktop', scaleConfig)).toEqual({
+      minScale: CONTENT_LAYOUT_TOKENS.mermaidDesktopMinScale,
+      minHeight: CONTENT_LAYOUT_TOKENS.mermaidMinHeight
+    })
+  })
+
+  it('fits a desktop diagram into a lane narrower than the wide-diagram minimum', () => {
+    // Колонка 590 px при открытом сайдбаре: диаграмма 791 px влезает при 0.746,
+    // это выше минимального масштаба, и прокрутка не нужна.
+    expect(
+      resolveMermaidAutoScale({
+        viewBoxWidth: 791,
+        viewBoxHeight: 478,
+        availableWidth: 590,
+        ...resolveMermaidScaleLimits('desktop', scaleConfig)
+      })
+    ).toBe(0.746)
+  })
+
+  it('keeps a medium-wide phone diagram readable instead of fitting it', () => {
+    expect(
+      resolveMermaidAutoScale({
+        viewBoxWidth: 900,
+        viewBoxHeight: 300,
+        availableWidth: 382,
+        ...resolveMermaidScaleLimits('mobile', scaleConfig)
+      })
+    ).toBe(0.756)
   })
 
   it('clamps manual scale by viewport mode', () => {

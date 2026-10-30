@@ -3,7 +3,8 @@ import {
   resolveMermaidAutoScale,
   resolveMermaidManualScale,
   resolveMermaidRenderedHeight,
-  resolveMermaidRenderedWidth
+  resolveMermaidRenderedWidth,
+  resolveMermaidScaleLimits
 } from '../lib/mermaidLayoutModel'
 import type { useMermaidViewport } from './useMermaidViewport'
 
@@ -21,12 +22,7 @@ export function useMermaidZoom(options: {
       viewBoxWidth: options.viewBoxWidth.value,
       viewBoxHeight: options.viewBoxHeight.value,
       availableWidth: viewport.availableWidth.value,
-      minScale:
-        viewport.viewportMode.value === 'mobile'
-          ? viewport.scaleConfig.value.mobileMinScale
-          : viewport.scaleConfig.value.desktopMinScale,
-      minHeight: viewport.scaleConfig.value.minHeight,
-      wideDiagramMinWidth: viewport.scaleConfig.value.wideDiagramMinWidth
+      ...resolveMermaidScaleLimits(viewport.viewportMode.value, viewport.scaleConfig.value)
     })
   })
   const effectiveScale = computed(() => manualScale.value ?? autoScale.value)

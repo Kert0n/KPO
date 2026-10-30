@@ -30,6 +30,7 @@
   /* Mermaid: авто-масштаб старается вписать диаграмму, но не делает её нечитаемой. */
   --kpo-mermaid-desktop-min-scale: 0.72;
   --kpo-mermaid-mobile-min-scale: 0.4;
+  /* Только телефон: не сжимать широкую диаграмму уже 680 px, а прокрутить. */
   --kpo-mermaid-wide-diagram-min-width: 680px;
   --kpo-mermaid-min-height: 120px;
   --kpo-table-min-readable-column-width: 112px;
