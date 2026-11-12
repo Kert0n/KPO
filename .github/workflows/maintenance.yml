@@ -24,7 +24,7 @@ jobs:
       - name: Published site and Kotlin API availability
         run: |
           curl --fail --location --retry 2 https://kert0n.github.io/KPO/ >/dev/null
-          curl --fail --location --retry 2 https://play.kotlinlang.org/api/compiler/latest >/dev/null
+          curl --fail --location --retry 2 https://api.kotlinlang.org/versions >/dev/null
 
   # Сверяет каждый пин зависимостей (scripts/dependency-pins.mts) с npm-реестром и открывает
   # issue «Можно снять пин: …», когда условие снятия выполнилось. Дубли не открывает.
