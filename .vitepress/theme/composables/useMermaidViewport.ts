@@ -330,7 +330,6 @@ export function useMermaidViewport(options: {
   }
 
   function resetUserScroll(): void {
-    pendingCenterRatio = null
     userScrolledViewport.value = false
     layoutGeneration += 1
   }
