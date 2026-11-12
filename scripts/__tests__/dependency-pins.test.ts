@@ -105,28 +105,22 @@ describe('dependency pin checks', () => {
     })
   })
 
-  it('follows the MathJax chain down to xmldom and ignores prereleases', async () => {
-    const xmldom = pin('xmldom-override')
-    const chain = (sreXmldom: string) =>
-      registry({
-        'markdown-it-mathjax3': {
-          latest: '5.0.0',
-          versions: { '4.3.2': { dependencies: { 'mathjax-full': '^3.2.0' } }, '5.0.0': {} }
-        },
-        'mathjax-full': {
-          latest: '3.2.2',
-          versions: { '3.2.2': { dependencies: { 'speech-rule-engine': '^4.0.6' } } }
-        },
-        'speech-rule-engine': {
-          latest: '5.0.0-rc.4',
-          versions: {
-            '4.1.4': { dependencies: { '@xmldom/xmldom': sreXmldom } },
-            '5.0.0-rc.4': { dependencies: { '@xmldom/xmldom': '^0.9.12' } }
-          }
-        }
-      })
-    expect((await xmldom.check(chain('0.9.10'))).ready).toBe(false)
-    expect((await xmldom.check(chain('^0.9.12'))).ready).toBe(true)
+  it('keeps the minimatch override until every consumer excludes vulnerable versions', async () => {
+    const minimatch = pin('minimatch-override')
+    const make = (ranges: string[]) =>
+      registry(
+        Object.fromEntries(
+          ['eslint', '@eslint/config-array', '@typescript-eslint/typescript-estree'].map(
+            (name, i) => [
+              name,
+              { latest: '1.0.0', versions: { '1.0.0': { dependencies: { minimatch: ranges[i] } } } }
+            ]
+          )
+        )
+      )
+    expect((await minimatch.check(make(['^11.0.1', '^10.2.6', '^11.0.1']))).ready).toBe(false)
+    expect((await minimatch.check(make(['^11.0.0', '^11.0.1', '^11.0.1']))).ready).toBe(false)
+    expect((await minimatch.check(make(['^11.0.1', '^11.0.1', '^12.0.0']))).ready).toBe(true)
   })
 
   it('waits for typescript-eslint to allow the newest TypeScript', async () => {
@@ -158,10 +152,10 @@ describe('dependency pin checks', () => {
 
   it('writes an actionable issue', () => {
     const vite = pin('vite-override')
-    expect(issueTitle(vite)).toBe('Можно снять пин: vitepress → vite 6.4.5')
+    expect(issueTitle(vite)).toBe('Можно снять пин: vitepress → vite 6.4.6')
     const body = issueBody(vite, { ready: true, evidence: 'vitepress@2.0.0: vite ^6.4.0' })
     expect(body).toContain(vite.liftWhen)
-    expect(body).toContain('vitepress → vite = 6.4.5')
+    expect(body).toContain('vitepress → vite = 6.4.6')
     expect(body).toContain('docs/dependency-maintenance.md')
   })
 })

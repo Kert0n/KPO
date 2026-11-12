@@ -298,8 +298,10 @@ function requiredReason(number: number): string {
             <h4 class="kpo-home__panel-label">Можно начинать сразу</h4>
             <p class="kpo-home__start">
               <template v-for="(number, index) in course.startHere" :key="number">
-                <a :href="withBase(course.lecture(number).route)">{{ number }}</a
-                ><template v-if="index < course.startHere.length - 1">, </template>
+                <a :href="withBase(course.lecture(number).route)">{{ number }}</a><template
+                  v-if="index < course.startHere.length - 1"
+                  >,
+                </template>
               </template>
             </p>
           </template>
@@ -342,8 +344,8 @@ function requiredReason(number: number): string {
               <span v-if="course.lecture(number).prerequisites.length" class="kpo-home__need">
                 Сначала:
                 <template v-for="(n, i) in course.lecture(number).prerequisites" :key="n">
-                  <a :href="withBase(course.lecture(n).route)">{{ n }}</a
-                  ><template v-if="i < course.lecture(number).prerequisites.length - 1"
+                  <a :href="withBase(course.lecture(n).route)">{{ n }}</a><template
+                    v-if="i < course.lecture(number).prerequisites.length - 1"
                     >,
                   </template>
                 </template>

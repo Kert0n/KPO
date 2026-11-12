@@ -27,7 +27,7 @@ export const SITE: SiteIdentity = {
   origin: 'https://kert0n.github.io',
   base: '/KPO/',
   language: 'ru-RU',
-  kotlinVersion: '2.4.0',
+  kotlinVersion: '2.4.21',
   storageKeys: {
     codeLanguage: 'kpo:code-language',
     playgroundMode: 'kpo:playground-mode',

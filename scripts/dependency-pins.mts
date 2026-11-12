@@ -110,36 +110,52 @@ export const PINS: readonly Pin[] = [
   },
   {
     id: 'vite-override',
-    title: '`vitepress → vite 6.4.5`',
-    locations: [{ kind: 'override', path: ['vitepress', 'vite'], version: '6.4.5' }],
+    title: '`vitepress → vite 6.4.6`',
+    locations: [{ kind: 'override', path: ['vitepress', 'vite'], version: '6.4.6' }],
     liftWhen: 'стабильная VitePress сама примет vite 6.4+',
     async check(registry) {
       const vitepress = await latestManifest(registry, 'vitepress')
       const range = vitepress.manifest.dependencies?.vite ?? ''
       return {
-        ready: Boolean(range) && semver.satisfies('6.4.5', range),
+        ready: Boolean(range) && semver.satisfies('6.4.6', range),
         evidence: `vitepress@${vitepress.version}: vite ${range || '(нет)'}`
       }
     }
   },
   {
-    id: 'xmldom-override',
-    title: '`@xmldom/xmldom 0.9.12`',
-    locations: [{ kind: 'override', path: ['@xmldom/xmldom'], version: '0.9.12' }],
-    liftWhen: 'цепочка MathJax сама потребует `@xmldom/xmldom` ≥ 0.9.12',
+    id: 'mdurl-types-override',
+    title: '`markdown-it → mdurl 2.0.0`',
+    locations: [{ kind: 'override', path: ['markdown-it', 'mdurl'], version: '2.0.0' }],
+    liftWhen: 'выйдет mdurl новее 2.1.0; проверить совместимость типов ESM и CommonJS полным gate',
     async check(registry) {
-      const mathjax = await resolve(registry, 'markdown-it-mathjax3', '^4')
-      const full = await resolve(registry, 'mathjax-full', dependency(mathjax, 'mathjax-full'))
-      const sre = await resolve(
-        registry,
-        'speech-rule-engine',
-        dependency(full, 'speech-rule-engine')
-      )
-      const range = dependency(sre, '@xmldom/xmldom')
-      const floor = semver.minVersion(range)?.version ?? '0.0.0'
+      const mdurl = await latestManifest(registry, 'mdurl')
       return {
-        ready: semver.gte(floor, '0.9.12'),
-        evidence: `speech-rule-engine@${sre.version} требует @xmldom/xmldom ${range}`
+        ready: semver.gt(mdurl.version, '2.1.0'),
+        evidence: `mdurl@${mdurl.version}; в 2.1.0 встроенные типы encode расходятся с @types/mdurl`
+      }
+    }
+  },
+  {
+    id: 'minimatch-override',
+    title: '`minimatch 7–10 → 11.0.1`',
+    locations: [{ kind: 'override', path: ['minimatch@>=7.0.0 <11.0.1'], version: '11.0.1' }],
+    liftWhen: 'все потребители minimatch 10 сами потребуют исправленную 11.0.1 или новее',
+    async check(registry) {
+      const consumers = ['eslint', '@eslint/config-array', '@typescript-eslint/typescript-estree']
+      const results = await Promise.all(
+        consumers.map(async (name) => {
+          const parent = await latestManifest(registry, name)
+          const range = parent.manifest.dependencies?.minimatch ?? ''
+          const floor = semver.minVersion(range)?.version
+          return {
+            ready: floor !== undefined && semver.gte(floor, '11.0.1'),
+            evidence: `${name}@${parent.version}: minimatch ${range || '(нет)'}`
+          }
+        })
+      )
+      return {
+        ready: results.every((result) => result.ready),
+        evidence: results.map((result) => result.evidence).join('; ')
       }
     }
   },
@@ -168,20 +184,6 @@ async function latestManifest(registry: PackageRegistry, name: string): Promise<
   const packument = await registry.packument(name)
   const version = packument['dist-tags'].latest
   return { version, manifest: packument.versions[version] ?? {} }
-}
-
-/** Самая свежая стабильная версия в диапазоне — то, что поставит npm. */
-async function resolve(registry: PackageRegistry, name: string, range: string): Promise<Resolved> {
-  const packument = await registry.packument(name)
-  const version = semver.maxSatisfying(stableVersions(packument), range)
-  if (!version) throw new Error(`${name}: нет стабильной версии в диапазоне ${range}`)
-  return { version, manifest: packument.versions[version] ?? {} }
-}
-
-function dependency(resolved: Resolved, name: string): string {
-  const range = resolved.manifest.dependencies?.[name]
-  if (!range) throw new Error(`${resolved.version}: нет зависимости ${name}`)
-  return range
 }
 
 function stableVersions(packument: Packument): string[] {
