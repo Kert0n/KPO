@@ -60,16 +60,20 @@ describe('commenting on watched issues', () => {
   /** Подставной GitHub: состояние issue и уже оставленные комментарии; POST-ы копятся в posted */
   function fakeGitHub(state: string, comments: string[] = []) {
     const posted: { path: string; body: string }[] = []
+    const commentPages: number[] = []
     const gh: GitHub = async (path, init) => {
       if (init?.method === 'POST') {
         posted.push({ path, body: JSON.parse(String(init.body)).body })
         return Response.json({})
       }
-      if (path.endsWith('/comments?per_page=100'))
-        return Response.json(comments.map((body) => ({ body })))
+      if (path.includes('/comments?')) {
+        const page = Number(new URL(path, 'https://api.github.com').searchParams.get('page') ?? 1)
+        commentPages.push(page)
+        return Response.json(comments.slice((page - 1) * 100, page * 100).map((body) => ({ body })))
+      }
       return Response.json({ state })
     }
-    return { gh, posted }
+    return { gh, posted, commentPages }
   }
 
   const betaOut = () =>
@@ -95,5 +99,27 @@ describe('commenting on watched issues', () => {
     const closed = fakeGitHub('closed')
     await notify(await betaOut(), closed.gh)
     expect([...marked.posted, ...closed.posted]).toEqual([])
+  })
+
+  it('finds an existing milestone marker after the first hundred comments', async () => {
+    vi.spyOn(console, 'log').mockImplementation(() => {})
+    const { gh, posted, commentPages } = fakeGitHub('open', [
+      ...Array.from({ length: 100 }, (_, index) => `discussion ${index}`),
+      marker(beta)
+    ])
+    await notify(await betaOut(), gh)
+    expect(posted).toEqual([])
+    expect(commentPages).toEqual([1, 2])
+  })
+
+  it('posts after checking every comment page when the milestone is new', async () => {
+    vi.spyOn(console, 'log').mockImplementation(() => {})
+    const { gh, posted, commentPages } = fakeGitHub(
+      'open',
+      Array.from({ length: 100 }, (_, index) => `discussion ${index}`)
+    )
+    await notify(await betaOut(), gh)
+    expect(posted).toHaveLength(1)
+    expect(commentPages).toEqual([1, 2])
   })
 })

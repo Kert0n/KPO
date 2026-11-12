@@ -116,10 +116,7 @@ export async function notify(results: Status[], gh: GitHub): Promise<void> {
       console.log(`#${watch.issue} закрыт, не комментирую: ${milestone.title}`)
       continue
     }
-    const comments = (await (await gh(`/issues/${watch.issue}/comments?per_page=100`)).json()) as {
-      body?: string
-    }[]
-    if (comments.some((comment) => comment.body?.includes(marker(milestone)))) {
+    if (await alreadyNotified(watch.issue, milestone, gh)) {
       console.log(`#${watch.issue} уже знает: ${milestone.title}`)
       continue
     }
@@ -128,6 +125,16 @@ export async function notify(results: Status[], gh: GitHub): Promise<void> {
       body: JSON.stringify({ body: commentBody(watch, milestone, version) })
     })
     console.log(`#${watch.issue}: сообщил, что вышла ${milestone.title}`)
+  }
+}
+
+async function alreadyNotified(issue: number, milestone: Milestone, gh: GitHub): Promise<boolean> {
+  for (let page = 1; ; page += 1) {
+    const comments = (await (
+      await gh(`/issues/${issue}/comments?per_page=100&page=${page}`)
+    ).json()) as { body?: string }[]
+    if (comments.some((comment) => comment.body?.includes(marker(milestone)))) return true
+    if (comments.length < 100) return false
   }
 }
 
