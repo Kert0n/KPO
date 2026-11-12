@@ -76,6 +76,16 @@ override `mermaid → katex 0.18.9` снят в октябре 2026, когда 
 `speech-rule-engine ^4.0.6`, а `speech-rule-engine 4.1.5` сам требует
 `@xmldom/xmldom ^0.9.12`.
 
+## Issues, которые ждут релиза
+
+Некоторые issues закрываются только обновлением зависимости, которой ещё нет: например, #103 ждёт
+VitePress 2. Такие ожидания записаны в `scripts/upstream-releases.mts` — номер issue, пакет и вехи
+(первая версия, которая считается выходом). Задача `upstream-releases` в
+`.github/workflows/maintenance.yml` по понедельникам сверяет их с npm-реестром и, когда веха
+достигнута, оставляет в issue один комментарий с версией и тем, что проверить. Повторно не пишет: в
+комментарии стоит маркер вехи. Закрытые issues не комментирует. Вручную —
+`node --experimental-strip-types scripts/upstream-releases.mts report`.
+
 ## Как разбирать пакет PR
 
 1. Зафиксировать SHA `master` и heads всех PR.
