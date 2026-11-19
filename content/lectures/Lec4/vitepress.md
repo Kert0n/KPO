@@ -15,8 +15,8 @@ recommends:
 
 В этой лекции мы рассматриваем порождающие паттерны GoF:
 
-- **Factory Method** - переносит создание одного продукта в отдельный фабричный метод.
-- **Abstract Factory** - создает семейства связанных продуктов и не дает смешать несовместимые варианты.
+- **Factory Method** - оставляет подклассу выбор продукта, которым пользуется общая операция.
+- **Abstract Factory** - создаёт совместимые продукты одного семейства за общим интерфейсом.
 - **Builder** - собирает сложный объект пошагово.
 - **Prototype** - создает новый объект копированием существующего.
 - **Singleton** - ограничивает класс одним экземпляром, но в современной разработке чаще рассматривается как решение с
@@ -24,10 +24,10 @@ recommends:
 
 ## Сквозной сценарий
 
-Будем смотреть на паттерны через рост одного приложения. Сначала логистический сервис умеет доставлять грузовиком. Затем
-появляется доставка кораблем, потом разные семейства UI-виджетов для web и desktop, затем сложный отчет с десятком
-опциональных настроек, потом нужно быстро клонировать похожие документы. В каждой точке проблема одна и та же:
-клиентский код начинает слишком много знать о создании объектов.
+Представьте, что в сервисе заказов появилась морская доставка. Как добавить её, сохранив общий порядок отправки
+груза? А если для покупателя нужно подобрать целый комплект мебели в одном стиле? Здесь меняются разные решения.
+В первом случае выбирают один вид транспорта, во втором — сразу несколько согласованных видов товара. Разберём эти
+задачи отдельно, а затем перейдём к сборке отчёта, копированию документа и времени жизни общих настроек.
 
 ```mermaid
 flowchart LR
@@ -46,7 +46,7 @@ flowchart LR
 
 ### Ситуация
 
-Сервис заказов сначала печатает один простой receipt. Потом появляются invoice, delivery note, разные шаблоны для
+Сервис заказов сначала печатает только чеки (`receipt`). Затем появляются счета (`invoice`), накладные (`delivery-note`), отдельные шаблоны для
 юридических лиц, локализация и тестовые документы с минимальным набором полей.
 
 ### Наивное решение
@@ -61,8 +61,9 @@ flowchart LR
 
 ### Улучшение
 
-Выделить создание в отдельную роль: фабрика выбирает тип документа, abstract factory не смешивает семейства шаблонов,
-builder собирает сложный документ по шагам, prototype помогает клонировать похожий документ.
+Для начала передайте сценарию функцию, которая по виду документа возвращает подходящий шаблон. Добавление накладной
+тогда меняет выбор шаблона в одном месте. Если позднее заголовок, строки и подпись придётся выбирать комплектом для PDF
+или HTML, появится отдельная задача для Abstract Factory. Builder пригодится, когда сложность окажется в заполнении полей.
 
 ### Почему это работает
 
@@ -251,7 +252,8 @@ val transport =
 ### Решение
 
 Вынесем создание транспорта в отдельную роль - `Logistics`. Конкретная логистика знает, какой транспорт ей нужен.
-Клиент работает с абстракциями: `Logistics` и `Transport`.
+Метод `planDelivery` задаёт общий порядок действий: создать транспорт, затем передать ему груз.
+Переопределяется только `createTransport`. В версии на Go общий алгоритм вынесен в функцию: она получает создателя через интерфейс.
 
 ```mermaid
 classDiagram
@@ -392,15 +394,17 @@ final class SeaLogistics extends Logistics {
 ```
 
 ```go
+import "fmt"
+
 type Transport interface {
     Deliver(cargoID string)
 }
 
 type Truck struct{}
-func (Truck) Deliver(cargoID string) {}
+func (Truck) Deliver(cargoID string) { fmt.Printf("Груз %s доставлен по дороге\n", cargoID) }
 
 type Ship struct{}
-func (Ship) Deliver(cargoID string) {}
+func (Ship) Deliver(cargoID string) { fmt.Printf("Груз %s доставлен морем\n", cargoID) }
 
 type Logistics interface {
     CreateTransport() Transport
@@ -465,16 +469,20 @@ logistics.PlanDelivery("ORD-42");
 ```
 
 ```java
-static Logistics logisticsFor(String routeType) {
-    return switch (routeType) {
-        case "road" -> new RoadLogistics();
-        case "sea" -> new SeaLogistics();
-        default -> throw new IllegalArgumentException("Неизвестный тип маршрута: " + routeType);
-    };
-}
+final class DeliveryExample {
+    static Logistics logisticsFor(String routeType) {
+        return switch (routeType) {
+            case "road" -> new RoadLogistics();
+            case "sea" -> new SeaLogistics();
+            default -> throw new IllegalArgumentException("Неизвестный тип маршрута: " + routeType);
+        };
+    }
 
-Logistics logistics = logisticsFor("sea");
-logistics.planDelivery("ORD-42");
+    public static void main(String[] args) {
+        Logistics logistics = logisticsFor("sea");
+        logistics.planDelivery("ORD-42");
+    }
+}
 ```
 
 ```go
@@ -489,11 +497,16 @@ func LogisticsFor(routeType string) Logistics {
     }
 }
 
-logistics := LogisticsFor("sea")
-PlanDelivery(logistics, "ORD-42")
+func main() {
+    logistics := LogisticsFor("sea")
+    PlanDelivery(logistics, "ORD-42")
+}
 ```
 
 :::
+
+Во всех четырёх вариантах маршрут `sea` выведет «Груз ORD-42 доставлен морем». Функция выбора `logisticsFor`
+осталась обычной фабричной функцией. Фабричный метод в смысле GoF — это точка расширения `createTransport` внутри общего сценария.
 
 ### Применимость
 
@@ -558,8 +571,7 @@ val table = VictorianTable() // несовместимый стиль
 
 ### Решение
 
-Создадим фабрику, которая отвечает за целое семейство. `ModernFurnitureFactory` создает только модерн-продукты,
-`VictorianFurnitureFactory` - только викторианские.
+Создадим фабрику, которая отвечает за целое семейство. `ModernFurnitureFactory` создаёт только мебель в стиле модерн, а `VictorianFurnitureFactory` — только мебель в викторианском стиле.
 
 ```mermaid
 classDiagram
@@ -823,7 +835,9 @@ func (VictorianFurnitureFactory) CreateTable() CoffeeTable { return VictorianTab
 
 :::
 
-Клиентский код получает фабрику и больше не принимает решений о конкретных классах.
+Клиент получает одну фабрику и запрашивает у неё все предметы. Если передать викторианскую фабрику, все три
+строки в результате описывают викторианскую мебель. Сам интерфейс допускает ошибочную реализацию, которая вернёт
+чужой столик. Согласованность семейства обеспечивает код конкретной фабрики, и её можно проверить тестом.
 
 ::: multi-code "Abstract Factory: клиент" {playground=off}
 
@@ -926,7 +940,7 @@ Abstract Factory применима, когда:
 
 | Плюсы                                                 | Минусы                                                        |
 |-------------------------------------------------------|---------------------------------------------------------------|
-| Гарантирует совместимость продуктов одного семейства. | Усложняет структуру проекта.                                  |
+| Сосредоточивает выбор совместимых продуктов в одной фабрике. | Усложняет структуру проекта.                                  |
 | Изолирует код создания от клиента.                    | Требует реализовать все продукты в каждой фабрике.            |
 | Упрощает замену целой линейки продуктов.              | Новый тип продукта меняет интерфейс фабрики и все реализации. |
 | Поддерживает OCP для добавления новых семейств.       | Может быть избыточна, если продукты не связаны по смыслу.     |
@@ -974,7 +988,8 @@ val report = Report("Продажи", null, true, false, "pdf", null, "A4")
 ### Решение
 
 Builder предоставляет понятные шаги сборки. Клиент вызывает только те шаги, которые нужны для конкретного результата.
-Если порядок шагов важен и повторяется, его можно вынести в отдельного **директора**.
+Если порядок шагов важен и повторяется, его можно вынести в отдельного **директора**. В примере `ReportBuilder`
+накапливает настройки одного типа отчёта. Формат PDF здесь всего лишь значение поля: построитель пока не формирует файл.
 
 ```mermaid
 sequenceDiagram
@@ -986,7 +1001,8 @@ sequenceDiagram
   Client->>Builder: withCharts()
   Client->>Builder: asPdf()
   Client->>Builder: build()
-  Builder-->>Report: готовый отчет
+  Builder->>Report: создать отчёт
+  Builder-->>Client: передать готовый отчёт
 ```
 
 ::: multi-code "Builder: отчет" {playground=off}
@@ -1034,6 +1050,13 @@ val report = ReportBuilder()
 ```
 
 ```csharp
+var report = new ReportBuilder()
+    .Title("Продажи")
+    .Author("Аналитический отдел")
+    .WithCharts()
+    .AsPdf()
+    .Build();
+
 public sealed record Report(
     string Title,
     string? Author,
@@ -1067,13 +1090,6 @@ public sealed class ReportBuilder
         return new Report(_title, _author, _includeCharts, _includeAppendix, _format, _watermark, _pageSize);
     }
 }
-
-var report = new ReportBuilder()
-    .Title("Продажи")
-    .Author("Аналитический отдел")
-    .WithCharts()
-    .AsPdf()
-    .Build();
 ```
 
 ```java
@@ -1168,15 +1184,15 @@ report := NewReportBuilder().
     Build()
 
 // Functional options — нет отдельного типа Builder
-report := NewReport(
+otherReport := NewReport(
     WithTitle("Продажи"),
     WithCharts(),
     AsPDF(),
 )
 ```
 
-Functional options проще: не нужен отдельный тип Builder, нет мутабельного промежуточного состояния, и `NewReport`
-остаётся единственной точкой создания. Классический Builder оправдан, когда нужна валидация по шагам или когда один
+Функции настройки применяет сам `NewReport`. Они могут менять промежуточную конфигурацию по указателю, но
+вызывающему коду не приходится хранить отдельный построитель. Если две настройки пишут в одно поле, их порядок может иметь значение. Классический Builder оправдан, когда нужна валидация по шагам или когда один
 builder создаёт разные представления (PDF, HTML, DOCX).
 :::
 
@@ -1202,8 +1218,8 @@ val config = ServerConfig().apply {
 ```mermaid
 classDiagram
   class ReportDirector {
-    +monthlySales(builder)
-    +shortSummary(builder)
+    +monthlySales()
+    +shortSummary()
   }
   class ReportBuilder {
     +title(value)
@@ -1237,14 +1253,16 @@ class ReportDirector {
 
 ### Builder и неизменяемость
 
-Частая хорошая практика: Builder изменяемый, а результат - неизменяемый. Это дает удобную сборку и безопасный готовый
-объект.
+В Java стандартный `HttpRequest.Builder` позволяет менять настройки и несколько раз вызывать `build()`. Каждый вызов
+создаёт отдельный неизменяемый запрос. Например, добавление заголовка после первого вызова `build()` повлияет на
+следующий запрос, а первый сохранит свои заголовки. В нашем примере Go возвращает структуру по значению: её открытые поля
+можно менять, но это не изменит поля построителя. Неизменяемость продукта требует отдельного решения при проектировании.
 
 ```mermaid
 flowchart LR
   Mutable[Изменяемый Builder] --> Build["build()"]
-  Build --> Immutable[Неизменяемый Report]
-  Immutable --> Safe[Дальше состояние не меняется случайно]
+  Build --> Java["Java HttpRequest: неизменяемый запрос"]
+  Build --> Go["Go Report: структура с доступными для записи полями"]
 ```
 
 ### Применимость
@@ -1293,7 +1311,7 @@ Builder собирает сложный объект по шагам из нич
 Простое присваивание переменной не создает копию ссылочного объекта.
 
 ```kotlin
-val original = Document("Договор", listOf("Раздел 1"))
+val original = Document("Договор", mutableListOf("Раздел 1"))
 val copy = original
 ```
 
@@ -1302,7 +1320,7 @@ val copy = original
 
 ### Решение
 
-Объект сам предоставляет операцию копирования. Клиент не знает конкретный класс и не повторяет сложную инициализацию.
+Объект сам предоставляет операцию копирования. В примере клиент создаёт исходный `Document` обычным конструктором. Получив готовый образец, он может запросить копию, не воспроизводя его инициализацию.
 
 ```mermaid
 classDiagram
@@ -1317,7 +1335,11 @@ classDiagram
   Client --> Prototype : clone()
 ```
 
-::: multi-code "Prototype: копирование документа" {playground=off}
+Копия договора должна редактироваться независимо от черновика. Предскажите заголовок первого раздела в каждом документе
+после исправления в копии. Все четыре примера проверяют, сохранился ли в черновике первоначальный текст.
+В Kotlin Playground замените тело `clone()` на `copy()` и повторите запуск: проверка в конце покажет, когда исходный список оказался общим.
+
+::: multi-code "Prototype: копирование документа"
 
 ```kotlin
 interface Prototype<T> {
@@ -1332,12 +1354,34 @@ data class Document(
         Document(title, sections.toMutableList())
 }
 
-val draft = Document("Договор", mutableListOf("Предмет договора"))
-val editableCopy = draft.clone()
-editableCopy.sections += "Сроки"
+fun main() {
+    val draft = Document("Договор", mutableListOf("Предмет договора"))
+    val edited = draft.clone()
+    edited.sections[0] = "Сроки"
+    check(draft.sections[0] == "Предмет договора")
+}
+```
+
+```kotlin playground
+data class Document(val title: String, val sections: MutableList<String>) {
+    fun clone(): Document = copy(sections = sections.toMutableList())
+}
+
+fun main() {
+    val draft = Document("Договор", mutableListOf("Предмет договора"))
+    val edited = draft.clone()
+    edited.sections[0] = "Сроки"
+
+    println(draft.sections[0])
+    println(edited.sections[0])
+    check(draft.sections[0] == "Предмет договора")
+}
 ```
 
 ```csharp
+using System;
+using System.Collections.Generic;
+
 public interface IPrototype<out T>
 {
     T Clone();
@@ -1358,12 +1402,23 @@ public sealed class Document : IPrototype<Document>
         new Document(Title, new List<string>(Sections));
 }
 
-var draft = new Document("Договор", ["Предмет договора"]);
-var editableCopy = draft.Clone();
-editableCopy.Sections.Add("Сроки");
+public static class Program
+{
+    public static void Main()
+    {
+        var draft = new Document("Договор", new List<string> { "Предмет договора" });
+        var edited = draft.Clone();
+        edited.Sections[0] = "Сроки";
+        if (draft.Sections[0] != "Предмет договора")
+            throw new InvalidOperationException("Изменился исходный документ");
+    }
+}
 ```
 
 ```java
+import java.util.ArrayList;
+import java.util.List;
+
 final class Document {
     private final String title;
     private final List<String> sections;
@@ -1373,16 +1428,28 @@ final class Document {
         this.sections = sections;
     }
 
+    List<String> sections() { return sections; }
+
     Document copy() {
         return new Document(title, new ArrayList<>(sections));
     }
 }
 
-Document draft = new Document("Договор", new ArrayList<>(List.of("Предмет договора")));
-Document editableCopy = draft.copy();
+class Demo {
+    public static void main(String[] args) {
+        Document draft = new Document("Договор", new ArrayList<>(List.of("Предмет договора")));
+        Document edited = draft.copy();
+        edited.sections().set(0, "Сроки");
+        if (!draft.sections().get(0).equals("Предмет договора")) {
+            throw new IllegalStateException("Изменился исходный документ");
+        }
+    }
+}
 ```
 
 ```go
+package main
+
 type Document struct {
     Title    string
     Sections []string
@@ -1394,16 +1461,20 @@ func (d Document) Clone() Document {
     return Document{Title: d.Title, Sections: sections}
 }
 
-draft := Document{Title: "Договор", Sections: []string{"Предмет договора"}}
-editableCopy := draft.Clone()
-editableCopy.Sections = append(editableCopy.Sections, "Сроки")
+func main() {
+    draft := Document{Title: "Договор", Sections: []string{"Предмет договора"}}
+    edited := draft.Clone()
+    edited.Sections[0] = "Сроки"
+    if draft.Sections[0] != "Предмет договора" {
+        panic("изменился исходный документ")
+    }
+}
 ```
 
 :::
 
 ::: only kotlin
-Kotlin решил Prototype элегантнее других языков курса. Любой `data class` автоматически получает метод `copy()` с
-именованными параметрами — можно скопировать объект, изменив только нужные поля:
+Компилятор Kotlin создаёт для `data class` метод `copy()` по свойствам первичного конструктора. Именованными аргументами можно указать, какие из них заменить:
 
 ```kotlin
 data class Config(val host: String, val port: Int, val debug: Boolean)
@@ -1412,8 +1483,12 @@ val production = Config("api.example.com", 443, debug = false)
 val staging = production.copy(host = "staging.example.com", debug = true)
 ```
 
-Для плоских (без вложенных мутабельных объектов) `data class` это покрывает 90% сценариев Prototype без единого
-дополнительного интерфейса.
+Оба экземпляра `Config` можно использовать независимо: их свойства содержат строки, числа и логические значения.
+В `Document` есть изменяемый список, поэтому ниже полезно проверить, что именно копирует `copy()`.
+:::
+
+::: only go
+Присваивание структуры копирует заголовок среза. Без отдельного массива обе копии по-прежнему обращались бы к одному первому элементу. Добавление через `append` могло бы выделить новый массив и скрыть ошибку, поэтому в проверке меняется уже существующий элемент.
 :::
 
 ### Поверхностное и глубокое копирование
@@ -1444,7 +1519,7 @@ copy.items += "Gadget"
 println(original.items) // [Widget, Gadget] — оригинал изменился!
 ```
 
-Решение: при копировании явно создать новый список — `original.copy(items = original.items.toMutableList())`.
+В этом случае достаточно выделить новый список вызовом `original.copy(items = original.items.toMutableList())`. Элементы здесь — неизменяемые строки. Если бы товаром был изменяемый объект, оба списка всё ещё содержали бы ссылку на тот же товар.
 
 ::: warning Типичная ошибка
 Если у объекта есть изменяемые коллекции или вложенные ссылочные объекты, недостаточно скопировать только верхний
@@ -1473,9 +1548,8 @@ Prototype подходит, когда:
 
 ## Singleton
 
-Prototype решает задачу «создать похожий объект». Но бывают объекты, которые *нельзя* создавать многократно: пул
-соединений, конфигурация приложения, глобальный счётчик метрик. Здесь задача противоположная — не «создать ещё один»,
-а «убедиться, что он ровно один».
+Сервисам, которые обращаются к одной базе с одинаковыми настройками, удобно передавать общий пул соединений.
+Для второй базы может понадобиться отдельный пул. Поэтому сначала определите границу, в которой ресурс должен быть общим.
 
 **Singleton** гарантирует, что у класса есть только один экземпляр, и предоставляет глобальную точку доступа к нему.
 
@@ -1501,6 +1575,8 @@ classDiagram
 
 ```kotlin
 class AppSettings private constructor() {
+    var currency: String = "RUB"
+
     companion object {
         private var instance: AppSettings? = null
 
@@ -1514,7 +1590,7 @@ class AppSettings private constructor() {
 }
 ```
 
-На первый взгляд код простой: конструктор закрыт, экземпляр хранится статически, `getInstance()` возвращает один и тот
+Это намеренно небезопасный пример ленивой инициализации. На первый взгляд код простой: конструктор закрыт, экземпляр хранится статически, `getInstance()` возвращает один и тот
 же объект. Но у этой версии сразу несколько проблем.
 
 ### Проблемы Singleton
@@ -1527,16 +1603,18 @@ class AppSettings private constructor() {
 | Скрытые зависимости  | По конструктору класса не видно, что он использует Singleton.                    |
 | Жизненный цикл       | Непонятно, когда объект создается и когда освобождает ресурсы.                   |
 
-Конкретный пример проблемы тестирования:
+В Kotlin объявление `object` инициализируется потокобезопасно при первом обращении. Последующие изменения
+его состояния требуют собственной синхронизации. В примере ниже оба теста используют сервис, который при форматировании
+читает `AppSettings.getInstance().currency`.
 
 ```kotlin
 // Тест A
 AppSettings.getInstance().currency = "USD"
-assert(service.formatTotal(100) == "100 USD") // ✅
+check(service.formatTotal(100) == "100 USD")
 
 // Тест B (запускается после A)
 // Ожидает дефолтный currency = "RUB", но Singleton помнит "USD" из теста A!
-assert(service.formatTotal(100) == "100 RUB") // ❌ получили "100 USD"
+check(service.formatTotal(100) == "100 RUB") // Проверка падает: получено "100 USD".
 ```
 
 Тесты перестают быть независимыми. Порядок запуска влияет на результат. В параллельном запуске результаты становятся
@@ -1620,30 +1698,20 @@ Singleton можно встретить:
 
 ```mermaid
 flowchart TD
-  Start[Нужно управлять созданием объекта] --> One{Создается один тип продукта?}
-  One -->|Да| Unknown{Клиент не должен знать конкретный класс?}
-  Unknown -->|Да| FM[Factory Method]
-  Unknown -->|Нет| Constructor[Обычный конструктор или функция]
-
-  One -->|Нет| Family{Продукты образуют совместимое семейство?}
-  Family -->|Да| AF[Abstract Factory]
-  Family -->|Нет| Complex{Один сложный объект собирается по шагам?}
-  Complex -->|Да| Builder[Builder]
-  Complex -->|Нет| Constructor
-
-  Start --> Copy{Нужна копия существующего объекта?}
-  Copy -->|Да| Prototype[Prototype]
-
-  Start --> Single{Нужен ровно один экземпляр?}
-  Single -->|Да| Lifecycle[DI lifetime или composition root]
-  Lifecycle --> Singleton[Singleton только при сильном обосновании]
+  Start[Что именно усложнилось?] -->|Выбор продукта внутри общего алгоритма| FM[Factory Method]
+  Start -->|Согласованный выбор нескольких продуктов| AF[Abstract Factory]
+  Start -->|Пошаговая сборка одного результата| Builder[Builder]
+  Start -->|Копирование готового состояния| Prototype[Prototype]
+  Start -->|Совместное использование ресурса| Lifecycle[Определить область жизни]
+  Lifecycle --> Shared[Один экземпляр в композиционном корне или контейнере]
+  Start -->|Только вызов с понятными аргументами| Constructor[Обычный конструктор или функция]
 ```
 
 ::: details Таблица выбора (альтернативный формат)
 
 | Ситуация                                                         | Подходящий вариант                    |
 |------------------------------------------------------------------|---------------------------------------|
-| Есть один интерфейс продукта и несколько реализаций.             | Factory Method                        |
+| Общий алгоритм вызывает переопределяемый метод создания.             | Factory Method                        |
 | Нужно создать кресло, диван и столик одного стиля.               | Abstract Factory                      |
 | Конструктор стал длинным и нечитаемым.                           | Builder                               |
 | Нужно редактировать копию объекта и уметь отменить изменения.    | Prototype                             |
@@ -1682,7 +1750,7 @@ flowchart TD
 
 Главные выводы:
 
-- Factory Method нужен, когда клиенту нужен продукт через общий интерфейс, а конкретный класс выбирается отдельно.
+- В Factory Method общий алгоритм использует продукт, а конкретный создатель переопределяет шаг его создания.
 - Abstract Factory нужна, когда создается семейство связанных продуктов и важно не смешивать варианты.
 - Builder нужен, когда объект сложно инициализировать одним понятным конструктором.
 - Prototype нужен, когда новый объект удобно получить копированием существующего состояния.
@@ -1702,6 +1770,13 @@ flowchart TD
 - [Порождающие паттерны на Metanit](https://metanit.com/sharp/patterns/2.1.php) — примеры на C#.
 - [Краткий конспект про все паттерны](https://habr.com/ru/articles/210288/) — обзор GoF-паттернов в одном материале.
 
+### Первоисточники и реальные API
+
+- [Gamma, Helm, Johnson, Vlissides — Design Patterns](https://www.informit.com/store/design-patterns-elements-of-reusable-object-oriented-9780201633610) — исходный каталог и его раздел о порождающих паттернах.
+- [Kotlin — копирование data class](https://kotlinlang.org/docs/data-classes.html#copying) — пример двух объектов с общим изменяемым списком.
+- [Java — HttpRequest.Builder](https://docs.oracle.com/en/java/javase/21/docs/api/java.net.http/java/net/http/HttpRequest.Builder.html) — контракт повторной сборки неизменяемых запросов.
+- [Dave Cheney — Functional options for friendly APIs](https://dave.cheney.net/2014/10/17/functional-options-for-friendly-apis) — как функции настройки меняют объект при создании.
+
 ### Видео
 
 - [Курс Avito о практиках и паттернах кода](https://avito.tech/patterns#seasons) — видеокурс с практическими разборами.
@@ -1711,8 +1786,8 @@ flowchart TD
 Ответьте на вопросы без подсказок. Если ответ неочевиден, вернитесь к соответствующему разделу.
 
 1. Почему паттерн нельзя воспринимать как готовый алгоритм?
-2. Чем Factory Method отличается от обычного вызова конструктора?
-3. Почему Abstract Factory защищает от смешивания несовместимых продуктов?
+2. Почему в примере логистики фабричным методом называют `createTransport`, а не `logisticsFor`?
+3. Где обеспечивается единый стиль мебели и какой тест поймает неподходящий столик?
 4. Когда Builder лучше длинного конструктора?
 5. Чем поверхностное копирование отличается от глубокого?
 6. Почему Singleton усложняет тестирование?
@@ -1725,17 +1800,21 @@ flowchart TD
 
 Требования:
 
-- документ может быть `invoice`, `receipt` или `delivery-note`;
+- сегодня поддерживаются счёт (`invoice`) и чек (`receipt`). Новое требование — добавить накладную (`delivery-note`);
 - для каждого типа нужен свой набор полей и шаблон;
-- часть полей обязательна, часть зависит от страны и способа оплаты;
+- номер счёта обязателен. Остальные поля могут зависеть от страны и способа оплаты;
 - в тестах нужно создавать короткие валидные документы без длинного setup;
 - в будущем появятся PDF и HTML-версии.
 
 Сделайте три шага:
 
 1. Решите, где достаточно обычного конструктора или named/default arguments.
-2. Выберите место, где уместен Factory Method или Abstract Factory.
-3. Покажите, какую часть сложной инициализации стоит вынести в Builder.
+2. Покажите, достаточно ли функции выбора шаблона. Если предлагаете Factory Method или Abstract Factory, назовите общий алгоритм или состав семейства.
+3. Назовите одно реальное требование, которое оправдало бы Builder. Если именованных аргументов и проверки в конструкторе хватает, оставьте этот вариант и приведите тест.
 
-Проверьте себя: если выбранный паттерн не уменьшил количество условных операторов, не защитил совместимость семейства
-объектов и не сделал создание читаемее, возможно, обычный код здесь лучше паттерна.
+::: details Как проверить решение
+Добавьте накладную в уже поддерживаемой стране. Покажите, что путь оформления заказа остался прежним, а тест на чек
+по-прежнему проходит. Затем попробуйте получить счёт без обязательного номера: ошибка должна обнаружиться до отправки
+документа. Наконец, посчитайте, сколько мест нужно изменить для нового формата вывода. Если меняется только одна
+функция выбора, поясните, какая дополнительная задача могла бы оправдать появление семейства фабрик.
+:::
