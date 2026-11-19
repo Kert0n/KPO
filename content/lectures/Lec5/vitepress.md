@@ -16,7 +16,7 @@ recommends:
 Главная мысль этой лекции: во многих задачах поведение полезно сделать явной сущностью. Алгоритм можно вынести в
 стратегию, состояние - в отдельный объект состояния, действие - в команду, реакцию на событие - в подписчика, а новую
 операцию над иерархией - в посетителя. Такой ход часто уменьшает связанность и помогает соблюдать Open/Closed Principle,
-но почти всегда платит за это дополнительными типами и большей архитектурной дисциплиной.
+но почти всегда требует дополнительных типов и большей архитектурной дисциплины.
 
 В этой лекции разберем шесть поведенческих паттернов:
 
@@ -29,10 +29,9 @@ recommends:
 
 ## Сквозной сценарий
 
-В этой лекции удобно представить одно приложение навигации и доставки. Пользователь выбирает способ построения маршрута,
-документ заказа проходит состояния, образовательный курс строится по повторяющемуся шаблону, биржевой модуль рассылает
-обновления подписчикам, редактор хранит действия для undo, а страховая система добавляет новый отчет по уже существующим
-типам клиентов.
+Представьте приложение доставки. Курьер выбирает способ построения маршрута, заказ проходит несколько состояний,
+а оператор иногда отменяет последнее действие. Эти задачи вернутся в мини-практике. Для отдельных паттернов
+возьмём короткие самостоятельные примеры — документ на подписи, учебный процесс, биржу и страхование зданий.
 
 ```mermaid
 flowchart LR
@@ -73,7 +72,7 @@ flowchart LR
 
 ### Почему это работает
 
-Поведенческие паттерны дают имени не классу, а намерению. Если команда говорит "это Strategy", она сообщает: здесь
+Название паттерна подсказывает, какую часть программы команда ожидает менять. Если команда говорит "это Strategy", она сообщает: здесь
 меняется алгоритм. Если говорит "это State", она сообщает: здесь правила зависят от текущего состояния и переходов.
 
 ## Где поведенческие паттерны в GoF
@@ -93,7 +92,7 @@ flowchart LR
 ::: tip Практическое правило
 Поведенческий паттерн стоит рассматривать не тогда, когда "хочется применить паттерн", а когда в коде уже видна сила:
 разрастающиеся условные операторы, повторяющийся алгоритм, жесткая связь отправителя и получателя, неуправляемые
-события или операции, размазанные по иерархии классов.
+события или операции, реализация которых разбросана по иерархии классов.
 :::
 
 ::: only kotlin
@@ -102,7 +101,7 @@ flowchart LR
 :::
 
 ::: only csharp
-В C# рядом с классическими интерфейсами часто используют делегаты, события и `Func<>`/`Action<>`. Это снижает церемонию,
+В C# рядом с классическими интерфейсами часто используют делегаты, события и `Func<>`/`Action<>`. Так требуется меньше шаблонного кода,
 но не отменяет вопроса: является ли поведение самостоятельной доменной сущностью или всего лишь callback-ом.
 :::
 
@@ -369,6 +368,8 @@ func (n *Navigator) BuildRoute(from Point, to Point) Route {
 
 :::
 
+В примере стратегии возвращают описания маршрутов. Граф дорог и поиск пути опущены. При тех же точках «Дом» и «Офис» смена стратегии меняет описание поездки.
+
 ### Strategy и DI
 
 Strategy иногда путают с dependency injection, потому что в обоих случаях объект получает зависимость извне. Разница в
@@ -380,6 +381,8 @@ Strategy иногда путают с dependency injection, потому что 
 | Когда часто меняется? | Во время работы программы | При сборке приложения или создании объекта |
 | Кто выбирает вариант? | Клиентский код, пользовательский сценарий, runtime-логика | Composition root, контейнер, конфигурация |
 | Пример | Переключить маршрут с пешего на автомобильный | Передать реальный или тестовый репозиторий |
+
+DI можно использовать для передачи стратегии в конструктор. Она останется стратегией, даже если приложение выбрало её один раз при запуске.
 
 ### Когда применять
 
@@ -439,7 +442,7 @@ fun accept() {
 ### Решение
 
 Каждое состояние становится отдельным объектом. Контекст `Document` хранит текущее состояние и делегирует ему действия.
-Состояние может решить, допустимо ли действие, и перевести документ в следующее состояние.
+Новый документ в примере начинает с черновика. Текущее состояние решает, допустимо ли действие, и при успехе переводит документ дальше. Попытка принять черновик должна закончиться ошибкой и оставить его черновиком.
 
 ```mermaid
 stateDiagram-v2
@@ -447,17 +450,13 @@ stateDiagram-v2
   Draft --> Signed: sign
   Signed --> Accepted: accept
   Accepted --> Done: complete
-  Draft --> Archived: archive
-  Signed --> Archived: archive
   Done --> [*]
-  Archived --> [*]
 ```
 
 ```mermaid
 classDiagram
   class Document {
     -DocumentState state
-    +setState(state)
     +sign()
     +accept()
     +complete()
@@ -496,16 +495,16 @@ classDiagram
 ```kotlin
 interface DocumentState {
     val name: String
-    fun sign(document: Document) = error("Нельзя подписать из состояния $name")
-    fun accept(document: Document) = error("Нельзя принять из состояния $name")
-    fun complete(document: Document) = error("Нельзя завершить из состояния $name")
+    fun sign(document: Document): Unit = error("Нельзя подписать из состояния $name")
+    fun accept(document: Document): Unit = error("Нельзя принять из состояния $name")
+    fun complete(document: Document): Unit = error("Нельзя завершить из состояния $name")
 }
 
-class Document(initialState: DocumentState) {
-    var state: DocumentState = initialState
+class Document {
+    var state: DocumentState = DraftState()
         private set
 
-    fun changeState(next: DocumentState) {
+    internal fun changeState(next: DocumentState) {
         state = next
     }
 
@@ -537,16 +536,16 @@ class DoneState : DocumentState {
 ```kotlin playground
 interface DocumentState {
     val name: String
-    fun sign(document: Document) = println("Нельзя подписать из состояния $name")
-    fun accept(document: Document) = println("Нельзя принять из состояния $name")
-    fun complete(document: Document) = println("Нельзя завершить из состояния $name")
+    fun sign(document: Document): Unit = error("Нельзя подписать из состояния $name")
+    fun accept(document: Document): Unit = error("Нельзя принять из состояния $name")
+    fun complete(document: Document): Unit = error("Нельзя завершить из состояния $name")
 }
 
-class Document(initialState: DocumentState) {
-    var state: DocumentState = initialState
+class Document {
+    var state: DocumentState = DraftState()
         private set
 
-    fun changeState(next: DocumentState) {
+    internal fun changeState(next: DocumentState) {
         println("${state.name} -> ${next.name}")
         state = next
     }
@@ -576,12 +575,14 @@ class DoneState : DocumentState {
 }
 
 fun main() {
-    val document = Document(DraftState())
-    document.accept()
+    val document = Document()
+    check(runCatching { document.accept() }.exceptionOrNull() is IllegalStateException)
+    check(document.state is DraftState)
     document.sign()
     document.accept()
     document.complete()
-    document.sign()
+    check(runCatching { document.sign() }.exceptionOrNull() is IllegalStateException)
+    check(document.state is DoneState)
 }
 ```
 
@@ -596,11 +597,9 @@ public interface IDocumentState
 
 public sealed class Document
 {
-    public IDocumentState State { get; private set; }
+    public IDocumentState State { get; private set; } = new DraftState();
 
-    public Document(IDocumentState initialState) => State = initialState;
-
-    public void ChangeState(IDocumentState next) => State = next;
+    internal void ChangeState(IDocumentState next) => State = next;
     public void Sign() => State.Sign(this);
     public void Accept() => State.Accept(this);
     public void Complete() => State.Complete(this);
@@ -648,11 +647,7 @@ interface DocumentState {
 }
 
 final class Document {
-    private DocumentState state;
-
-    Document(DocumentState initialState) {
-        state = initialState;
-    }
+    private DocumentState state = new DraftState();
 
     void changeState(DocumentState next) {
         state = next;
@@ -672,6 +667,15 @@ final class SignedState implements DocumentState {
     public String name() { return "Подписан"; }
     public void accept(Document document) { document.changeState(new AcceptedState()); }
 }
+
+final class AcceptedState implements DocumentState {
+    public String name() { return "Принят"; }
+    public void complete(Document document) { document.changeState(new DoneState()); }
+}
+
+final class DoneState implements DocumentState {
+    public String name() { return "Завершен"; }
+}
 ```
 
 ```go
@@ -690,11 +694,11 @@ type Document struct {
 	state DocumentState
 }
 
-func NewDocument(initialState DocumentState) *Document {
-	return &Document{state: initialState}
+func NewDocument() *Document {
+	return &Document{state: DraftState{}}
 }
 
-func (d *Document) ChangeState(next DocumentState) {
+func (d *Document) changeState(next DocumentState) {
 	d.state = next
 }
 
@@ -706,7 +710,7 @@ type DraftState struct{}
 
 func (DraftState) Name() string { return "Черновик" }
 func (DraftState) Sign(document *Document) error {
-	document.ChangeState(SignedState{})
+	document.changeState(SignedState{})
 	return nil
 }
 func (s DraftState) Accept(*Document) error   { return fmt.Errorf("нельзя принять из состояния %s", s.Name()) }
@@ -717,14 +721,45 @@ type SignedState struct{}
 func (SignedState) Name() string { return "Подписан" }
 func (SignedState) Sign(*Document) error { return fmt.Errorf("уже подписан") }
 func (SignedState) Accept(document *Document) error {
-	document.ChangeState(AcceptedState{})
+	document.changeState(AcceptedState{})
 	return nil
 }
 func (SignedState) Complete(*Document) error { return fmt.Errorf("сначала нужно принять документ") }
 
 type AcceptedState struct{}
+
+func (AcceptedState) Name() string { return "Принят" }
+func (AcceptedState) Sign(*Document) error { return fmt.Errorf("уже подписан") }
+func (AcceptedState) Accept(*Document) error { return fmt.Errorf("уже принят") }
+func (AcceptedState) Complete(document *Document) error {
+    document.changeState(DoneState{})
+    return nil
+}
+
+type DoneState struct{}
+
+func (DoneState) Name() string { return "Завершен" }
+func (DoneState) Sign(*Document) error { return fmt.Errorf("документ завершён") }
+func (DoneState) Accept(*Document) error { return fmt.Errorf("документ завершён") }
+func (DoneState) Complete(*Document) error { return fmt.Errorf("документ завершён") }
 ```
 
+:::
+
+::: only go
+В лексере шаблонов Go переход между состояниями выражен функцией. Схематически цикл выглядит так:
+
+```go
+type stateFn func(ctx *Context) stateFn
+
+func run(ctx *Context) {
+    for state := startState; state != nil; {
+        state = state(ctx)
+    }
+}
+```
+
+Каждое состояние — функция, возвращающая следующее состояние. Значение `nil` завершает цикл. Такой переход удобно проследить в лексере пакета `text/template/parse`.
 :::
 
 ### Кто отвечает за переходы
@@ -772,7 +807,7 @@ type AcceptedState struct{}
 ## Template Method
 
 State экстернализирует поведение, зависящее от состояния. Но что если алгоритм *фиксирован*, а различаются лишь отдельные
-шаги? Например, обработка любого документа идёт по одной схеме, но PDF, JSON и XML извлекают данные по-разному. Здесь
+шаги? Например, обработка любого документа идёт по одной схеме, но из PDF, JSON и XML данные извлекают по-разному. Здесь
 менять нужно не весь алгоритм и не состояние, а конкретные шаги внутри общего скелета.
 
 **Template Method** задает скелет алгоритма в базовом классе, а отдельные шаги оставляет подклассам. Порядок шагов
@@ -822,6 +857,8 @@ classDiagram
 | Абстрактный шаг | Подкласс обязан дать реализацию |
 | Шаг с реализацией по умолчанию | Подкласс может использовать готовое поведение |
 | Hook | Пустой или минимальный метод, который подкласс переопределяет при необходимости |
+
+Возьмём пример, где порядок легко проверить без парсера. Школа и университет проводят аттестацию перед выдачей документа, но защита выпускной работы появляется только у университета. Влияет ли этот дополнительный шаг на последовательность остальных?
 
 ::: multi-code "Template Method: образовательный процесс"
 
@@ -1012,23 +1049,6 @@ func (p Pipeline) Run() error {
 Это композиция вместо наследования — Go-идиома для того же намерения.
 :::
 
-::: only go
-State machine в Go часто реализуют через знаменитый паттерн Rob Pike — `stateFn`:
-
-```go
-type stateFn func(ctx *Context) stateFn
-
-func run(ctx *Context) {
-    for state := startState; state != nil; {
-        state = state(ctx)
-    }
-}
-```
-
-Каждое состояние — функция, возвращающая следующее состояние. Nil означает конец. Нет интерфейсов, нет классов — только
-функции и переходы. Этот паттерн используется в `text/template`, `encoding/json` и многих Go-проектах.
-:::
-
 ::: warning Template Method легко нарушает LSP
 Если подкласс меняет смысл шага так, что общий алгоритм перестает быть корректным, клиент уже не может безопасно
 использовать подкласс вместо базового класса. Поэтому шаблонный метод часто делают `final`/непереопределяемым, а
@@ -1137,7 +1157,7 @@ class Exchange {
     }
 
     fun publish(info: StockInfo) {
-        observers.forEach { it.update(info) }
+        observers.toList().forEach { it.update(info) }
     }
 }
 
@@ -1234,8 +1254,9 @@ public sealed class Bank : IObserver
 ```
 
 ```java
-import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 
 record StockInfo(double usd, double eur) {}
 
@@ -1244,7 +1265,7 @@ interface Observer {
 }
 
 final class Exchange {
-    private final List<Observer> observers = new ArrayList<>();
+    private final Set<Observer> observers = new LinkedHashSet<>();
 
     void subscribe(Observer observer) {
         observers.add(observer);
@@ -1271,7 +1292,10 @@ final class Bank implements Observer {
 ```go
 package main
 
-import "fmt"
+import (
+    "fmt"
+    "maps"
+)
 
 type StockInfo struct {
 	USD float64
@@ -1283,17 +1307,24 @@ type Observer interface {
 }
 
 type Exchange struct {
-	observers []Observer
+    nextID    int
+    observers map[int]Observer
 }
 
-func (e *Exchange) Subscribe(observer Observer) {
-	e.observers = append(e.observers, observer)
+func (e *Exchange) Subscribe(observer Observer) func() {
+    if e.observers == nil {
+        e.observers = make(map[int]Observer)
+    }
+    id := e.nextID
+    e.nextID++
+    e.observers[id] = observer
+    return func() { delete(e.observers, id) }
 }
 
 func (e *Exchange) Publish(info StockInfo) {
-	for _, observer := range e.observers {
-		observer.Update(info)
-	}
+    for _, observer := range maps.Clone(e.observers) {
+        observer.Update(info)
+    }
 }
 
 type Bank struct{}
@@ -1304,6 +1335,10 @@ func (Bank) Update(info StockInfo) {
 ```
 
 :::
+
+В Playground банк получает обе котировки. Брокер видит только первую и выводит «Брокер ждет»: ко второй публикации он уже отписался. Издатель вызывает подписчиков синхронно по снимку подписок на начало рассылки. Отписка внутри обработчика повлияет на следующую рассылку. Вызовы выполняются в одном потоке. Если обработчик выбросит исключение (в Go — вызовет необработанную `panic`), обход прервётся. Оставшиеся подписчики пропустят эту котировку.
+
+Что произойдёт, если дважды подписать один и тот же объект банка? В Kotlin, C# и Java множество хранит его один раз. В Go каждый вызов создаёт самостоятельную подписку и возвращает свою функцию отмены. После двух регистраций и отмены одной банк всё ещё получит одно уведомление. На очередность доставки между подписчиками полагаться нельзя.
 
 ### Push и Pull
 
@@ -1331,17 +1366,12 @@ func (Bank) Update(info StockInfo) {
 | Хорошо подходит для UI и событийной модели | Сложнее отлаживать цепочки реакций |
 
 ::: warning Следите за жизненным циклом подписок
-Если подписчик живет меньше издателя, его нужно отписывать или использовать механизм слабых ссылок/автоматического
-освобождения. Иначе издатель будет удерживать ссылку на объект, который уже не должен участвовать в работе программы.
+Когда пользователь закрывает экран курсов валют, снимите подписку экрана. Биржа может жить гораздо дольше и продолжать вызывать обработчик закрытого экрана. Слабая ссылка помогает освободить объект после исчезновения остальных ссылок. Закрытие экрана и сборка мусора происходят в разное время, поэтому момент прекращения уведомлений лучше задать явно.
 :::
 
 ## Command
 
-Observer оповещает о событии — «что-то произошло». Command делает следующий шаг: превращает *действие* в самостоятельный
-объект, который можно передать, положить в очередь, отменить или повторить.
-
-**Command** превращает запрос или действие в объект. Такой объект можно передать в другой класс, положить в очередь,
-сохранить, выполнить позже, повторить или отменить.
+Observer сообщает о свершившемся событии, например «документ сохранён». **Command** представляет запрос на действие, например «сохранить документ». Его можно передать исполнителю или поставить в очередь. Для повторения и отмены действия понадобятся дополнительные правила.
 
 ### Проблема
 
@@ -1453,14 +1483,26 @@ class InsertTextCommand(
 
 class CommandHistory {
     private val history = ArrayDeque<Command>()
+    private val undone = ArrayDeque<Command>()
 
     fun run(command: Command) {
         command.execute()
         history.addLast(command)
+        undone.clear()
     }
 
     fun undoLast() {
-        history.removeLastOrNull()?.undo()
+        val command = history.lastOrNull() ?: return
+        command.undo()
+        history.removeLast()
+        undone.addLast(command)
+    }
+
+    fun redoLast() {
+        val command = undone.lastOrNull() ?: return
+        command.execute()
+        undone.removeLast()
+        history.addLast(command)
     }
 }
 
@@ -1474,10 +1516,18 @@ fun main() {
 
     history.undoLast()
     println(editor)
+    history.redoLast()
+    check(editor.toString() == "Hello, world")
+    history.undoLast()
+    history.run(InsertTextCommand(editor, 5, "!"))
+    history.redoLast()
+    check(editor.toString() == "Hello!")
 }
 ```
 
 ```csharp
+using System.Text;
+
 public interface ICommand
 {
     void Execute();
@@ -1597,6 +1647,8 @@ func (c InsertTextCommand) Undo() {
 
 :::
 
+После двух вставок редактор выводит `Hello, world`. Отмена второй оставляет `Hello`. Отменённую вставку можно повторить, пока пользователь не ввёл новый текст. После вставки `!` старая ветка истории отброшена. Позиции сохранённых команд остаются верными, пока документ редактируют через эту историю и отменяют изменения с конца. В сокращённом примере на Go команды умеют дописывать только в конец.
+
 ### Command и callback
 
 Callback тоже можно передать и вызвать позже. Command нужен, когда у действия появляется собственная модель:
@@ -1605,7 +1657,7 @@ Callback тоже можно передать и вызвать позже. Comm
 |-------|----------|---------|
 | Просто выполнить функцию позже | Подходит | Может быть избыточен |
 | Хранить параметры и получателя | Можно, но неявно | Естественно |
-| Отменять действие | Неудобно | Встроено через `undo` |
+| Отменять действие | Неудобно | Требуется обратная операция или снимок состояния |
 | Логировать, сериализовать, ставить в очередь | Сложнее | Обычно проще |
 | Объединять команды в макрокоманды | Сложнее | Естественно |
 
@@ -1624,7 +1676,7 @@ Callback тоже можно передать и вызвать позже. Comm
 | Инициатор не зависит от получателя | Появляется много классов команд |
 | Команды можно хранить и запускать позже | Undo требует аккуратного хранения состояния |
 | Удобно строить историю, очереди, макрокоманды | Сериализация команд может быть сложной |
-| Поддерживает транзакционный стиль | Для простых UI-кнопок может быть избыточен |
+| Для обратимых операций можно реализовать отмену | Для простых UI-кнопок может быть избыточен |
 
 ::: warning Команда не равна распределенной транзакции
 Если команда сериализуется и отправляется в другой сервис, это еще не гарантирует атомарность, идемпотентность и
@@ -1634,8 +1686,7 @@ Callback тоже можно передать и вызвать позже. Comm
 
 ## Visitor
 
-У вас 5 типов клиентов и 3 отчёта. Каждый новый отчёт — это 5 новых `if`. Добавить четвёртый отчёт — ещё 5. Visitor
-меняет эту математику: новая операция = один новый класс, а не N правок по всей иерархии.
+Представьте отчёт о домах, фабриках и банках. Для каждого вида здания нужна своя строка. Visitor собирает три обработчика в одном классе отчёта. При добавлении второго отчёта по-прежнему придётся описать три варианта, зато классы зданий уже готовы принять нового посетителя.
 
 **Visitor** добавляет новые операции к объектной структуре без помещения этих операций внутрь классов элементов. Это
 особенно полезно для деревьев и стабильных иерархий: AST, документов, UI-деревьев, моделей отчетов.
@@ -1651,8 +1702,7 @@ Callback тоже можно передать и вызвать позже. Comm
 ### Решение
 
 Элемент получает метод `accept(visitor)`. Внутри `accept` элемент вызывает подходящий метод посетителя, передавая себя:
-`visitor.visitHouse(this)`. Это называется **double dispatch**: сначала клиент выбирает элемент и вызывает `accept`, затем
-сам элемент выбирает правильную перегрузку/метод посетителя по своему конкретному типу.
+`visitor.visitHouse(this)`. Это называется **double dispatch**: во время вызова `building.accept(visitor)` тип здания определяет реализацию `accept`. Дом вызывает `visitHouse(this)`, а тип переданного посетителя определяет, что произойдёт с домом — расчёт страховки или добавление строки в отчёт.
 
 ```mermaid
 classDiagram
@@ -1706,11 +1756,11 @@ interface BuildingVisitor {
 
 class InsuranceVisitor : BuildingVisitor {
     override fun visitHouse(house: House) {
-        println("Предложить ${house.owner} страхование имущества")
+        println("Страхование имущества. Владелец: ${house.owner}")
     }
 
     override fun visitFactory(factory: Factory) {
-        println("Предложить ${factory.title} страхование от простоя")
+        println("Страхование от простоя. Предприятие: ${factory.title}")
     }
 }
 ```
@@ -1740,15 +1790,15 @@ interface BuildingVisitor {
 
 class InsuranceVisitor : BuildingVisitor {
     override fun visitHouse(house: House) {
-        println("Предложить ${house.owner} страхование имущества")
+        println("Страхование имущества. Владелец: ${house.owner}")
     }
 
     override fun visitFactory(factory: Factory) {
-        println("Предложить ${factory.title} страхование от пожара и простоя")
+        println("Страхование от пожара и простоя. Предприятие: ${factory.title}")
     }
 
     override fun visitBank(bank: Bank) {
-        println("Предложить ${bank.title} страхование финансовых рисков")
+        println("Страхование финансовых рисков. Банк: ${bank.title}")
     }
 }
 
@@ -1816,10 +1866,10 @@ public interface IBuildingVisitor
 public sealed class InsuranceVisitor : IBuildingVisitor
 {
     public void VisitHouse(House house) =>
-        Console.WriteLine($"Предложить {house.Owner} страхование имущества");
+        Console.WriteLine($"Страхование имущества. Владелец: {house.Owner}");
 
     public void VisitFactory(Factory factory) =>
-        Console.WriteLine($"Предложить {factory.Title} страхование от простоя");
+        Console.WriteLine($"Страхование от простоя. Предприятие: {factory.Title}");
 }
 ```
 
@@ -1859,11 +1909,11 @@ interface BuildingVisitor {
 
 final class InsuranceVisitor implements BuildingVisitor {
     public void visitHouse(House house) {
-        System.out.println("Предложить " + house.owner + " страхование имущества");
+        System.out.println("Страхование имущества. Владелец: " + house.owner);
     }
 
     public void visitFactory(Factory factory) {
-        System.out.println("Предложить " + factory.title + " страхование от простоя");
+        System.out.println("Страхование от простоя. Предприятие: " + factory.title);
     }
 }
 ```
@@ -1901,11 +1951,11 @@ type BuildingVisitor interface {
 type InsuranceVisitor struct{}
 
 func (InsuranceVisitor) VisitHouse(house House) {
-	fmt.Println("Предложить", house.Owner, "страхование имущества")
+	fmt.Println("Страхование имущества. Владелец:", house.Owner)
 }
 
 func (InsuranceVisitor) VisitFactory(factory Factory) {
-	fmt.Println("Предложить", factory.Title, "страхование от простоя")
+	fmt.Println("Страхование от простоя. Предприятие:", factory.Title)
 }
 ```
 
@@ -1937,14 +1987,13 @@ data class House(val owner: String) : Building
 data class Factory(val title: String) : Building
 
 fun insure(b: Building): String = when (b) {
-    is House -> "Предложить ${b.owner} страхование имущества"
-    is Factory -> "Предложить ${b.title} страхование от простоя"
+    is House -> "Страхование имущества. Владелец: ${b.owner}"
+    is Factory -> "Страхование от простоя. Предприятие: ${b.title}"
     // новый тип Building → компилятор заставит добавить ветку
 }
 ```
 
-Это «Expression Problem наоборот»: добавить новый тип легко (sealed), но новая операция — это новая функция с `when`,
-а не новый класс-visitor.
+Добавить операцию можно отдельной функцией с `when`. Если же добавить новый вид здания, например `Bank`, придётся дополнить все исчерпывающие выражения `when` по этой иерархии, в которых нет подходящей ветки. В данном примере компилятор укажет на `insure`.
 :::
 
 ::: warning Главный tradeoff Visitor
@@ -1971,7 +2020,7 @@ Visitor удобен, когда операции меняются чаще, ч�
 | Strategy vs State | Strategy выбирает алгоритм извне; State моделирует внутреннее состояние и переходы |
 | Strategy vs Template Method | Strategy использует композицию и заменяет весь алгоритм; Template Method использует наследование и фиксирует порядок шагов |
 | Observer vs Command | Observer сообщает о событии многим подписчикам; Command представляет одно действие как объект |
-| Command vs Strategy | Оба экстернализируют поведение, но Strategy заменяет *алгоритм* (как считать), а Command инкапсулирует *действие* (что сделать), добавляя undo, очередь и историю |
+| Command vs Strategy | Strategy заменяет *алгоритм* (как считать). Command представляет *действие* (что сделать), для которого можно реализовать отмену, очередь или историю |
 | Visitor vs полиморфизм | Полиморфизм удобен, когда поведение принадлежит самому элементу; Visitor удобен, когда операций много и они не должны жить внутри элементов |
 
 ::: details Почему поведенческие паттерны часто похожи
@@ -2008,6 +2057,12 @@ Visitor удобен, когда операции меняются чаще, ч�
 
 - [Поведенческие паттерны на Refactoring Guru](https://refactoringguru.cn/ru/design-patterns/behavioral-patterns) — теоретическое описание блока GoF.
 - [Поведенческие паттерны на Metanit](https://metanit.com/sharp/patterns/3.1.php) — примеры на C#.
+
+### Примеры из библиотек
+
+- [ElementVisitor в Java](https://docs.oracle.com/en/java/javase/21/docs/api/java.compiler/javax/lang/model/element/ElementVisitor.html) — как API компилятора выбирает метод для элемента и что происходит при появлении нового вида элемента.
+- [QUndoStack в Qt](https://doc.qt.io/qt-6/qundostack.html) — как история отменяет, повторяет и отбрасывает команды.
+- [Observer в .NET](https://learn.microsoft.com/en-us/dotnet/standard/events/observer-design-pattern) — кто владеет подпиской и как наблюдатель её завершает.
 
 ### Видео
 
@@ -2105,3 +2160,9 @@ Callback обычно только выполняет функцию. Command д
 
 После выбора добавьте по одному аргументу против каждого паттерна. Это упражнение важно: хороший инженер умеет не
 только узнать паттерн, но и отказаться от него, если цена выше пользы.
+
+::: details Как проверить решение
+Проверьте маршрутизацию на двух допустимых путях между одними и теми же точками. Путь A занимает 20 минут и стоит 300 рублей, путь B — 30 минут и 100 рублей. Режим «самый быстрый» должен вернуть A, режим «самый дешёвый» — B. Попытка отправить заказ из `Draft` оставляет его в `Draft` и даёт вызывающему коду сигнал об ошибке. Подписчик, отписавшийся до отправки следующего уведомления, его не получает.
+
+Затем внесите два изменения на бумаге. При добавлении экспорта в JSON перечислите затронутые типы. Повторите для нового вида узла дерева. При выборе Visitor в первом случае появляется новый посетитель, во втором придётся пересмотреть существующих посетителей. Для журнала отдельно укажите, где хранится результат выполнения команды и как отличить попытку от успешно выполненного действия.
+:::
