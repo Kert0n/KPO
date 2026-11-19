@@ -49,10 +49,9 @@ Major-обновление принимается только когда все
 | `markdown-it` и `@types/markdown-it` на 14 | `dependabot.yml` | VitePress 1.6.4 отдаёт плагинам инстанс markdown-it 14; типы 15 с ним не совпадают                                                                           | VitePress перейдёт на markdown-it 15                                |
 | `@types/markdown-it` не 14.2.0             | `dependabot.yml` | 14.2.0 собран криво: `lib/*.d.mts` и `dist/index.cjs.d.ts` расходятся, typecheck падает                                                                      | выйдет версия новее 14.2.0                                          |
 | `markdown-it-mathjax3` на 4                | `dependabot.yml` | VitePress 1.6.4 требует `markdown-it-mathjax3 ^4`                                                                                                            | VitePress перейдёт на 5                                             |
-| TypeScript на 6                            | `dependabot.yml` | `typescript-eslint` 8.72.2 поддерживает TypeScript `<6.1`                                                                                                    | `typescript-eslint` разрешит TypeScript 7                           |
+| TypeScript на 6                            | `dependabot.yml` | `typescript-eslint` 8.73.0 поддерживает TypeScript `<6.1`                                                                                                    | `typescript-eslint` разрешит TypeScript 7                           |
 | `vitepress → vite 6.4.6`                   | `overrides`      | VitePress 1.6.4 просит `vite ^5.4.14` (последняя 5.x — 5.4.21), а vitest 5 требует `^6.4`; override держит одну поддерживаемую копию vite для сайта и тестов | выйдет стабильная VitePress 2 со своим vite 6+                      |
 | `markdown-it → mdurl 2.0.0`                | `overrides`      | Встроенные типы mdurl 2.1.0 расходятся с @types/mdurl 2: ESM и CommonJS MarkdownIt становятся несовместимыми, typecheck падает                               | выйдет mdurl новее 2.1.0; проверить совместимость типов полным gate |
-| `minimatch 7–10 → 11.0.1`                  | `overrides`      | GHSA-g3hv-75wg-m249 исправлена с 11.0.1, а ESLint 10 и typescript-eslint 8.72.2 требуют minimatch 10; override применяется только к уязвимым версиям 7–10    | все потребители minimatch 10 сами потребуют 11.0.1+                 |
 | `gray-matter → js-yaml → argparse 2.0.1`   | `overrides`      | GHSA-hp3w-g68c-fv3c в `sprintf-js` не исправлена ни в одной версии; js-yaml 3 использует argparse только в CLI, а argparse 2 не зависит от sprintf-js        | gray-matter перейдёт на js-yaml 4                                   |
 
 Помнить про пины не нужно: за ними следит автоматика.
@@ -119,3 +118,18 @@ VitePress 2. Такие ожидания записаны в `scripts/upstream-r
   записано в реестр пинов.
 - Проверка доступности Kotlin API в maintenance переведена на `/versions` актуального
   `api.kotlinlang.org`: прежний `play.kotlinlang.org/api/compiler/latest` возвращает 404.
+
+## Проверка релизов 19 ноября 2026
+
+- Совместимые npm-обновления: Playwright 1.65.1, Vitest и coverage-v8 5.1.1,
+  ESLint 10.15.0, typescript-eslint 8.73.0 и lint-staged 17.6.1.
+- Override `minimatch 7–10 → 11.0.1` снят из конфигурации, реестра пинов и таблицы:
+  ESLint 10.15.0 и config-array 0.23.6 требуют minimatch `^11.0.5`,
+  typescript-estree 8.73.0 — `^11.0.1`. После обновления дерева все три потребителя получают minimatch 11.0.9 без override.
+- GitHub Actions обновлены до setup-java 6.3.0 и dependency-review-action 5.0.1.
+  У setup-java Java problem matcher стал opt-in; `problem-matcher: true` сохраняет
+  аннотации диагностики в CI.
+- Условия снятия остальных пинов пока не выполнены: VitePress latest 1.6.4,
+  next 2.0.0-alpha.21; TypeScript 7 не поддерживается typescript-eslint 8.73.0;
+  исправления для типов markdown-it и mdurl ещё не вышли. Issue #103 остаётся открытым.
+- Стабильные Kotlin 2.4.21, Gradle 9.9.1 и actionlint 1.7.12 пока актуальны.

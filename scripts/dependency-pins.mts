@@ -136,30 +136,6 @@ export const PINS: readonly Pin[] = [
     }
   },
   {
-    id: 'minimatch-override',
-    title: '`minimatch 7–10 → 11.0.1`',
-    locations: [{ kind: 'override', path: ['minimatch@>=7.0.0 <11.0.1'], version: '11.0.1' }],
-    liftWhen: 'все потребители minimatch 10 сами потребуют исправленную 11.0.1 или новее',
-    async check(registry) {
-      const consumers = ['eslint', '@eslint/config-array', '@typescript-eslint/typescript-estree']
-      const results = await Promise.all(
-        consumers.map(async (name) => {
-          const parent = await latestManifest(registry, name)
-          const range = parent.manifest.dependencies?.minimatch ?? ''
-          const floor = semver.minVersion(range)?.version
-          return {
-            ready: floor !== undefined && semver.gte(floor, '11.0.1'),
-            evidence: `${name}@${parent.version}: minimatch ${range || '(нет)'}`
-          }
-        })
-      )
-      return {
-        ready: results.every((result) => result.ready),
-        evidence: results.map((result) => result.evidence).join('; ')
-      }
-    }
-  },
-  {
     id: 'argparse-override',
     title: '`gray-matter → js-yaml → argparse 2.0.1`',
     locations: [

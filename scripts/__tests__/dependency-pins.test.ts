@@ -105,24 +105,6 @@ describe('dependency pin checks', () => {
     })
   })
 
-  it('keeps the minimatch override until every consumer excludes vulnerable versions', async () => {
-    const minimatch = pin('minimatch-override')
-    const make = (ranges: string[]) =>
-      registry(
-        Object.fromEntries(
-          ['eslint', '@eslint/config-array', '@typescript-eslint/typescript-estree'].map(
-            (name, i) => [
-              name,
-              { latest: '1.0.0', versions: { '1.0.0': { dependencies: { minimatch: ranges[i] } } } }
-            ]
-          )
-        )
-      )
-    expect((await minimatch.check(make(['^11.0.1', '^10.2.6', '^11.0.1']))).ready).toBe(false)
-    expect((await minimatch.check(make(['^11.0.0', '^11.0.1', '^11.0.1']))).ready).toBe(false)
-    expect((await minimatch.check(make(['^11.0.1', '^11.0.1', '^12.0.0']))).ready).toBe(true)
-  })
-
   it('waits for typescript-eslint to allow the newest TypeScript', async () => {
     const typescript = pin('typescript-6')
     const make = (peer: string) =>
