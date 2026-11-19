@@ -1095,6 +1095,10 @@ class PromoteService(private val repo: CustomerRepository) {
 Поэтому сама координация может жить в domain service.
 
 При этом инварианты баланса остаются внутри `Account`: нельзя списать больше, чем есть, и нельзя смешивать валюты.
+Перевод должен сохранять и общий инвариант: либо изменились оба счёта, либо ни один. Если зачисление
+завершится ошибкой после списания, сервис должен восстановить оба исходных баланса. В учебном примере
+ниже для этого сохраняются снимки значений `Money`; служебный метод восстановления
+имеет ограниченную видимость.
 
 ```mermaid
 flowchart LR
@@ -1110,8 +1114,16 @@ flowchart LR
 ```kotlin
 class MoneyTransferService {
     fun transfer(from: Account, to: Account, amount: Money) {
-        from.withdraw(amount)
-        to.deposit(amount)
+        val fromBefore = from.balance()
+        val toBefore = to.balance()
+        try {
+            from.withdraw(amount)
+            to.deposit(amount)
+        } catch (error: Exception) {
+            from.restoreBalance(fromBefore)
+            to.restoreBalance(toBefore)
+            throw error
+        }
     }
 }
 ```
@@ -1132,6 +1144,10 @@ class Account(
 
     fun balance(): Money = balance
 
+    internal fun restoreBalance(snapshot: Money) {
+        balance = snapshot
+    }
+
     fun withdraw(amount: Money) {
         require(amount.currency == balance.currency) { "Currency mismatch" }
         require(balance.amount >= amount.amount) { "Not enough money" }
@@ -1146,8 +1162,16 @@ class Account(
 
 class MoneyTransferService {
     fun transfer(from: Account, to: Account, amount: Money) {
-        from.withdraw(amount)
-        to.deposit(amount)
+        val fromBefore = from.balance()
+        val toBefore = to.balance()
+        try {
+            from.withdraw(amount)
+            to.deposit(amount)
+        } catch (error: Exception) {
+            from.restoreBalance(fromBefore)
+            to.restoreBalance(toBefore)
+            throw error
+        }
     }
 }
 
@@ -1164,7 +1188,28 @@ fun main() {
     val overdraft = runCatching {
         service.transfer(sender, recipient, Money(1000, "USD"))
     }
+    check(overdraft.isFailure)
+    check(sender.balance() == Money(60, "USD"))
+    check(recipient.balance() == Money(65, "USD"))
     println("Overdraft accepted: ${overdraft.isSuccess}")
+
+    val euroRecipient = Account("a-3", Money(25, "EUR"))
+    val wrongCurrency = runCatching {
+        service.transfer(sender, euroRecipient, Money(40, "USD"))
+    }
+    check(wrongCurrency.isFailure)
+    check(sender.balance() == Money(60, "USD"))
+    check(euroRecipient.balance() == Money(25, "EUR"))
+    println("Rejected transfer preserved both balances")
+
+    val fullRecipient = Account("a-4", Money(Int.MAX_VALUE, "USD"))
+    val overflow = runCatching {
+        service.transfer(sender, fullRecipient, Money(1, "USD"))
+    }
+    check(overflow.isFailure)
+    check(sender.balance() == Money(60, "USD"))
+    check(fullRecipient.balance() == Money(Int.MAX_VALUE, "USD"))
+    println("Recipient overflow preserved both balances")
 }
 ```
 
@@ -1197,6 +1242,11 @@ public sealed class Account
         Balance = initialBalance;
     }
 
+    internal void RestoreBalance(Money snapshot)
+    {
+        Balance = snapshot;
+    }
+
     public void Withdraw(Money amount)
     {
         EnsureSameCurrency(amount);
@@ -1223,8 +1273,19 @@ public sealed class MoneyTransferService
 {
     public void Transfer(Account from, Account to, Money amount)
     {
-        from.Withdraw(amount);
-        to.Deposit(amount);
+        var fromBefore = from.Balance;
+        var toBefore = to.Balance;
+        try
+        {
+            from.Withdraw(amount);
+            to.Deposit(amount);
+        }
+        catch (Exception)
+        {
+            from.RestoreBalance(fromBefore);
+            to.RestoreBalance(toBefore);
+            throw;
+        }
     }
 }
 ```
@@ -1256,6 +1317,10 @@ public final class Account {
         return balance;
     }
 
+    void restoreBalance(Money snapshot) {
+        balance = snapshot;
+    }
+
     public void withdraw(Money amount) {
         ensureSameCurrency(amount);
         if (balance.amount().compareTo(amount.amount()) < 0) {
@@ -1278,8 +1343,16 @@ public final class Account {
 
 public final class MoneyTransferService {
     public void transfer(Account from, Account to, Money amount) {
-        from.withdraw(amount);
-        to.deposit(amount);
+        Money fromBefore = from.balance();
+        Money toBefore = to.balance();
+        try {
+            from.withdraw(amount);
+            to.deposit(amount);
+        } catch (RuntimeException error) {
+            from.restoreBalance(fromBefore);
+            to.restoreBalance(toBefore);
+            throw error;
+        }
     }
 }
 ```
@@ -1313,6 +1386,10 @@ func NewAccount(id string, initialBalance Money) Account {
     return Account{id: id, balance: initialBalance}
 }
 
+func (account *Account) restoreBalance(snapshot Money) {
+    account.balance = snapshot
+}
+
 func (account *Account) Withdraw(amount Money) error {
     if amount.Currency != account.balance.Currency {
         return fmt.Errorf("currency mismatch")
@@ -1328,17 +1405,27 @@ func (account *Account) Deposit(amount Money) error {
     if amount.Currency != account.balance.Currency {
         return fmt.Errorf("currency mismatch")
     }
-    account.balance.Amount += amount.Amount
+    nextBalance, err := NewMoney(account.balance.Amount + amount.Amount, account.balance.Currency)
+    if err != nil {
+        return err
+    }
+    account.balance = nextBalance
     return nil
 }
 
 type MoneyTransferService struct{}
 
 func (service MoneyTransferService) Transfer(from *Account, to *Account, amount Money) error {
+    fromBefore, toBefore := from.balance, to.balance
     if err := from.Withdraw(amount); err != nil {
         return err
     }
-    return to.Deposit(amount)
+    if err := to.Deposit(amount); err != nil {
+        from.restoreBalance(fromBefore)
+        to.restoreBalance(toBefore)
+        return err
+    }
+    return nil
 }
 ```
 
@@ -1346,6 +1433,11 @@ func (service MoneyTransferService) Transfer(from *Account, to *Account, amount 
 
 Domain service не должен становиться "богатым сервисом", который забирает у entity все правила. Его роль - собрать
 несколько доменных объектов в одну операцию, сохранив инварианты внутри объектов.
+
+Здесь откат работает для последовательного выполнения в памяти: восстановление снимка — простое присваивание
+без новых проверок и побочных эффектов. Это не замена транзакции хранилища: при работе с БД application service
+должен выполнять загрузку и сохранение обоих счетов в одной транзакции с нужной изоляцией. Иначе параллельный
+перевод или сбой процесса может нарушить согласованность, даже если исключения перехватываются.
 
 ### Агрегатный корень
 
