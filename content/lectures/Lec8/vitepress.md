@@ -9,129 +9,58 @@ recommends:
 
 # Лекция 8. Эволюция Enterprise-архитектур
 
-Эта лекция начинает архитектурный блок курса. До этого мы в основном разбирали локальные решения: как связать два
-класса, как спрятать создание объекта, как подменить зависимость, как организовать поведение внутри небольшого участка
-кода. Архитектурные паттерны работают на другом масштабе: они задают форму приложения целиком, направление зависимостей,
-границы модулей и правила общения с внешним миром.
+В кафе появилась вторая касса. Первая принимает заказы по HTTP, а новая должна работать в киоске. Обе продают один и тот же латте за 2,50 €. Сейчас его цену знает только HTTP-контроллер. Придётся ли киоску притворяться браузером или заводить собственный прайс?
 
-Цель этой статьи - не выучить все архитектуры и не запомнить картинки с кругами, слоями и шестиугольниками. Важно
-увидеть причинно-следственную цепочку: какая боль возникала в разработке, почему старого решения переставало хватать и
-какую новую границу пыталась провести следующая архитектура.
-
-Материал написан как самостоятельный компаньон к лекции. Если вы пропустили занятие, начните отсюда: после чтения вы
-должны понимать, зачем появились слоистая архитектура, Ports and Adapters, Onion, Clean Architecture и MV-паттерны
-клиентского слоя.
-
-::: tip Главная идея лекции
-Архитектуры развивались не ради новых картинок, а ради управления зависимостями. Чем сложнее бизнес и дольше живет
-приложение, тем важнее отделить доменную логику от UI, базы данных, фреймворков и внешних сервисов.
-:::
-
-::: tip Как работать с примерами
-Сквозной пример лекции - кафе, которое принимает заказ кофе. Kotlin-примеры там, где это уместно, имеют две версии:
-короткий статический фрагмент для чтения и отдельный `kotlin playground` с `main`, тестовыми данными и выводом. C#, Java
-и Go показывают те же архитектурные идеи через привычные интерфейсы и типы.
-:::
+До сих пор мы выбирали, как связать два класса и как подменить зависимость в тесте. Теперь вопрос касается всего приложения. Пройдём путь одного заказа от кнопки до записи в базе, а затем посмотрим на ту же кнопку со стороны разработчика экрана.
 
 ## Маршрут лекции
 
-Эта страница - мост между локальным дизайном и системной архитектурой. До нее мы уже умеем выделять интерфейсы, внедрять
-зависимости, тестировать код, выражать доменные правила и применять паттерны. Теперь нужно решить, как все это
-расположить в приложении так, чтобы UI, база данных, HTTP-клиенты и фреймворки не диктовали бизнес-правилам форму.
+У каждой части свой вопрос. **Слои** помогают распределить обязанности. **Ports and Adapters, Onion и Clean** объясняют, как сохранить правила кафе при смене кассы, базы или платёжного провайдера. **Микросервисы** поднимают вопрос о независимом выпуске частей системы. **MVC, MVP и MVVM** помогают разобраться, кто обрабатывает выбор напитка и обновляет экран.
 
-```mermaid
-flowchart LR
-    Local["Классы, DI, тесты, DDD"] --> Layered["Layered"]
-    Layered --> Pain["БД и UI тянут зависимости внутрь"]
-    Pain --> DomainFirst["Domain-first"]
-    DomainFirst --> Ports["Ports and Adapters"]
-    Ports --> Onion["Onion"]
-    Onion --> Clean["Clean"]
-    Ports --> ClientMV["MVC / MVP / MVVM"]
-```
-
-Сквозная история про кафе нужна не ради предметной области кофе. Она показывает один и тот же use case в разных
-архитектурных формах: принять заказ, проверить правила, сохранить результат и сообщить внешнему миру. Меняется не
-бизнес-сценарий, а то, кто от кого зависит.
-
-## Worked example: controller начинает управлять всем
+## Когда контроллер начинает управлять всем
 
 ### Ситуация
 
-В первой версии кафе HTTP controller принимает заказ, проверяет напиток, считает цену, пишет строку в базу и дергает
-платежный SDK. Это быстрее, чем строить архитектуру, и для демо действительно работает.
+Клиент выбирает напиток, кафе определяет цену, принимает оплату и регистрирует заказ. В учебном меню два напитка — латте за 250 и эспрессо за 200 евроцентов. Остальные коды касса отклоняет. Цену назначает кафе. Касса передаёт код напитка и идентификатор заказа, по которому можно связать заказ с оплатой.
 
 ### Наивное решение
 
-```kotlin
-fun placeOrder(request: HttpRequest): HttpResponse {
-    val drink = request.param("drink")
-    val price = if (drink == "latte") 350 else 250          // бизнес-правило
-    db.execute("INSERT INTO orders (drink, price) VALUES (?, ?)", drink, price)
-    paymentSdk.charge(request.header("X-Token"), price)     // внешний SDK
-    return HttpResponse(201, """{"status":"ok"}""")
-}
-```
+В первой версии обработчик напрямую разговаривает с платёжным клиентом и с базой. Вот тот же сценарий в псевдокоде.
 
-Оставить controller главным местом бизнес-логики. Когда появляется скидка, новый способ оплаты и тестовый storage,
-добавить еще несколько зависимостей прямо туда.
+```text
+принять HTTP-запрос с id и кодом напитка
+    если код = "latte", взять цену 250
+    иначе если код = "espresso", взять цену 200
+    иначе вернуть HTTP 400 «Неизвестный напиток»
+
+    списать сумму через платёжный SDK для этого id
+    выполнить INSERT в orders, передав id, код и цену как параметры
+    вернуть HTTP 201 «Заказ создан»
+```
 
 ### Что ломается
 
-UI/API слой начинает диктовать форму домена. Бизнес-правило нельзя проверить без HTTP, базы и SDK. Замена хранилища или
-фреймворка превращается в изменение use case. Controller становится и adapter, и application service, и domain model.
+Чтобы проверить цену без экрана, приходится подготавливать HTTP-запрос и подменять два технических клиента. Если разработчик киоска скопирует `when`, следующее изменение цены придётся выпускать дважды. Есть и другая проблема. Если платёж прошёл, а запись заказа упала, клиент может заплатить и остаться без заказа.
 
 ### Улучшение
 
-Вынести use case в application layer, доменные правила - в domain model, а базу, HTTP и платежи подключить через ports
-and adapters. Controller остается primary adapter: он переводит HTTP-запрос в команду приложения.
+Оставим в контроллере чтение запроса и выбор HTTP-ответа. Выбор цены отдадим меню, порядок действий — прикладному сценарию `CreateOrder`. Контракты оплаты и записи заказа сформулируем в терминах кафе. Контроллер, киоск и тест смогут вызвать один сценарий.
 
 ### Почему это работает
 
-Архитектура здесь не добавляет круги ради кругов. Она проводит dependency rule: бизнес-сценарий не зависит от формы
-HTTP, ORM или платежного SDK. Поэтому его можно тестировать, развивать и переносить между runtime-деталями.
-
-## Цели
-
-После этой статьи вы должны уметь:
-
-- объяснять разницу между локальным design pattern и architectural pattern;
-- различать `layer` и `tier`;
-- объяснять задачу архитектуры через стоимость изменений;
-- понимать разницу между database-first и domain-first;
-- объяснять слоистую архитектуру, закрытые и открытые слои;
-- объяснять Ports and Adapters: core, port, adapter, primary adapter и secondary adapter;
-- понимать, как DDD повлиял на Hexagonal, Onion и Clean Architecture;
-- различать Onion и Clean без механического заучивания картинок;
-- объяснять, почему микросервисы не являются "следующей чистой архитектурой";
-- различать MVC, MVP, MVVM и Presentation Model;
-- выбирать архитектурный подход по сложности задачи, а не по модности названия.
+Киоску больше не нужны типы HTTP, а тесту цены — база и платёжный SDK. Подмена адаптера позволит также воспроизвести сбой записи после списания. Согласование двух операций потребует отдельного решения, к этому вернёмся после примера.
 
 ## Карта эволюции
 
-Историю архитектур удобно читать как историю повышения уровня абстракции. Сначала код разделяли хотя бы на модель,
-представление и обработку ввода. Потом приложения стали серверными, базоцентричными и слоистыми. Затем бизнес стал
-сложнее, DDD перенес внимание в домен, а Ports and Adapters, Onion и Clean начали защищать этот домен от технических
-деталей.
+Эти идеи отвечают на разные вопросы. В 2005 году Алистер Кокберн показал приложение, которое можно целиком проверить без настоящего экрана и БД. В 2008 году Джеффри Палермо описал Onion для долгоживущих приложений с доменной моделью в центре. В 2012 году Роберт Мартин сопоставил родственные подходы и сформулировал общее правило направления зависимостей. Команда вполне может применить все три наблюдения к одному заказу.
 
-```mermaid
-flowchart LR
-    MVC["MVC, 1979"] --> Layered["Layered Architecture"]
-    Layered --> DDD["DDD: domain-first"]
-    DDD --> Hexagonal["Ports and Adapters / Hexagonal"]
-    Hexagonal --> Onion["Onion Architecture"]
-    Onion --> Clean["Clean Architecture"]
-    DDD --> Microservices["Bounded Context -> Microservices"]
-    MVC --> MVP["MVP"]
-    MVP --> MVVM["MVVM"]
-    MVVM --> PM["Presentation Model"]
-```
-
-::: discussion
-Эта схема - учебная карта, а не строгая историческая шкала всех архитектур. Многие идеи развивались параллельно, а
-термины в разных командах используются по-разному. Для курса важнее не дата, а сдвиг мышления: от "куда положить код" к
-"от чего мой код имеет право зависеть".
-:::
+| Что меняется в кафе | Какую границу исследуем |
+|---|---|
+| Киоск приходит на смену веб-кассе | Между входным адаптером и сценарием заказа |
+| Меняется драйвер БД | Между контрактом хранения и его реализацией |
+| Усложняются скидки | Между правилами меню и последовательностью шагов заказа |
+| Платежи выпускает отдельная команда | Между модулями или независимо развёртываемыми сервисами |
+| Один экран рисует сумму и ошибку | Между состоянием представления и виджетами |
 
 ## Зачем вообще архитектура
 
@@ -139,83 +68,59 @@ flowchart LR
 файле и помнить связи в голове. Когда появляются годы сопровождения, несколько команд, внешние интеграции, разные UI и
 тесты, случайные зависимости становятся дорогими.
 
-Архитектура решает четыре связанные задачи:
-
-- снижает стоимость изменений;
-- дает команде общий язык;
-- ограничивает направления зависимостей;
-- повышает уровень абстракции после языков, парадигм и локальных паттернов.
-
-| Боль | Архитектурный ответ |
-|---|---|
-| UI меняется чаще бизнес-правил | Отделить представление от модели. |
-| БД или ORM меняются и мешают тестам | Зависеть от интерфейса, а не от драйвера. |
-| Бизнес-правила размазаны по сервисам | Вынести доменную модель и use cases. |
-| Приложение растет по командам | Выделять bounded contexts и модули. |
-| Тесты требуют реальной БД или HTTP | Заменить адаптер fake-реализацией. |
-
-Главный критерий качества архитектуры - не красота диаграммы. Вопрос практичнее: что нужно поменять, если завтра UI
-станет мобильным, PostgreSQL заменится на другое хранилище, появится второй способ оплаты или команда разделит систему
-на несколько модулей?
+В кафе есть простой способ оценить границу. Повысьте цену латте, подключите второй терминал, затем попробуйте протестировать отказ оплаты. По списку затронутых модулей и по тому, что пришлось запускать, видно, какие зависимости стоят команде времени.
 
 ::: only kotlin
-В Kotlin-серверах архитектурные границы часто видны не по фреймворку, а по пакетам и конструкторам: `domain` не должен
-импортировать Ktor/Spring/SQL-клиенты, а application/use case получает порты через DI.
+В Kotlin пакеты помогают найти доменную модель, но сами по себе не запрещают импорт из инфраструктуры. Если оформить ядро отдельным Gradle-модулем без зависимости от Ktor и SQL-клиента, такой импорт остановит сборку.
 :::
 
 ::: only csharp
-В C# типичная Clean/Onion-структура разделяет проекты вроде `Domain`, `Application`, `Infrastructure`, `Web`. Это не
-магия .NET, а способ заставить компилятор помогать с направлением зависимостей.
+В C# направление зависимостей видно в ссылках между проектами. Если `Infrastructure` ссылается на `Application`, внутренний проект сможет объявить контракт, а внешний — реализовать его.
+
 :::
 
 ::: only java
-В Java/Spring легко случайно превратить архитектуру в набор аннотаций. Для курса важнее другое: доменная модель и use
-case не должны зависеть от `JpaRepository`, `RestTemplate` или web-аннотаций, даже если Spring собирает приложение.
+В Java приложение на Spring может собрать сценарий в конфигурации, а интерфейс, расширяющий `JpaRepository`, оставить внутри адаптера. Тогда для проверки цен нужен обычный объект Java, контекст Spring запускать не придётся.
+
 :::
 
 ::: only go
-В Go архитектурные границы часто выражают пакетами и интерфейсами на стороне потребителя. Простота языка не отменяет
-правило: бизнес-пакет не должен знать о SQL-драйвере, HTTP-router-е или конкретном брокере.
+В Go пакет сценария может объявить небольшой интерфейс хранения. Адаптер с нужным набором методов удовлетворяет ему без объявления `implements`. Компилятор проверит совместимость, когда сборочный код передаст адаптер сценарию.
 :::
 
 ## Layer и Tier
 
 В архитектурных разговорах часто смешивают два разных слова.
 
-**Layer** - логический слой в коде. Например, `Presentation`, `Application`, `Domain`, `Data Access`. Слой задает
+**Layer** — логический слой в коде. Например, `Presentation`, `Application`, `Domain`, `Data Access`. Слой задает
 ответственность и направление зависимостей внутри программы.
 
-**Tier** - физическое размещение. Например, браузер пользователя, application server, database server, контейнер,
-виртуальная машина или отдельный процесс.
+**Tier** — часть системы, выделенная при развёртывании. Например, приложение кассы обращается по сети к серверу заказов, а сервер — к отдельному серверу БД.
 
-Трехслойное приложение может быть одно-tier, если все запускается локально в одном процессе. И наоборот: один логический
-слой может быть развернут на нескольких серверах или контейнерах.
+Пока касса работает на одном компьютере с локальной SQLite, в её процессе могут сосуществовать три логических слоя. Если вынести хранение в PostgreSQL на отдельном узле, появится сетевая граница. Классы расчёта цены могут остаться прежними. А если запустить две копии сервера заказов за балансировщиком, получится два экземпляра одного tier.
 
 ```mermaid
-flowchart TD
-    subgraph Code["Логические слои"]
-        UI["Presentation Layer"] --> App["Application Layer"]
-        App --> Data["Data Access Layer"]
+flowchart LR
+    subgraph Terminal["Касса"]
+        Screen["Экран"]
     end
-
-    subgraph Runtime["Физическое размещение"]
-        Browser["Клиент"] --> Server["Application Server"]
-        Server --> DB["Database Server"]
+    subgraph Server["Сервер заказов"]
+        HTTP["HTTP-контроллер"] --> App["Сценарий заказа"] --> Data["Доступ к данным"]
     end
+    Screen -->|"HTTPS"| HTTP
+    Data -->|"SQL по сети"| DB[("Сервер БД")]
 ```
-
-В этой лекции мы в основном обсуждаем `layer`: как код логически организован и кто от кого зависит. Физическое
-размещение пригодится позже, когда речь пойдет о контейнерах, Kubernetes и микросервисах.
 
 ## Слоистая архитектура
 
-Слоистая архитектура - один из самых простых способов навести порядок в приложении. Вместо общего комка кода мы
+Слоистая архитектура — один из самых простых способов навести порядок в приложении. Вместо общего комка кода мы
 выделяем уровни ответственности:
 
 - `Presentation` принимает действия пользователя или HTTP-запросы;
 - `Application` или `Business` выполняет сценарии приложения;
-- `Data Access` знает, как читать и сохранять данные;
-- `Database` хранит состояние.
+- `Data Access` знает, как читать и сохранять данные.
+
+Саму базу на схеме показываем отдельно. Слой доступа к данным — код приложения, а СУБД исполняет запросы и хранит записи.
 
 ```mermaid
 flowchart TD
@@ -236,193 +141,41 @@ flowchart TD
 админки, прототипа или учебного проекта. Но у нее есть риск: если команда думает от базы данных, доменные объекты легко
 становятся анемичными структурами, а бизнес-логика начинает жить в сервисах, SQL, контроллерах и обработчиках.
 
-## Сквозной пример: заказ кофе
-
-Дальше будем использовать один домен: кафе принимает заказ кофе. Минимальная модель:
-
-- `Order` - заказ;
-- `Money` - сумма;
-- `CreateOrder` - сценарий создания заказа;
-- `OrderRepository` - контракт сохранения заказа;
-- `PaymentGateway` - контракт оплаты.
-
-Это маленький пример, но он показывает важную эволюцию. Сначала можно написать обычный слоистый сервис. Потом становится
-заметно, что сервис слишком много знает о базе и платежах. Тогда мы вводим порты, адаптеры и use case, чтобы бизнесовое
-решение "создать заказ" не зависело от PostgreSQL, HTTP-клиента или конкретного UI.
-
 ## Прямая зависимость от инфраструктуры
 
-В плохой версии `OrderService` сам знает, как собрать SQL, куда отправить платеж и как сохранить данные. Такой код может
-работать, но его трудно тестировать: unit-тест внезапно требует базу, сеть, платежный сервис и реальные настройки.
+Можно перенести тело контроллера в `OrderService` и передать SQL-клиент через конструктор. Контроллер станет короче. Посмотрите, однако, кто теперь знает имена столбцов. Во всех четырёх фрагментах `sql` — конкретный клиент с привязкой параметров, `order` — заказ с суммой в евроцентах.
 
-::: multi-code "Проблема прямой зависимости от инфраструктуры" {playground=off}
+::: multi-code "Запись заказа внутри прикладного сервиса" {playground=off}
 
 ```kotlin
-data class Money(val cents: Int)
-data class Order(val id: String, val drink: String, val total: Money)
-
-class SqlClient {
-    fun execute(sql: String) {}
-}
-
-class HttpPaymentClient {
-    fun charge(cents: Int) {}
-}
-
-class OrderService(
-    private val sql: SqlClient,
-    private val payments: HttpPaymentClient
-) {
-    fun createOrder(id: String, drink: String, total: Money): Order {
-        payments.charge(total.cents)
-        sql.execute(
-            "insert into orders(id, drink, total_cents) values ('$id', '$drink', ${total.cents})"
-        )
-        return Order(id, drink, total)
-    }
-}
+sql.execute("insert into orders(id, total_cents) values (?, ?)", order.id, order.total.cents)
 ```
 
 ```csharp
-public sealed record Money(int Cents);
-public sealed record Order(string Id, string Drink, Money Total);
-
-public sealed class SqlClient
-{
-    public void Execute(string sql) { }
-}
-
-public sealed class HttpPaymentClient
-{
-    public void Charge(int cents) { }
-}
-
-public sealed class OrderService
-{
-    private readonly SqlClient _sql;
-    private readonly HttpPaymentClient _payments;
-
-    public OrderService(SqlClient sql, HttpPaymentClient payments)
-    {
-        _sql = sql;
-        _payments = payments;
-    }
-
-    public Order CreateOrder(string id, string drink, Money total)
-    {
-        _payments.Charge(total.Cents);
-        _sql.Execute(
-            $"insert into orders(id, drink, total_cents) values ('{id}', '{drink}', {total.Cents})");
-        return new Order(id, drink, total);
-    }
-}
+sql.Execute("insert into orders(id, total_cents) values (@Id, @Cents)",
+    new { order.Id, order.Total.Cents });
 ```
 
 ```java
-record Money(int cents) {}
-record Order(String id, String drink, Money total) {}
-
-final class SqlClient {
-    void execute(String sql) {}
-}
-
-final class HttpPaymentClient {
-    void charge(int cents) {}
-}
-
-final class OrderService {
-    private final SqlClient sql;
-    private final HttpPaymentClient payments;
-
-    OrderService(SqlClient sql, HttpPaymentClient payments) {
-        this.sql = sql;
-        this.payments = payments;
-    }
-
-    Order createOrder(String id, String drink, Money total) {
-        payments.charge(total.cents());
-        sql.execute(
-            "insert into orders(id, drink, total_cents) values ('%s', '%s', %d)"
-                .formatted(id, drink, total.cents()));
-        return new Order(id, drink, total);
-    }
-}
+sql.update("insert into orders(id, total_cents) values (?, ?)", order.id(), order.total().cents());
 ```
 
 ```go
-package cafe
-
-import "fmt"
-
-type Money struct {
-    Cents int
-}
-
-type Order struct {
-    ID    string
-    Drink string
-    Total Money
-}
-
-type SQLClient struct{}
-
-func (c SQLClient) Execute(sql string) {}
-
-type HTTPPaymentClient struct{}
-
-func (c HTTPPaymentClient) Charge(cents int) {}
-
-type OrderService struct {
-    sql      SQLClient
-    payments HTTPPaymentClient
-}
-
-func (s OrderService) CreateOrder(id, drink string, total Money) Order {
-    s.payments.Charge(total.Cents)
-    s.sql.Execute(fmt.Sprintf(
-        "insert into orders(id, drink, total_cents) values ('%s', '%s', %d)",
-        id, drink, total.Cents,
-    ))
-    return Order{ID: id, Drink: drink, Total: total}
+_, err := db.Exec("insert into orders(id, total_cents) values ($1, $2)", order.ID, order.Total.Cents)
+if err != nil {
+    return err
 }
 ```
 
 :::
 
-Проблема не в том, что здесь есть SQL или HTTP. Проблема в направлении зависимости: сценарий создания заказа зависит от
-технических деталей. Если завтра понадобится тест без БД, другая база или другой платежный провайдер, придется менять
-или обходить бизнесовый код.
+Переименуйте `total_cents` в схеме. Исправлять придётся сценарий заказа, хотя кассир по-прежнему принимает ту же сумму. Внедрение зависимости через конструктор решает, где мы собираем объект. Инверсия зависимости решает другой вопрос — кто определяет контракт, на котором разговаривают сценарий и хранилище.
 
 ## Поворот DDD: domain-first
 
-DDD не является архитектурой приложения. Это подход к проектированию предметной области. Но именно DDD сильно повлиял на
-архитектуры, которые появились после: Hexagonal, Onion и Clean строятся вокруг идеи, что доменная модель должна быть в
-центре, а технические детали должны вращаться вокруг нее.
+В [лекции 7](/lectures/07) мы договорились искать правила в языке предметной области. Попросите кассира описать продажу. «Цена берётся из меню, неизвестный напиток пробить нельзя». Из этого разговора получается операция `priceOf(drink)`. Таблица `orders` сама по себе не подскажет ни эту операцию, ни её владельца.
 
-Ключевой сдвиг: не база данных определяет модель, а бизнесовые понятия. Таблицы важны, но они не обязаны диктовать имена
-классов, границы модулей и место бизнес-правил.
-
-```mermaid
-flowchart LR
-    subgraph DBFirst["Database-first"]
-        DB1[DB schema] --> Model1[Model] --> Service1[Service]
-    end
-```
-
-```mermaid
-flowchart LR
-    subgraph DomainFirst["Domain-first"]
-        Service2[Service] --> Model2[Domain Model] 
-        Adapter["DB adapter"] -.-> Model2
-    end
-```
-
-| Database-first | Domain-first |
-|---|---|
-| Сначала таблицы. | Сначала бизнес-понятия. |
-| Объект часто повторяет строку таблицы. | Объект защищает инварианты. |
-| Логика уходит в сервисы, SQL или хранимые процедуры. | Логика ближе к домену. |
-| Тесты часто требуют инфраструктуры. | Домен можно тестировать отдельно. |
+Этот подход к проектированию вокруг предметной области называют **Domain-Driven Design (DDD)**. При **database-first** отправной точкой служит схема хранения. Это удобно для редактирования справочника, где поля формы действительно соответствуют столбцам. При **domain-first** сначала уточняют понятия и правила бизнеса, затем решают, как их сохранять. Начинать можно и с уже существующей базы. Адаптер переведёт строку таблицы в понятия модели.
 
 Важные идеи DDD для этой лекции:
 
@@ -439,87 +192,63 @@ flowchart LR
 
 ## Ports and Adapters
 
-Ports and Adapters, или Hexagonal Architecture, формулирует следующий шаг: ядро приложения не должно зависеть от UI,
-HTTP, ORM, базы данных, очередей, файловой системы и внешних сервисов. Все эти вещи должны подключаться через порты и
-адаптеры.
+В гексагональной архитектуре Кокберна главная граница проходит между приложением и его окружением. **Порт** описывает содержательный разговор через эту границу. «Оформить заказ» и «сохранить заказ» — два разных разговора. Контракт задаёт допустимые данные, результат и значимые для вызывающей стороны ошибки. В коде его можно выразить интерфейсом, функцией или протоколом.
 
-**Port** описывает контракт. Это может быть интерфейс, протокол, функция, сокет или другой способ определить правила
-общения. В прикладном коде порт чаще всего выражается интерфейсом.
+**Адаптер** переводит между контрактом и конкретной технологией. HTTP-контроллер — входной (*driving*, или *primary*) адаптер. Он начинает разговор с приложением. Адаптер PostgreSQL — выходной (*driven*, или *secondary*). К нему обращается само приложение. Ответ базы идёт обратно по тому же пути. Направление ответа не меняет роль адаптера.
 
-**Adapter** связывает порт с конкретной технологией. Web controller адаптирует HTTP-запрос к вызову use case.
-PostgreSQL repository адаптирует интерфейс `OrderRepository` к SQL и драйверу базы данных.
+Так проходит **вызов во время работы** при сохранении заказа. На этой схеме оставим в стороне оплату. Контроллер и киоск используют один вход.
 
 ```mermaid
 flowchart LR
-    Web["Web controller"] --> InAdapter["Input adapter"]
-    InAdapter --> InPort["Input port: CreateOrderUseCase"]
-    InPort --> Core["Application core"]
-    Core --> OutPort["Output port: OrderRepository"]
-    OutPort --> DbAdapter["PostgreSQL adapter"]
-    DbAdapter --> DB[("Database")]
+    Web["HTTP-контроллер"] --> UC["Создать заказ"]
+    Kiosk["Киоск"] --> UC
+    UC -->|"save(order)"| Store["Адаптер PostgreSQL"]
+    Store --> DB[("База заказов")]
 ```
 
-Классическая гексагональная диаграмма:
+А так устроены **зависимости исходного кода**. Стрелка означает «ссылается на объявление». Контракт хранения принадлежит ядру, его используют сценарий и оба адаптера.
 
 ```mermaid
-flowchart TD
-    HTTP["HTTP controller"] --> Core
-    CLI["CLI"] --> Core
-    Tests["Tests"] --> Core
-
-    subgraph Core["Application Core"]
-        UseCases["Use Cases"]
-        Domain["Domain Model"]
+flowchart LR
+    subgraph Core["Ядро приложения"]
+        UC["CreateOrderService"] --> Port["OrderRepository"]
     end
-
-    Core --> DBPort["DB adapter"]
-    Core --> PayPort["Payment adapter"]
-    Core --> MsgPort["Message adapter"]
+    SQL["PostgresOrderRepository"] --> Port
+    Memory["InMemoryOrderRepository"] --> Port
 ```
 
-Primary-адаптеры (слева/сверху) *вызывают* ядро. Secondary-адаптеры (справа/снизу) *вызываются* ядром через порты.
-
-В этой схеме есть два вида адаптеров:
-
-- **primary/input adapter** вызывает приложение: HTTP controller, CLI command, UI handler, test;
-- **secondary/output adapter** вызывается приложением через порт: repository, payment gateway, file storage, message
-  publisher.
-
-Dependency Inversion Principle здесь работает на архитектурном уровне. Домен и use cases зависят от абстракций, а
-инфраструктура реализует эти абстракции. Поэтому зависимость исходного кода направлена внутрь, хотя данные во время
-выполнения могут идти в обе стороны.
+Это архитектурное применение принципа инверсии зависимостей (DIP). У Кокберна программа рассчитывает скидку. Тестовая оснастка и графический экран подают ей сумму через один порт, а источник ставки скидки можно заменить. У кафе сходный эксперимент — отправить заказ из теста и проверить полученную запись в памяти. У шестиугольника может быть любое число портов. Шесть сторон рисунка не задают число интерфейсов.
 
 ## Порты приложения
 
-Теперь перепишем заказ кофе так, чтобы сценарий создания заказа зависел от портов. Use case знает, что заказ нужно
-сохранить и оплатить, но не знает, кто именно это сделает: PostgreSQL, in-memory fake, HTTP-клиент или тестовая заглушка.
+Операцию, которую приложение выполняет для пользователя, будем называть сценарием (*use case*). У входного порта `CreateOrderUseCase` одна команда — идентификатор заказа и код напитка. Меню проверяет код и возвращает цену. Дальше сценарий вызывает два выходных порта — `PaymentGateway` и `OrderRepository`. Для краткости считаем, что способ оплаты уже привязан к заказу. Ошибку внешней операции адаптер передаёт вызывающей стороне.
 
-::: multi-code "Порты приложения: создать заказ"
+Предскажите, до какого шага дойдёт каждый заказ. Что запишется для латте? Дойдёт ли неизвестный напиток до оплаты? Что успеет сделать касса при отказе хранилища и при явном отказе в оплате?
+
+::: multi-code "Порты приложения — создать заказ"
 
 ```kotlin
 data class Money(val cents: Int)
 data class Order(val id: String, val drink: String, val total: Money)
-data class CreateOrder(val id: String, val drink: String, val total: Money)
+data class CreateOrder(val id: String, val drink: String)
 
-interface CreateOrderUseCase {
-    fun create(command: CreateOrder): Order
+fun priceOf(drink: String): Money = when (drink) {
+    "latte" -> Money(250)
+    "espresso" -> Money(200)
+    else -> throw IllegalArgumentException("Unknown drink")
 }
 
-interface OrderRepository {
-    fun save(order: Order)
-}
-
-interface PaymentGateway {
-    fun charge(amount: Money)
-}
+fun interface CreateOrderUseCase { fun create(command: CreateOrder): Order }
+fun interface OrderRepository { fun save(order: Order) }
+fun interface PaymentGateway { fun charge(id: String, amount: Money) }
 
 class CreateOrderService(
     private val orders: OrderRepository,
     private val payments: PaymentGateway
 ) : CreateOrderUseCase {
     override fun create(command: CreateOrder): Order {
-        val order = Order(command.id, command.drink, command.total)
-        payments.charge(order.total)
+        val order = Order(command.id, command.drink, priceOf(command.drink))
+        payments.charge(order.id, order.total)
         orders.save(order)
         return order
     }
@@ -527,101 +256,87 @@ class CreateOrderService(
 ```
 
 ```kotlin playground
-data class Money(val cents: Int) {
-    override fun toString(): String = "${cents / 100}.${(cents % 100).toString().padStart(2, '0')}"
-}
-
+data class Money(val cents: Int)
 data class Order(val id: String, val drink: String, val total: Money)
-data class CreateOrder(val id: String, val drink: String, val total: Money)
+data class CreateOrder(val id: String, val drink: String)
 
-interface CreateOrderUseCase {
-    fun create(command: CreateOrder): Order
+fun priceOf(drink: String): Money = when (drink) {
+    "latte" -> Money(250)
+    "espresso" -> Money(200)
+    else -> throw IllegalArgumentException("Unknown drink")
 }
 
-interface OrderRepository {
-    fun save(order: Order)
-    fun all(): List<Order>
-}
-
-interface PaymentGateway {
-    fun charge(amount: Money)
-}
+fun interface CreateOrderUseCase { fun create(command: CreateOrder): Order }
+fun interface OrderRepository { fun save(order: Order) }
+fun interface PaymentGateway { fun charge(id: String, amount: Money) }
 
 class CreateOrderService(
     private val orders: OrderRepository,
     private val payments: PaymentGateway
 ) : CreateOrderUseCase {
     override fun create(command: CreateOrder): Order {
-        val order = Order(command.id, command.drink, command.total)
-        payments.charge(order.total)
+        val order = Order(command.id, command.drink, priceOf(command.drink))
+        payments.charge(order.id, order.total)
         orders.save(order)
         return order
     }
 }
 
-class InMemoryOrderRepository : OrderRepository {
-    private val items = mutableListOf<Order>()
-
-    override fun save(order: Order) {
-        items += order
-    }
-
-    override fun all(): List<Order> = items.toList()
-}
-
-class FakePaymentGateway : PaymentGateway {
-    override fun charge(amount: Money) {
-        println("Charged $amount")
-    }
-}
-
 fun main() {
-    val repository = InMemoryOrderRepository()
-    val useCase = CreateOrderService(repository, FakePaymentGateway())
+    val saved = mutableListOf<Order>()
+    val charges = mutableListOf<Pair<String, Money>>()
+    val orders = OrderRepository { saved.add(it) }
+    val payments = PaymentGateway { id, amount -> charges.add(id to amount) }
+    val cafe = CreateOrderService(orders, payments)
 
-    val order = useCase.create(CreateOrder("o-1", "latte", Money(250)))
+    val latte = cafe.create(CreateOrder("o-1", "latte"))
+    check(latte.total == Money(250) && saved == listOf(latte))
+    check(charges == listOf("o-1" to Money(250)))
+    check(priceOf("espresso") == Money(200))
 
-    println("Created: $order")
-    println("Saved orders: ${repository.all().size}")
+    val unknown = runCatching { cafe.create(CreateOrder("o-2", "tea")) }
+    check(unknown.exceptionOrNull() is IllegalArgumentException)
+    check(charges.size == 1 && saved.size == 1)
+
+    val offline = CreateOrderService(OrderRepository { error("Storage offline") }, payments)
+    val failed = runCatching { offline.create(CreateOrder("o-3", "espresso")) }
+    check(failed.exceptionOrNull()?.message == "Storage offline")
+    check(charges.last() == ("o-3" to Money(200)))
+    val refused = CreateOrderService(orders, PaymentGateway { _, _ -> error("Payment declined") })
+    val declined = runCatching { refused.create(CreateOrder("o-4", "latte")) }
+    check(declined.exceptionOrNull()?.message == "Payment declined")
+    check(saved == listOf(latte))
+    println("o-1: 250, tea: rejected, o-3: charged but not saved, o-4: payment declined")
 }
 ```
 
 ```csharp
 public sealed record Money(int Cents);
 public sealed record Order(string Id, string Drink, Money Total);
-public sealed record CreateOrder(string Id, string Drink, Money Total);
+public sealed record CreateOrder(string Id, string Drink);
 
-public interface ICreateOrderUseCase
+public static class Menu
 {
-    Order Create(CreateOrder command);
-}
-
-public interface IOrderRepository
-{
-    void Save(Order order);
-}
-
-public interface IPaymentGateway
-{
-    void Charge(Money amount);
-}
-
-public sealed class CreateOrderService : ICreateOrderUseCase
-{
-    private readonly IOrderRepository _orders;
-    private readonly IPaymentGateway _payments;
-
-    public CreateOrderService(IOrderRepository orders, IPaymentGateway payments)
+    public static Money PriceOf(string drink) => drink switch
     {
-        _orders = orders;
-        _payments = payments;
-    }
+        "latte" => new Money(250),
+        "espresso" => new Money(200),
+        _ => throw new ArgumentException("Unknown drink")
+    };
+}
 
+public interface ICreateOrderUseCase { Order Create(CreateOrder command); }
+public interface IOrderRepository { void Save(Order order); }
+public interface IPaymentGateway { void Charge(string id, Money amount); }
+
+public sealed class CreateOrderService(IOrderRepository orders, IPaymentGateway payments)
+    : ICreateOrderUseCase
+{
     public Order Create(CreateOrder command)
     {
-        var order = new Order(command.Id, command.Drink, command.Total);
-        _payments.Charge(order.Total);
-        _orders.Save(order);
+        var order = new Order(command.Id, command.Drink, Menu.PriceOf(command.Drink));
+        payments.Charge(order.Id, order.Total);
+        orders.Save(order);
         return order;
     }
 }
@@ -630,32 +345,27 @@ public sealed class CreateOrderService : ICreateOrderUseCase
 ```java
 record Money(int cents) {}
 record Order(String id, String drink, Money total) {}
-record CreateOrder(String id, String drink, Money total) {}
+record CreateOrder(String id, String drink) {}
 
-interface CreateOrderUseCase {
-    Order create(CreateOrder command);
-}
-
-interface OrderRepository {
-    void save(Order order);
-}
-
-interface PaymentGateway {
-    void charge(Money amount);
-}
-
-final class CreateOrderService implements CreateOrderUseCase {
-    private final OrderRepository orders;
-    private final PaymentGateway payments;
-
-    CreateOrderService(OrderRepository orders, PaymentGateway payments) {
-        this.orders = orders;
-        this.payments = payments;
+final class Menu {
+    static Money priceOf(String drink) {
+        return switch (drink) {
+            case "latte" -> new Money(250);
+            case "espresso" -> new Money(200);
+            default -> throw new IllegalArgumentException("Unknown drink");
+        };
     }
+}
 
+interface CreateOrderUseCase { Order create(CreateOrder command); }
+interface OrderRepository { void save(Order order); }
+interface PaymentGateway { void charge(String id, Money amount); }
+
+record CreateOrderService(OrderRepository orders, PaymentGateway payments)
+        implements CreateOrderUseCase {
     public Order create(CreateOrder command) {
-        var order = new Order(command.id(), command.drink(), command.total());
-        payments.charge(order.total());
+        var order = new Order(command.id(), command.drink(), Menu.priceOf(command.drink()));
+        payments.charge(order.id(), order.total());
         orders.save(order);
         return order;
     }
@@ -665,208 +375,104 @@ final class CreateOrderService implements CreateOrderUseCase {
 ```go
 package cafe
 
-type Money struct {
-    Cents int
-}
+import "errors"
 
+type Money struct{ Cents int }
 type Order struct {
-    ID    string
-    Drink string
-    Total Money
+    ID, Drink string
+    Total     Money
+}
+type CreateOrder struct{ ID, Drink string }
+
+func priceOf(drink string) (Money, error) {
+    switch drink {
+    case "latte":
+        return Money{250}, nil
+    case "espresso":
+        return Money{200}, nil
+    default:
+        return Money{}, errors.New("unknown drink")
+    }
 }
 
-type CreateOrder struct {
-    ID    string
-    Drink string
-    Total Money
-}
-
-type CreateOrderUseCase interface {
-    Create(command CreateOrder) Order
-}
-
-type OrderRepository interface {
-    Save(order Order)
-}
-
-type PaymentGateway interface {
-    Charge(amount Money)
-}
+type CreateOrderUseCase interface { Create(CreateOrder) (Order, error) }
+type OrderRepository interface { Save(Order) error }
+type PaymentGateway interface { Charge(string, Money) error }
 
 type CreateOrderService struct {
     orders   OrderRepository
     payments PaymentGateway
 }
 
-func NewCreateOrderService(orders OrderRepository, payments PaymentGateway) CreateOrderService {
-    return CreateOrderService{orders: orders, payments: payments}
-}
-
-func (s CreateOrderService) Create(command CreateOrder) Order {
-    order := Order{ID: command.ID, Drink: command.Drink, Total: command.Total}
-    s.payments.Charge(order.Total)
-    s.orders.Save(order)
-    return order
+func (s CreateOrderService) Create(c CreateOrder) (Order, error) {
+    total, err := priceOf(c.Drink)
+    if err != nil {
+        return Order{}, err
+    }
+    order := Order{ID: c.ID, Drink: c.Drink, Total: total}
+    if err := s.payments.Charge(order.ID, total); err != nil {
+        return Order{}, err
+    }
+    if err := s.orders.Save(order); err != nil {
+        return Order{}, err
+    }
+    return order, nil
 }
 ```
 
 :::
 
-Теперь use case можно протестировать без реальной базы и без реального платежного провайдера. Это не делает приложение
-автоматически "идеальным", но дает точку замены инфраструктуры.
+В Playground четыре наблюдаемых исхода. Для `o-1` списано 250 евроцентов и сохранён один заказ. Для `tea` оба адаптера остались без новых вызовов. Для `o-3` списаны 200 евроцентов, а сохранение завершилось ошибкой. Для `o-4` платёжный адаптер явно отказал в списании. Исключение дошло до клиента, до записи заказа сценарий не дошёл. Тайм-аут потребовал бы сверки: из отсутствия ответа ещё нельзя узнать, прошёл ли платёж.
+
+::: warning Списание и запись — две операции
+Перестановка строк меняет характер сбоя. После записи и до успешной оплаты останется неоплаченный заказ. В рабочей кассе можно сначала сохранить заказ в состоянии «ожидает оплаты», отправлять провайдеру устойчивый ключ операции и по его результату переводить заказ в «оплачен». После тайм-аута важны поддержка идемпотентности у провайдера и сверка статуса. Повтор с тем же ключом должен приводить к одному списанию. В учебном коде такого протокола нет.
+:::
 
 ## Адаптеры
 
-Порт сам ничего не сохраняет и не отправляет. Он только задает форму общения. Реальная работа живет в адаптере.
+После успешного создания HTTP-касса возвращает 201. Для неизвестного напитка она возвращает 400. Входной адаптер считывает из HTTP идентификатор и код напитка, вызывает `create` и переводит результат в HTTP-ответ. Тот же сценарий можно вызвать из командной строки. Сборочный код приложения выбирает, какие реализации контрактов оплаты и хранения передать в конструктор.
 
-Input adapter преобразует внешний запрос в команду приложения: HTTP JSON в `CreateOrder`, CLI-аргументы в команду,
-нажатие кнопки в вызов use case.
+На выходе сценарий передаёт готовый заказ в `save`. Пусть в этой кассе идентификатор заказа уникален, повторная вставка считается ошибкой. В PostgreSQL это обеспечивает первичный ключ `orders.id`. Ниже только методы адаптера. SQL-клиенты в Kotlin, C# и Java привязывают значения к параметрам и сообщают об ошибке исключением. В Go метод возвращает ошибку драйвера.
 
-Output adapter реализует порт через конкретную технологию: PostgreSQL, Redis, файловую систему, внешний HTTP API,
-message broker. Именно в адаптерах уместны DTO, SQL, JSON, HTTP status codes, retries, mapping и детали драйверов.
-
-::: multi-code "Адаптер хранилища" {playground=off}
+::: multi-code "Внутри адаптера PostgreSQL" {playground=off}
 
 ```kotlin
-interface OrderRepository {
-    fun save(order: Order)
-}
-
-class InMemoryOrderRepository : OrderRepository {
-    private val items = mutableMapOf<String, Order>()
-
-    override fun save(order: Order) {
-        items[order.id] = order
-    }
-}
-
-class PostgresOrderRepository(
-    private val sql: SqlClient
-) : OrderRepository {
-    override fun save(order: Order) {
-        sql.execute(
-            "insert into orders(id, drink, total_cents) values (?, ?, ?)",
-            order.id,
-            order.drink,
-            order.total.cents
-        )
-    }
+override fun save(order: Order) {
+    sql.execute("insert into orders(id, drink, total_cents) values (?, ?, ?)",
+        order.id, order.drink, order.total.cents)
 }
 ```
 
 ```csharp
-public interface IOrderRepository
+public void Save(Order order)
 {
-    void Save(Order order);
-}
-
-public sealed class InMemoryOrderRepository : IOrderRepository
-{
-    private readonly Dictionary<string, Order> _items = new();
-
-    public void Save(Order order)
-    {
-        _items[order.Id] = order;
-    }
-}
-
-public sealed class PostgresOrderRepository : IOrderRepository
-{
-    private readonly SqlClient _sql;
-
-    public PostgresOrderRepository(SqlClient sql)
-    {
-        _sql = sql;
-    }
-
-    public void Save(Order order)
-    {
-        _sql.Execute(
-            "insert into orders(id, drink, total_cents) values (@id, @drink, @total)",
-            order.Id,
-            order.Drink,
-            order.Total.Cents);
-    }
+    sql.Execute("insert into orders(id, drink, total_cents) values (@Id, @Drink, @Cents)",
+        new { order.Id, order.Drink, order.Total.Cents });
 }
 ```
 
 ```java
-interface OrderRepository {
-    void save(Order order);
-}
-
-final class InMemoryOrderRepository implements OrderRepository {
-    private final Map<String, Order> items = new HashMap<>();
-
-    public void save(Order order) {
-        items.put(order.id(), order);
-    }
-}
-
-final class PostgresOrderRepository implements OrderRepository {
-    private final SqlClient sql;
-
-    PostgresOrderRepository(SqlClient sql) {
-        this.sql = sql;
-    }
-
-    public void save(Order order) {
-        sql.execute(
-            "insert into orders(id, drink, total_cents) values (?, ?, ?)",
-            order.id(),
-            order.drink(),
-            order.total().cents());
-    }
+public void save(Order order) {
+    sql.update("insert into orders(id, drink, total_cents) values (?, ?, ?)",
+        order.id(), order.drink(), order.total().cents());
 }
 ```
 
 ```go
-package cafe
-
-type OrderRepository interface {
-    Save(order Order)
-}
-
-type InMemoryOrderRepository struct {
-    items map[string]Order
-}
-
-func NewInMemoryOrderRepository() *InMemoryOrderRepository {
-    return &InMemoryOrderRepository{items: map[string]Order{}}
-}
-
-func (r *InMemoryOrderRepository) Save(order Order) {
-    r.items[order.ID] = order
-}
-
-type SQLClient interface {
-    Execute(query string, args ...any)
-}
-
-type PostgresOrderRepository struct {
-    sql SQLClient
-}
-
-func (r PostgresOrderRepository) Save(order Order) {
-    r.sql.Execute(
-        "insert into orders(id, drink, total_cents) values ($1, $2, $3)",
-        order.ID,
-        order.Drink,
-        order.Total.Cents,
-    )
+func (r PostgresOrderRepository) Save(order Order) error {
+    _, err := r.db.Exec("insert into orders(id, drink, total_cents) values ($1, $2, $3)",
+        order.ID, order.Drink, order.Total.Cents)
+    return err
 }
 ```
 
 :::
 
-В учебном примере `InMemoryOrderRepository` выглядит почти игрушечно, но архитектурно он важен: use case не отличает
-его от PostgreSQL-адаптера. Значит, тесты могут запускаться быстро и без внешней инфраструктуры.
+Два теста отвечают на разные вопросы. Записывающий двойник в Playground подтверждает, какой заказ сценарий передаёт на сохранение. Для SQL-адаптера нужен интеграционный тест на тестовой PostgreSQL со схемой приложения. Сохраните `o-1`, прочитайте поля независимым запросом, затем повторите вставку. Ожидаются `latte`, 250 и ошибка уникальности при повторе. Этот тест репозитория ничего не списывает.
 
 ## Onion Architecture
 
-Onion Architecture выросла из идей DDD и Ports and Adapters. Ее часто рисуют как луковицу, но смысл не в форме. Важное
-уточнение Onion - внутреннее ядро не однослойное: в нем можно различать доменную модель, доменные сервисы и
-application-сервисы.
+У Джеффри Палермо доменная модель находится в центре. Вокруг неё располагаются службы ядра. Правило для кода простое — внешний слой может ссылаться на любой более внутренний. Количество слоёв зависит от задачи. В кафе меню может прямо вернуть цену. Если скидка зависит от программы лояльности и состава заказа, расчёт можно выделить в доменный сервис. Прикладной сервис организует оплату и запись.
 
 ```mermaid
 flowchart TD
@@ -874,12 +480,13 @@ flowchart TD
     Infrastructure["Infrastructure"] --> Application
     Application --> DomainServices["Domain Services"]
     DomainServices --> Domain["Domain Model"]
+    Application --> Domain
 ```
 
 Типичная логика слоев:
 
 - **Domain Model** хранит бизнесовые понятия и инварианты;
-- **Domain Service** содержит доменную операцию, которая не принадлежит естественно одному entity или value object;
+- **Domain Service** содержит доменную операцию, которую по смыслу нельзя отнести к одной сущности или одному объекту-значению;
 - **Application Service** организует сценарий приложения: транзакция, вызов домена, сохранение, публикация события;
 - **Infrastructure** реализует технические детали: база, ORM, HTTP, файлы, очереди;
 - **UI/API** является внешним способом вызвать приложение.
@@ -894,7 +501,7 @@ src/
 └── Api/              # Controllers, middleware, startup
 ```
 
-Это те же файлы из Ports & Adapters, но с явным разделением внутри ядра.
+Так можно разложить проект с портами по модулям. Правило проверяется по импортам и ссылкам между модулями. Одних названий папок для этого недостаточно.
 
 `Domain Service` не должен становиться мусорной корзиной для всей логики. Его используют, когда операция действительно
 доменная, но ее нельзя честно положить внутрь одного объекта. Например, перевод денег между двумя счетами или расчет
@@ -902,9 +509,9 @@ src/
 
 ## Clean Architecture
 
-Clean Architecture закрепляет те же идеи более строго и педагогично. В центре находятся entities: самые устойчивые
-бизнесовые правила. Вокруг них - use cases, то есть сценарии приложения. Еще дальше - interface adapters, которые
-переводят данные между внешним миром и use cases. Самый внешний слой - frameworks and drivers: UI, web framework, DB,
+Роберт Мартин в Clean Architecture различает правила бизнеса и правила отдельного приложения. В центре находятся entities: самые устойчивые
+бизнесовые правила. Вокруг них — use cases, то есть сценарии приложения. Еще дальше — interface adapters, которые
+переводят данные между внешним миром и use cases. Самый внешний слой — frameworks and drivers: UI, web framework, DB,
 устройства, внешние сервисы.
 
 ```mermaid
@@ -915,21 +522,21 @@ flowchart TD
 ```
 
 Главное правило Clean Architecture: зависимости исходного кода направлены внутрь. Use case не импортирует web framework.
-Entity не знает про ORM. Adapter может знать про use case, но use case не должен знать про конкретный adapter.
+Entity не знает про ORM. Adapter может знать про use case, но сценарию достаточно внутреннего контракта.
 
 Данные при выполнении могут идти в любую сторону: пользователь отправляет запрос внутрь, приложение сохраняет данные
 наружу, база возвращает результат. Но типы и зависимости должны быть устроены так, чтобы внутренние слои не зависели от
 внешних.
 
-| Hexagonal | Onion | Clean |
-|---|---|---|
-| Core | Domain/Application core | Entities + Use Cases |
-| Input port | Application service/use case boundary | Input boundary |
-| Output port | Repository/service interface | Output boundary |
-| Adapter | Infrastructure/UI | Interface Adapter / Framework driver |
+У Мартина есть показательный переход через границу. Контроллер вызывает сценарий, сценарий передаёт результат презентеру. Чтобы зависимость исходного кода по-прежнему шла от внешнего слоя к ядру, ядро объявляет интерфейс вывода, а внешний презентер его реализует. Через границу удобно передать сумму и идентификатор заказа в простой структуре. Строка ORM протащила бы в ядро зависимость от устройства БД.
 
-Onion и Clean не отменяют Ports and Adapters. Скорее они по-разному уточняют внутреннюю структуру ядра и словарь вокруг
-него.
+| Какой вопрос задаём | Hexagonal | Onion | Clean |
+|---|---|---|---|
+| Как вызвать приложение? | Входной порт | Контракт прикладного сервиса | Input boundary сценария |
+| Кто считает цену? | Ядро, детали его устройства открыты | Доменная модель или доменный сервис | Правило бизнеса в Entities, порядок шагов в Use Cases |
+| Кто умеет сохранять? | Выходной адаптер за портом | Внутренний контракт, внешняя реализация | Адаптер доступа к данным за интерфейсом ядра |
+
+Интерфейс репозитория и выходной интерфейс презентера могут применять один принцип инверсии. У них разные обязанности — сохранить заказ и представить результат сценария.
 
 ## Когда Clean будет лишней
 
@@ -938,21 +545,11 @@ Onion и Clean не отменяют Ports and Adapters. Скорее они п�
 стоить дороже, чем сэкономит. Архитектура должна соответствовать сложности задачи.
 :::
 
-| Ситуация | Подход |
-|---|---|
-| Учебный CRUD или прототип | Простая слоистая архитектура. |
-| Бизнес-логика есть, но проект небольшой | Hexagonal / Ports and Adapters. |
-| Много сценариев, сложный домен, тесты важны | Clean или Onion. |
-| Несколько команд и разные языки бизнеса | Bounded contexts, затем возможные сервисы. |
-| Нужна независимая поставка и масштабирование частей | Микросервисы, но после проработки границ. |
-
-Архитектору платят не за то, чтобы он всегда выбирал самую сложную схему. Его задача - оценить вероятные изменения и
-поставить границы там, где они окупятся.
+В справочнике из двух таблиц каждый запрос может проходить через контроллер, сценарий и репозиторий. Если новый слой просто повторяет методы следующего и пересобирает те же поля, исправление одного поля затронет все копии. Другой случай — добавился импорт CSV. Теперь отдельный сценарий редактирования приносит измеримую пользу. И форма, и импорт проверяют запись одним и тем же правилом.
 
 ## Микросервисы и границы
 
-Микросервис не равен Clean Architecture и не является "следующей стадией" Hexagonal. Микросервис - это способ разделить
-систему на независимо разрабатываемые и разворачиваемые сервисы. Внутри конкретного микросервиса можно использовать
+Пока касса и оплата выпускаются вместе, им достаточно границ внутри приложения. Если платёжная команда должна выпускать изменения отдельно, можно выделить сервис с собственным контрактом и циклом развёртывания. Внутри конкретного микросервиса можно использовать
 слоистую архитектуру, Ports and Adapters, Onion или Clean.
 
 DDD помогает искать границы микросервисов через bounded contexts. Если в разных частях бизнеса разные правила, разные
@@ -979,32 +576,22 @@ flowchart LR
 Цена микросервисов:
 
 - сетевые ошибки вместо обычных вызовов методов;
-- сложнее транзакционная консистентность;
-- нужны observability, tracing, централизованные логи и метрики;
-- сложнее локальная разработка;
-- появляются отдельные pipeline, deployment и versioning API.
+- потребуется согласовывать состояния заказа и платежа при частичных отказах;
+- чтобы восстановить историю заказа, придётся связывать записи журналов и трассировки нескольких сервисов;
+- для сквозного теста понадобится запускать несколько служб;
+- каждый сервис выпускается отдельно, совместимость версий API нужно проверять.
 
-Поэтому хороший bounded context не обязан сразу становиться микросервисом. Часто правильный первый шаг - модульный
-монолит с четкими границами.
+Если касса и платёжный модуль всё равно выходят одним релизом, их можно оставить в модульном монолите. При выделении сервиса придётся решить, что покажет касса, когда запрос уже дошёл до оплаты, а ответ потерялся. Семантику такого обмена разбирает [лекция 10](/lectures/10).
 
 ## MV-паттерны на клиенте
 
-До сих пор мы организовывали backend: как отделить домен от базы, HTTP и ORM. Но клиентская часть тоже нуждается в
-структуре — UI-логика, состояние экрана и пользовательский ввод быстро превращаются в клубок, если не провести границы.
+Вернёмся к киоску. Покупатель выбирает латте, и экран показывает 2,50 €. Если выбор сбросили, сумму нужно убрать и предложить выбрать напиток. Это правило представления. Окончательную сумму заказа по-прежнему определяет меню кафе.
 
-До этого мы говорили в основном о бэкенде: как отделить домен от базы, HTTP, ORM и внешних сервисов. На клиенте боль
-похожая: нужно отделить отображение от состояния и логики интерфейса.
-
-MV* - семейство паттернов презентационного слоя. `Model` и `View` почти всегда присутствуют. Третий участник меняется:
-`Controller`, `Presenter`, `ViewModel` или `Presentation Model`.
-
-Model на клиенте часто не является богатой доменной моделью как на сервере. Это может быть DTO, состояние экрана,
-результат запроса или данные, подготовленные для отображения. View отвечает за визуализацию и пользовательские действия.
-Остальная часть паттерна решает, кто именно обрабатывает ввод, хранит состояние экрана и связывает View с Model.
+В семействе **MV-паттернов** модель предоставляет данные и поведение, а представление рисует экран и принимает действия человека. В наших фрагментах клиентская модель уже получила предложение меню с кодом и текстом цены. Посмотрим, кто решает, что теперь должен увидеть покупатель.
 
 ## MVC
 
-MVC появился в конце 1970-х как способ отделить модель от отображения и управления вводом. В классическом объяснении:
+**Model–View–Controller (MVC)** разделяет модель, представление и обработку ввода. В записке 1979 года Трюгве Реенскауг описал представление как способ показать выбранные свойства модели, а контроллер связал с действиями пользователя. В классическом объяснении:
 
 - **Model** хранит данные и правила;
 - **View** отображает состояние модели;
@@ -1018,95 +605,63 @@ flowchart TD
     View --> User
 ```
 
-::: discussion
-У MVC много вариантов. В активной View представление может напрямую наблюдать модель. В пассивной View контроллер
-активнее управляет обновлением экрана. Из-за этого слово `MVC` в разных фреймворках может означать разные детали.
-:::
+В классическом Smalltalk MVC контроллер интерпретирует ввод, модель сообщает об изменениях подписчикам, а представление читает её состояние для обновления. Стрелки выше показывают ход взаимодействия. Модель может уведомить наблюдателей, ничего не зная о классе экрана.
 
-Главная историческая идея остается простой: UI-код, состояние и обработка ввода не должны быть одним неразделимым
-комком.
+У серверного MVC другой привычный цикл. HTTP-контроллер принимает запрос, получает результат сценария и выбирает представление для ответа. Киоск может получать JSON и организовать свой экран по MVP или MVVM независимо от устройства сервера.
 
 ## MVP
 
-MVP появился как ответ на изменение UI-платформ. Современные элементы управления уже умеют многое делать сами: кнопка
-сама реагирует на hover, поле ввода само принимает текст, список сам умеет отрисовываться. Поэтому классический
-Controller, который буквально управлял вводом и отрисовкой, стал менее естественным.
-
-В MVP View принимает пользовательские действия и передает значимые события Presenter-у. Presenter общается с моделью и
-обновляет View. Важная деталь: Presenter обычно знает View через интерфейс, а не через конкретное окно или страницу.
+В **Model–View–Presenter (MVP)** действия пользователя получает презентер. Разберём вариант **Passive View**. Виджет сообщает презентеру о выборе. Презентер решает, какой метод представления вызвать. Для латте это будет `showTotal("2,50 €")`. При сбросе выбора он попросит показать подсказку. Договоримся, что каждый метод заменяет всю строку результата на экране. Поэтому прошлая сумма и сообщение об ошибке не остаются рядом.
 
 ::: multi-code "Presenter зависит от интерфейса View" {playground=off}
 
 ```kotlin
+data class Offer(val code: String, val priceText: String)
+
 interface OrderView {
     fun showTotal(text: String)
     fun showError(message: String)
 }
 
 class OrderPresenter(private val view: OrderView) {
-    fun onDrinkSelected(drink: String) {
-        if (drink.isBlank()) {
-            view.showError("Choose a drink")
-            return
-        }
-
-        val price = if (drink == "latte") "2.50" else "2.00"
-        view.showTotal("Total: $price")
+    fun select(offer: Offer?) {
+        if (offer == null) view.showError("Выберите напиток")
+        else view.showTotal(offer.priceText)
     }
 }
 ```
 
 ```csharp
+public sealed record Offer(string Code, string PriceText);
+
 public interface IOrderView
 {
     void ShowTotal(string text);
     void ShowError(string message);
 }
 
-public sealed class OrderPresenter
+public sealed class OrderPresenter(IOrderView view)
 {
-    private readonly IOrderView _view;
-
-    public OrderPresenter(IOrderView view)
+    public void Select(Offer? offer)
     {
-        _view = view;
-    }
-
-    public void OnDrinkSelected(string drink)
-    {
-        if (string.IsNullOrWhiteSpace(drink))
-        {
-            _view.ShowError("Choose a drink");
-            return;
-        }
-
-        var price = drink == "latte" ? "2.50" : "2.00";
-        _view.ShowTotal($"Total: {price}");
+        if (offer is null) view.ShowError("Выберите напиток");
+        else view.ShowTotal(offer.PriceText);
     }
 }
 ```
 
 ```java
+record Offer(String code, String priceText) {}
+
 interface OrderView {
     void showTotal(String text);
     void showError(String message);
 }
 
-final class OrderPresenter {
-    private final OrderView view;
-
-    OrderPresenter(OrderView view) {
-        this.view = view;
-    }
-
-    void onDrinkSelected(String drink) {
-        if (drink == null || drink.isBlank()) {
-            view.showError("Choose a drink");
-            return;
-        }
-
-        var price = drink.equals("latte") ? "2.50" : "2.00";
-        view.showTotal("Total: " + price);
+record OrderPresenter(OrderView view) {
+    void select(Offer offer) {
+        if (offer == null) view.showError("Выберите напиток");
+        else view.showTotal(offer.priceText());
     }
 }
 ```
@@ -1114,161 +669,113 @@ final class OrderPresenter {
 ```go
 package cafe
 
+type Offer struct{ Code, PriceText string }
 type OrderView interface {
-    ShowTotal(text string)
-    ShowError(message string)
+    ShowTotal(string)
+    ShowError(string)
 }
+type OrderPresenter struct{ view OrderView }
 
-type OrderPresenter struct {
-    view OrderView
-}
-
-func NewOrderPresenter(view OrderView) OrderPresenter {
-    return OrderPresenter{view: view}
-}
-
-func (p OrderPresenter) OnDrinkSelected(drink string) {
-    if drink == "" {
-        p.view.ShowError("Choose a drink")
+func (p OrderPresenter) Select(offer *Offer) {
+    if offer == nil {
+        p.view.ShowError("Выберите напиток")
         return
     }
-
-    price := "2.00"
-    if drink == "latte" {
-        price = "2.50"
-    }
-
-    p.view.ShowTotal("Total: " + price)
+    p.view.ShowTotal(offer.PriceText)
 }
 ```
 
 :::
 
-Такой Presenter можно тестировать без реального окна: достаточно fake View, который запомнит вызовы `showTotal` и
-`showError`.
+Проверка без окна выглядит так. Передайте презентеру тестовое представление, которое записывает вызовы. Выберите латте, затем сбросьте выбор. В журнале должны быть по порядку `showTotal("2,50 €")` и `showError("Выберите напиток")`. Меню может поменять текст цены, не затронув код презентера.
 
 ## MVVM
 
-MVVM доводит разделение еще дальше. ViewModel хранит состояние экрана и команды, а View связывается с ней через
-data binding или похожий механизм. ViewModel не должна знать конкретную View: она не вызывает `button.setText`, а меняет
-состояние, на которое View подписана.
+В **Model–View–ViewModel (MVVM)** представление передаёт действие во ViewModel, а та меняет доступное представлению состояние. Для нашего киоска достаточно трёх полей — выбранный напиток, текст суммы и ошибка. Здесь тестируем сам переход. В приложении механизм привязки данных или подписка на состояние доставит изменения виджетам.
 
 ```mermaid
 flowchart LR
-    View["View"] <-->|"Data binding / Commands"| ViewModel["ViewModel"]
-    ViewModel --> Model["Model"]
-    Model --> ViewModel
+    View["Экран"] -->|"выбор или сброс"| VM["ViewModel"]
+    VM -->|"новое состояние"| View
+    Model["Предложение из модели меню"] -->|"код и текст цены"| View
 ```
 
-MVVM особенно естественна там, где фреймворк поддерживает observable state, commands и автоматическую перерисовку:
-WPF, Xamarin/MAUI, Android-подходы с ViewModel, многие frontend-фреймворки с реактивным состоянием.
+Проделайте тот же опыт с латте и сбросом, затем выберите эспрессо. Теперь интересен снимок состояния после каждого шага.
 
 ::: multi-code "ViewModel как состояние экрана"
 
 ```kotlin
-data class OrderViewState(
-    val selectedDrink: String = "",
-    val totalText: String = "Total: 0.00",
-    val error: String? = null
-)
+data class Offer(val code: String, val priceText: String)
+data class OrderViewState(val drink: String? = null, val totalText: String = "", val error: String? = null)
 
 class OrderViewModel {
     var state = OrderViewState()
         private set
 
-    fun selectDrink(drink: String) {
-        state = if (drink.isBlank()) {
-            state.copy(error = "Choose a drink")
-        } else {
-            val price = if (drink == "latte") "2.50" else "2.00"
-            OrderViewState(drink, "Total: $price")
-        }
+    fun select(offer: Offer?) {
+        state = if (offer == null) OrderViewState(error = "Выберите напиток")
+                else OrderViewState(offer.code, offer.priceText)
     }
 }
 ```
 
 ```kotlin playground
-data class OrderViewState(
-    val selectedDrink: String = "",
-    val totalText: String = "Total: 0.00",
-    val error: String? = null
-)
+data class Offer(val code: String, val priceText: String)
+data class OrderViewState(val drink: String? = null, val totalText: String = "", val error: String? = null)
 
 class OrderViewModel {
     var state = OrderViewState()
         private set
 
-    fun selectDrink(drink: String) {
-        state = if (drink.isBlank()) {
-            state.copy(error = "Choose a drink")
-        } else {
-            val price = if (drink == "latte") "2.50" else "2.00"
-            OrderViewState(
-                selectedDrink = drink,
-                totalText = "Total: $price",
-                error = null
-            )
-        }
+    fun select(offer: Offer?) {
+        state = if (offer == null) OrderViewState(error = "Выберите напиток")
+                else OrderViewState(offer.code, offer.priceText)
     }
 }
 
 fun main() {
-    val viewModel = OrderViewModel()
-
-    println(viewModel.state)
-    viewModel.selectDrink("latte")
-    println(viewModel.state)
-    viewModel.selectDrink("")
-    println(viewModel.state)
+    val vm = OrderViewModel()
+    val latte = Offer("latte", "2,50 €")
+    vm.select(latte)
+    check(vm.state == OrderViewState("latte", "2,50 €"))
+    vm.select(null)
+    check(vm.state == OrderViewState(error = "Выберите напиток"))
+    vm.select(Offer("espresso", "2,00 €"))
+    check(vm.state == OrderViewState("espresso", "2,00 €"))
+    println(vm.state.totalText)
 }
 ```
 
 ```csharp
-public sealed record OrderViewState(
-    string SelectedDrink = "",
-    string TotalText = "Total: 0.00",
-    string? Error = null);
+public sealed record Offer(string Code, string PriceText);
+public sealed record OrderViewState(string? Drink = null, string TotalText = "", string? Error = null);
 
 public sealed class OrderViewModel
 {
     public OrderViewState State { get; private set; } = new();
 
-    public void SelectDrink(string drink)
+    public void Select(Offer? offer)
     {
-        if (string.IsNullOrWhiteSpace(drink))
-        {
-            State = State with { Error = "Choose a drink" };
-            return;
-        }
-
-        var price = drink == "latte" ? "2.50" : "2.00";
-        State = new OrderViewState(drink, $"Total: {price}", null);
+        State = offer is null
+            ? new OrderViewState(Error: "Выберите напиток")
+            : new OrderViewState(offer.Code, offer.PriceText);
     }
 }
 ```
 
 ```java
-record OrderViewState(String selectedDrink, String totalText, String error) {
-    static OrderViewState initial() {
-        return new OrderViewState("", "Total: 0.00", null);
-    }
-}
+record Offer(String code, String priceText) {}
+record OrderViewState(String drink, String totalText, String error) {}
 
 final class OrderViewModel {
-    private OrderViewState state = OrderViewState.initial();
+    private OrderViewState state = new OrderViewState(null, "", null);
 
-    OrderViewState state() {
-        return state;
-    }
+    OrderViewState state() { return state; }
 
-    void selectDrink(String drink) {
-        if (drink == null || drink.isBlank()) {
-            state = new OrderViewState(state.selectedDrink(), state.totalText(), "Choose a drink");
-            return;
-        }
-
-        var price = drink.equals("latte") ? "2.50" : "2.00";
-        state = new OrderViewState(drink, "Total: " + price, null);
+    void select(Offer offer) {
+        state = offer == null
+            ? new OrderViewState(null, "", "Выберите напиток")
+            : new OrderViewState(offer.code(), offer.priceText(), null);
     }
 }
 ```
@@ -1276,154 +783,90 @@ final class OrderViewModel {
 ```go
 package cafe
 
-type OrderViewState struct {
-    SelectedDrink string
-    TotalText     string
-    Error         string
-}
+type Offer struct{ Code, PriceText string }
+type OrderViewState struct{ Drink, TotalText, Error string }
+type OrderViewModel struct{ State OrderViewState }
 
-type OrderViewModel struct {
-    State OrderViewState
-}
-
-func NewOrderViewModel() OrderViewModel {
-    return OrderViewModel{
-        State: OrderViewState{TotalText: "Total: 0.00"},
-    }
-}
-
-func (vm *OrderViewModel) SelectDrink(drink string) {
-    if drink == "" {
-        vm.State.Error = "Choose a drink"
+func (vm *OrderViewModel) Select(offer *Offer) {
+    if offer == nil {
+        vm.State = OrderViewState{Error: "Выберите напиток"}
         return
     }
-
-    price := "2.00"
-    if drink == "latte" {
-        price = "2.50"
-    }
-
-    vm.State = OrderViewState{
-        SelectedDrink: drink,
-        TotalText:     "Total: " + price,
-        Error:         "",
-    }
+    vm.State = OrderViewState{Drink: offer.Code, TotalText: offer.PriceText}
 }
 ```
 
 :::
 
-В реальном MVVM фреймворк еще уведомляет View об изменении состояния. В примере это опущено, чтобы не привязывать идею к
-конкретной библиотеке.
+При сбросе выбора прежняя сумма исчезает. Следующий выбор одновременно выставляет новую цену и снимает ошибку. Playground проверяет оба перехода и выводит `2,00 €`. В отличие от теста презентера, здесь нам не понадобился объект, изображающий экран.
 
 ## Presentation Model
 
-Presentation Model похожа на MVVM по цели: вынести состояние и логику представления из View. Отличие практическое:
-если нет готового data binding, связывание приходится писать вручную.
+Мартин Фаулер описывает форму для музыкального каталога. Поле композитора доступно только для классического альбома. Пока это правило живёт в обработчике виджета, проверить его отдельно от формы неудобно. **Presentation Model** хранит признак доступности вместе с остальным состоянием представления. У киоска такой же вопрос можно задать о кнопке «Заказать» — доступна ли она после сброса выбора?
 
-Этот подход полезен в UI, где фреймворк не дает полноценной MVVM-инфраструктуры, но команда все равно хочет тестировать
-логику экрана отдельно от виджетов. Presentation Model хранит данные для отображения, выбранные фильтры, флаги,
-ошибки, доступность кнопок и другие вещи, которые относятся не к домену, а к экрану.
+MVVM принадлежит к той же семье решений. Модель представления можно синхронизировать с экраном через обработчики событий или средства привязки платформы. Способ синхронизации сам по себе не отличает эти паттерны.
 
-| Паттерн | Кто обрабатывает ввод | Кто хранит состояние экрана | Чем хорош | Цена |
-|---|---|---|---|---|
-| MVC | Controller | Model/View, зависит от варианта | Исторически простое разделение. | Много вариантов, термин перегружен. |
-| MVP | View + Presenter | Presenter/View | Тестируемость Presenter. | Много ручного кода. |
-| MVVM | View + binding commands | ViewModel | Меньше glue-кода при наличии binding. | Нужна поддержка фреймворка. |
-| Presentation Model | View + ручное связывание | Presentation Model | Работает без binding-фреймворка. | Binding пишется вручную. |
+| Подход | Что происходит после выбора латте | Как проверить |
+|---|---|---|
+| Классический MVC | Контроллер интерпретирует ввод, модель меняется, представление читает её состояние | Проверить изменение модели и реакцию подписанного представления |
+| MVP, Passive View | Презентер вызывает метод представления | Записать вызов `showTotal("2,50 €")` |
+| MVVM | ViewModel обновляет доступное экрану состояние | Прочитать `totalText` до и после сброса выбора |
+| Presentation Model | Модель представления отражает состояние формы, в том числе доступность команд | Проверить, доступна ли кнопка заказа для текущего выбора |
 
 ## Итоговая карта выбора
 
-Архитектуры отличаются не картинкой, а направлением зависимостей и ценой изменений. Чем сложнее домен, тем ближе к
-центру должна быть бизнес-логика. UI, база данных и фреймворки должны быть заменяемыми деталями там, где такая
-заменяемость экономически оправдана.
+У кафе могут одновременно быть слоистый сервер, порт оплаты, один развёртываемый модуль и экран с MVVM. Выбор начинается с изменения, которое команда ожидает на практике.
 
-```mermaid
-flowchart TD
-    Start["Нужно выбрать архитектуру"] --> Domain{"Есть сложная уникальная бизнес-логика?"}
-    Domain -->|"нет"| Layered["Layered / простая модульная структура"]
-    Domain -->|"да"| Ports["Ports and Adapters"]
-    Ports --> ManyCases{"Много сценариев и долгоживущий проект?"}
-    ManyCases -->|"да"| Clean["Onion / Clean"]
-    ManyCases -->|"нет"| Hex["Hexagonal без лишних слоев"]
-    Clean --> Teams{"Разные команды и bounded contexts?"}
-    Teams -->|"да"| Services["Возможны микросервисы"]
-    Teams -->|"нет"| Modular["Модульный монолит"]
-```
-
-Практические выводы:
-
-- слоистая архитектура нормально подходит для простых приложений;
-- Ports and Adapters полезны, когда домен нужно защитить от инфраструктуры;
-- Onion и Clean помогают структурировать сложное ядро и большое количество use cases;
-- микросервисы требуют хороших границ до физического разделения;
-- MV-паттерны решают похожую задачу на клиенте: отделяют UI от состояния и логики представления.
-
-## Самопроверка
-
-Ответьте на вопросы без подсказок:
-
-- Почему архитектура появилась как способ повышения уровня абстракции?
-- Чем `layer` отличается от `tier`?
-- Почему database-first плохо сочетается с rich domain model?
-- Что такое порт и почему он часто выражается интерфейсом?
-- Чем adapter отличается от port?
-- Почему Clean Architecture не обязана быть лучше Hexagonal?
-- Почему микросервисы не спасают плохие границы?
-- Чем Presenter отличается от Controller?
-- Что делает ViewModel в MVVM?
+| Условие | Что попробовать | По чему судить |
+|---|---|---|
+| Небольшой справочник, одна касса | Слои представления, сценариев и доступа к данным | Изменение формы не требует править SQL |
+| Добавляются киоск и второй платёжный провайдер | Общий вход в сценарий, порт оплаты, отдельные адаптеры | Тот же тест сценария работает с тестовым адаптером |
+| Появляются сложные правила скидок | Выделить доменную политику, отделить её от координации заказа | Правила проверяются примерами из меню без базы и сети |
+| Командам нужны отдельные выпуски | Проверить границы модулей и стоимость сетевых отказов | Платёжный сервис можно выпустить без синхронного выпуска кассы |
 
 ## Резюме
 
-Ключевые идеи лекции:
+Мы начали со второй кассы. У неё появился общий с веб-кассой сценарий заказа, у меню осталось одно место для цены, а SQL и платёжный клиент оказались за контрактами ядра. Слои помогают распределять обязанности. Правило зависимостей определяет, чьи типы может использовать код. Граница развёртывания добавляет отдельный вопрос — что будет при отказе сети. На экране похожее разделение позволяет проверить сумму и ошибку без запуска виджетов.
 
-- архитектурные паттерны работают на масштабе приложения, а не отдельного класса;
-- история архитектур нужна, чтобы понимать причины выбора, а не спорить о датах;
-- architecture layer отличается от deployment tier;
-- слоистая архитектура проста, но может тянуть систему к database-first;
-- DDD переносит фокус на домен, bounded context и единый язык;
-- Ports and Adapters защищает core через порты и адаптеры;
-- DIP разворачивает зависимость от инфраструктуры к абстракции;
-- Onion уточняет внутреннее ядро: Domain Model, Domain Services, Application Services;
-- Clean Architecture выделяет Entities, Use Cases, Interface Adapters, Frameworks & Drivers;
-- микросервисы являются способом физического и организационного разделения, а не заменой архитектуры внутри сервиса;
-- MVC, MVP, MVVM и Presentation Model отделяют View, Model и логику представления разными способами;
-- архитектуру выбирают по сложности, сроку жизни и вероятным изменениям системы.
+В следующей лекции перейдём от контракта хранения к выбору самой СУБД. Начнём с того, какие задачи заставляли команды менять способ хранения данных. [Лекция 9. Эволюция подходов к хранению данных](/lectures/09#эволюция-подходов-к-хранению-данных).
 
-Дальше архитектура выходит из кода в runtime. Сервис с хорошими слоями все равно нужно запустить, сконфигурировать,
-масштабировать и связать с хранилищем. Поэтому следующая тема - [виртуализация, контейнеры и эволюция баз данных](/lectures/09#карта-эволюции).
+## Самопроверка
+
+1. Все три слоя работают в одном процессе. Что изменится, если сделать ещё одну копию сервера? А если вынести БД на отдельный узел?
+2. Во время выполнения сценарий вызывает PostgreSQL-адаптер. Почему в исходном коде именно адаптер ссылается на контракт ядра?
+3. Какой из отказов в Playground может оставить покупателя без заказа после списания? Что нужно узнать перед повторной попыткой?
+4. Какие результаты следует сравнить в тестах Passive View и ViewModel после сброса выбора?
+
+::: details Сверка
+1. Копия увеличивает число экземпляров одного tier. Удалённая БД добавляет отдельный tier и сетевой переход.
+2. Сценарий использует объявление `OrderRepository`, адаптер удовлетворяет этому контракту. При запуске сценарий получает конкретный объект, который реализует этот контракт.
+3. Отказ `save` после успешного `charge`. Нужны идентификатор операции и её состояние у провайдера.
+4. В первом случае проверяем вызов подсказки у представления, во втором — снимок состояния с пустой суммой, снятым выбором и текстом ошибки.
+:::
 
 ## Дополнительное чтение
 
-Материалы помогают увидеть эволюцию enterprise-архитектур и отдельно повторить MV-паттерны презентационного слоя.
+### Архитектура приложения
 
-### Enterprise-архитектуры
+- [Алистер Кокберн. Hexagonal Architecture](https://alistair.cockburn.us/hexagonal-architecture) — два порта в примере расчёта скидки, тестовый и графический входы.
+- [Джеффри Палермо. The Onion Architecture, part 1](https://jeffreypalermo.com/2008/07/the-onion-architecture-part-1/) — доменная модель в центре и реализация репозитория снаружи.
+- [Роберт Мартин. The Clean Architecture](https://blog.cleancoder.com/uncle-bob/2012/08/13/the-clean-architecture.html) — как передать результат презентеру при зависимостях внутрь.
+- [Джеймс Льюис и Мартин Фаулер. Microservices](https://martinfowler.com/articles/microservices.html) — независимый выпуск, владение данными и проектирование с учётом отказов.
 
-- [Слоистая архитектура](https://systems.education/layered-architecture) — глава из книги Марка Ричардса о layered architecture.
-- [Популярные архитектуры разработки ПО и что между ними общего](https://habr.com/ru/articles/344164/) — перевод статьи Mark Seemann.
+### Представление
 
-### Presentation layer
-
-- [Шпаргалка по MV-паттернам](https://habr.com/ru/articles/151219/) — краткое сравнение MVC, MVP, MVVM и близких подходов.
-- [Обзор MV*-паттернов](https://habr.com/ru/companies/mobileup/articles/313538/) — перевод обзорной статьи по presentation patterns.
-- [MV-паттерны в web application development](https://simpleone.ru/blog/mv-patterns-in-web-application-development) — исторический контекст становления MV*.
+- [Трюгве Реенскауг. Models–Views–Controllers](https://zenodo.org/records/3676092/files/1979-12-MVC.pdf) — исходная записка о представлениях модели и вводе пользователя.
+- [Мартин Фаулер. GUI Architectures](https://martinfowler.com/eaaDev/uiArchs.html) — один экран в нескольких вариантах организации UI.
+- [Мартин Фаулер. Presentation Model](https://martinfowler.com/eaaDev/PresentationModel.html) — пример с альбомами, доступностью полей и синхронизацией формы.
+- [Microsoft. Model-View-ViewModel](https://learn.microsoft.com/en-us/dotnet/architecture/maui/mvvm) — команды и доставка изменений представлению в .NET MAUI.
 
 ## Мини-практика
 
-Возьмите сценарий заказа кофе из лекции и выберите архитектурную форму для трех вариантов продукта.
+Кафе добавляет фильтр-кофе за 180 евроцентов и открывает киоск. Сервер и киоск пока выпускает одна команда. Поставщик оплаты иногда подтверждает списание с задержкой.
 
-| Вариант | Контекст | Что выбрать |
-|---|---|---|
-| Учебный MVP на один месяц | два экрана, одна база, простые правила | простая layered-структура или модульный монолит |
-| Сервис заказов в растущей сети кофеен | правила скидок, статусы, интеграции оплаты и склада | domain-first + Ports and Adapters |
-| Платформа для нескольких команд | разные bounded contexts, независимые релизы, наблюдаемость | модульный монолит с четкими границами или микросервисы после проверки границ |
+1. Добавьте в меню код `filter`. Вызовите сценарий из теста. Для нового заказа должна сохраниться сумма 180 и пройти одно списание на 180. Для неизвестного кода число вызовов обоих адаптеров должно остаться прежним.
+2. Нарисуйте путь заказа из киоска. Подпишите, кто вызывает входной порт, кто объявляет выходной, кто его реализует. Другим цветом нанесите ссылки исходного кода. Проверьте себя на замене PostgreSQL — класс сценария должен собраться без драйвера.
+3. Передайте экрану предложение `filter` с текстом `1,80 €`. Выберите его, сбросьте выбор, затем выберите латте. Ожидаемая последовательность — `1,80 €`, подсказка без суммы, `2,50 €` без ошибки. Укажите, как будете наблюдать результат в MVP и MVVM.
+4. Объясните кассиру, что он увидит, если ответ платёжного провайдера потерялся. Предложите состояние для такого заказа и способ сверки. Проверьте решение мысленным повтором запроса — для одного оплаченного заказа в выписке должна остаться одна операция.
 
-Для каждого варианта ответьте:
-
-1. Где находится доменная логика?
-2. От чего зависит application layer?
-3. Что является портом, а что адаптером?
-4. Где появится первый integration test?
-5. Что станет дороже, если выбрать Clean Architecture слишком рано?
-
-Цель упражнения - не выбрать "самую правильную" архитектуру, а увидеть цену каждого уровня защиты домена.
+В конце назовите изменение, которое оправдало бы отдельный сервис платежей, и один новый отказ, который команде тогда придётся обрабатывать.
