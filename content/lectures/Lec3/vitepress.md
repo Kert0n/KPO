@@ -6,24 +6,24 @@ requires:
 
 # Лекция 3. Принципы эффективного юнит-тестирования
 
-Эта лекция - самостоятельный конспект о том, как разработчику писать полезные unit-тесты. Она не требует, чтобы вы
-помнили устную лекцию: сначала разберем, зачем вообще нужны тесты, затем отделим unit-тесты от других уровней
-тестирования, а после этого перейдем к качеству тестов, тестовым двойникам, DI и мокированию зависимостей.
+В чеке за товары на 600 и 500 рублей появилась сумма 1100 вместо ожидаемых 990. Какой тест мог бы
+обнаружить пропавшую скидку до выпуска приложения? Начнём с расчёта корзины, затем проверим оплату
+и отправку уведомлений. Для каждого случая выберем наблюдаемый результат и границу проверки.
 
 После прочтения вы должны уметь:
 
-- объяснить, чем unit-тест отличается от интеграционного и функционального теста;
+- объяснить, чем различаются юнит-тест, интеграционный тест и сквозная проверка;
 - написать простой тест по правилу Arrange-Act-Assert;
 - понять, что именно проверяет тест: выход, состояние или взаимодействие;
 - отличить stub, fake, spy и mock;
 - увидеть хрупкий тест, который привязан к реализации;
 - решить, что тестировать unit-тестами, что проверять интеграционно, а что сначала рефакторить;
-- выбрать, какие зависимости мокать, а какие лучше проверять настоящими тестами.
+- выбрать, какие зависимости заменить двойниками и где проверить их настоящие реализации.
 
 ## Сквозной сценарий
 
 В [Лекции 2](/lectures/02#di-и-тесты) мы передали `FakePaymentGateway` в `OrderService` вместо реального шлюза — это
-был тестовый двойник. Но мы не обсуждали, *как* написать тест, который использует этот fake правильно. Теперь
+был тестовый двойник. По сумме в памяти мы проверили, сколько сервис передал шлюзу по одному заказу. Теперь
 `OrderService` считает итог заказа, проверяет скидку, обращается к платежному шлюзу и публикует событие. Первый импульс —
 открыть приложение вручную, нажать кнопку "Оплатить" и посмотреть, что случится. Это полезно один раз, но плохо работает
 как инженерная обратная связь: ручная проверка медленная, неполная и зависит от внешних систем.
@@ -31,7 +31,7 @@ requires:
 В этой лекции мы будем постепенно сужать вопрос. Вместо "работает ли все приложение?" спросим:
 
 - правильно ли считается скидка при заданных товарах;
-- вызывает ли сервис платеж только после успешной валидации;
+- вызывает ли сервис платеж только после проверки заказа;
 - что делать, если внешний API оплаты недоступен;
 - какие проверки оставить unit-тестами, а какие вынести на интеграционный уровень.
 
@@ -44,28 +44,24 @@ flowchart LR
     Question --> E2E["E2E: критический пользовательский путь"]
 ```
 
-## Worked example: хрупкий тест против теста поведения
+## Разбор ошибки в расчёте скидки {#worked-example-хрупкии-тест-против-теста-поведения}
 
 ### Ситуация
 
-`OrderService` должен применить скидку, если сумма заказа больше порога. Пользователю неважно, как метод внутри
+`OrderService` должен применить скидку, если сумма заказа достигла 1000 рублей. Пользователю неважно, как метод внутри
 разбивает вычисление на private-функции; важно, какой итог он получит.
 
 ### Наивное решение
 
-Написать тест, который проверяет, что `OrderService` вызвал внутренний helper или dependency ровно один раз. Такой тест
-может пройти, даже если итоговая сумма неверна, и упасть после безвредного рефакторинга.
+Первый тест требует одного вызова вспомогательного метода `applyDiscount`. Если тот по ошибке вернёт исходные 1100 рублей, тест всё равно пройдёт.
 
 ### Что ломается
 
-Тест начинает охранять реализацию, а не поведение. Разработчик меняет порядок вызовов, выносит часть логики в value
-object или объединяет два helper-а, и тест падает, хотя пользовательский результат не изменился.
+Разработчик переносит верное вычисление в корзину и удаляет прежний вызов. В чеке по-прежнему 990 рублей, но тот же тест теперь падает.
 
 ### Улучшение
 
-Сформулировать Arrange-Act-Assert вокруг наблюдаемого результата: подготовить заказ, выполнить расчет, проверить итог и
-важные side effects на границе системы. Interaction проверять только там, где само взаимодействие является поведением:
-например, платеж не должен уйти при невалидном заказе.
+Сложите в корзину товары за 600 и 500 рублей, вызовите расчёт и сравните итог с 990. Это три шага Arrange–Act–Assert. Для другого требования меняется наблюдение. Например, если отменённый заказ оплачивать нельзя, проверка должна обнаружить любую попытку списания.
 
 ### Почему это работает
 
@@ -78,24 +74,17 @@ object или объединяет два helper-а, и тест падает, �
 разработчика тесты прежде всего дают обратную связь: изменил код, запустил проверку, быстро понял, осталась ли система в
 ожидаемом состоянии.
 
-Чем позже найдена ошибка, тем дороже ее исправление. Ошибка, пойманная локальным unit-тестом, обычно исправляется за
-минуты: контекст еще в голове, затронутый участок кода рядом. Ошибка, найденная отделом тестирования, уже превращается в
+Если ошибка в расчёте скидки обнаружилась локально, разработчик видит входные данные и место изменения. Ошибка, найденная отделом тестирования, уже превращается в
 баг-репорт, triage, назначение исполнителя и повторную проверку. Ошибка в production добавляет пользователей, данные,
 поддержку, релизы исправлений и репутационный ущерб.
 
 ```mermaid
 flowchart LR
-    Manual[Ручная проверка разработчиком] --> Separate[Отдельная роль тестировщика]
-    Separate --> QA[Quality Assurance]
-    QA --> Automation[Автоматизация тестов]
-    Automation --> CI[CI/CD и постоянная обратная связь]
+    Edit[Изменили правило скидки] --> Unit[Запустили тест корзины]
+    Unit -->|Итог неверен| Fix[Исправили расчет]
+    Fix --> Unit
+    Unit -->|Итог верен| CI[Проверили связи с другими модулями в CI]
 ```
-
-Исторически отношение к тестированию менялось вместе со сложностью программ. Пока программы были небольшими, казалось
-реалистичным вручную проверить основные входы и выходы. Когда систем стало больше, появился отдельный процесс
-тестирования. Затем стало понятно, что качество нельзя "добавить в конце": его нужно обеспечивать на каждом этапе
-разработки. Unit-тесты занимают в этой картине самое раннее место - они помогают разработчику обнаружить ошибку до того,
-как код попадет к другим людям и системам.
 
 ::: tip Практический смысл
 Хороший тест - это не доказательство, что багов больше нет. Это дешевый способ быстро узнать, что важное поведение
@@ -104,8 +93,7 @@ flowchart LR
 
 ## Карта видов тестирования
 
-Для разработчика главное разделение — по уровню: что именно проверяет тест и сколько инфраструктуры ему нужно. Три
-уровня, которые вам реально нужно понимать: unit, integration и e2e.
+Сравним проверки по охвату. Можно проверить вычисление скидки в памяти, запись заказа в базу, собранное приложение через его публичный интерфейс или весь путь покупателя до квитанции. Сквозной сценарий иногда охватывает несколько систем, поэтому названия категорий могут пересекаться.
 
 Обычно уровни тестирования объясняют пирамидой. Внизу много быстрых дешевых тестов, наверху меньше дорогих и медленных
 тестов, которые зато ближе к реальному пользовательскому сценарию.
@@ -120,7 +108,7 @@ flowchart LR
 | Запуск кода       | Статическое / динамическое        | Анализируем код без запуска или выполняем программу.                                             |
 | Автоматизация     | Ручное / автоматизированное       | Человек проходит сценарий сам или сценарий выполняет инструмент.                                 |
 | Требования        | Функциональное / нефункциональное | Проверяем поведение продукта или свойства вроде скорости, удобства, безопасности.                |
-| Знание системы    | Black box / gray box / white box  | Тестировщик не знает внутренности, знает часть контракта или работает с кодом.                   |
+| Знание системы    | Black box / gray box / white box  | Тест выводят из внешнего контракта, частичных сведений о реализации или её внутренней структуры.                   |
 | Уровень           | Unit / integration / system / e2e | Проверяем маленькую единицу поведения, связь модулей, систему целиком или пользовательский путь. |
 :::
 
@@ -149,8 +137,12 @@ Unit-тест должен быть быстрым, повторяемым и п
 |--------------|------------------------------------------------|-----------------------------------------------------------|-----------------------------------------------|
 | Unit         | Небольшое поведение в контролируемом окружении | Доменная логика, расчеты, правила валидации, ветвления    | Слишком много моков и привязка к реализации   |
 | Integration  | Совместную работу нескольких компонентов       | Репозитории с БД, сериализация, DI-конфигурация, адаптеры | Медленнее и сложнее в подготовке              |
-| Functional   | Сценарий с точки зрения требования             | "Пользователь оформляет заказ", "сервис принимает платеж" | Ошибка найдена, но причина может быть далеко  |
-| System / e2e | Реальную систему почти целиком                 | Критические пользовательские пути                         | Дорого поддерживать, медленная обратная связь |
+| System       | Собранную систему как целое                    | Проверка приложения через публичный интерфейс             | Сложнее локализовать причину ошибки           |
+| End-to-end   | Сквозной путь через участвующие компоненты      | От оформления заказа до квитанции и уведомления           | Дорого поддерживать окружение                 |
+
+Функциональный тест проверяет требование к поведению. Правило «от 1000 рублей действует скидка»
+можно проверить и одним вызовом корзины, и оформлением заказа через сайт. Требование одно,
+а охват, скорость и причины возможного падения различаются.
 
 ::: tip Короткое определение
 Unit-тест хорош, когда быстро отвечает на конкретный вопрос о поведении: "при таких условиях этот участок системы делает
@@ -165,7 +157,7 @@ Unit-тест хорош, когда быстро отвечает на конк
 - Act - выполнить проверяемое действие;
 - Assert - проверить результат.
 
-Ниже один и тот же пример: корзина дает скидку 10%, если сумма заказа достигла 1000.
+Во всех четырёх вкладках действует одно правило. При сумме от 1000 рублей включительно покупатель платит 90% стоимости. В учебном примере цены целые и неотрицательные, сумма корзины помещается в 32-битное целое, дробную часть конечной суммы отбрасываем.
 
 ::: multi-code "Unit-тест по правилу 3A"
 
@@ -198,7 +190,7 @@ class Cart {
 
     fun total(): Int {
         val sum = prices.sum()
-        return if (sum >= 1000) (sum * 0.9).toInt() else sum
+        return if (sum >= 1000) (sum.toLong() * 9 / 10).toInt() else sum
     }
 }
 ```
@@ -215,7 +207,7 @@ class Cart {
 
     fun total(): Int {
         val sum = prices.sum()
-        return if (sum >= 1000) (sum * 0.9).toInt() else sum
+        return if (sum >= 1000) (sum.toLong() * 9 / 10).toInt() else sum
     }
 }
 
@@ -266,7 +258,7 @@ public class Cart
     public int Total()
     {
         var sum = prices.Sum();
-        return sum >= 1000 ? (int)(sum * 0.9) : sum;
+        return sum >= 1000 ? (int)((long)sum * 9 / 10) : sum;
     }
 }
 ```
@@ -303,7 +295,7 @@ class Cart {
 
     int total() {
         int sum = prices.stream().mapToInt(Integer::intValue).sum();
-        return sum >= 1000 ? (int)(sum * 0.9) : sum;
+        return sum >= 1000 ? (int)((long)sum * 9 / 10) : sum;
     }
 }
 ```
@@ -346,7 +338,7 @@ func (c *Cart) Total() int {
         sum += price
     }
     if sum >= 1000 {
-        return int(float64(sum) * 0.9)
+        return int(int64(sum) * 9 / 10)
     }
     return sum
 }
@@ -354,8 +346,7 @@ func (c *Cart) Total() int {
 
 :::
 
-Этот тест не утверждает, что внутри `Cart` должна быть `MutableList`, `ArrayList`, массив или SQL-таблица. Он утверждает
-наблюдаемое поведение: если в корзине товары на 600 и 500, итог должен быть 990. Именно поэтому такой тест переживет
+Для этого теста неважно, как `Cart` хранит товары: в `MutableList`, `ArrayList`, массиве или SQL-таблице. Он проверяет наблюдаемое поведение: если в корзине товары на 600 и 500, итог должен быть 990. Именно поэтому такой тест переживет
 рефакторинг внутреннего хранения, но упадет при изменении бизнес-правила скидки.
 
 ```mermaid
@@ -399,9 +390,10 @@ flowchart LR
 >         total    int
 >         expected int
 >     }{
->         {"below threshold", 500, 500},
+>         {"below threshold", 999, 999},
 >         {"at threshold", 1000, 900},
->         {"above threshold", 1500, 1350},
+>         {"just above threshold", 1001, 900},
+>         {"large total", 1000000000, 900000000},
 >     }
 >     for _, tt := range tests {
 >         t.Run(tt.name, func(t *testing.T) {
@@ -422,7 +414,9 @@ flowchart LR
 Когда одну и ту же логику нужно проверить на нескольких наборах данных, каждый язык предлагает свой механизм. Вместо
 дублирования тестовых функций, данные собираются в таблицу:
 
-::: multi-code "Параметризованные тесты"
+Строка для 1000 отличает условие `>= 1000` от `> 1000`. Для 1001 итог до округления равен 900,9 рубля, после округления — 900. Для 1 миллиарда проверяем, что расчёт не переполнил 32-битный промежуточный результат.
+
+::: multi-code "Параметризованные тесты" {playground=off}
 
 ```kotlin
 import org.junit.jupiter.params.ParameterizedTest
@@ -431,14 +425,14 @@ import kotlin.test.assertEquals
 
 class DiscountTest {
     @ParameterizedTest
-    @CsvSource("500,500", "1000,900", "1500,1350")
+    @CsvSource("999,999", "1000,900", "1001,900", "1000000000,900000000")
     fun appliesDiscount(total: Int, expected: Int) {
         assertEquals(expected, applyDiscount(total))
     }
 }
 
 fun applyDiscount(total: Int): Int =
-    if (total >= 1000) total * 90 / 100 else total
+    if (total >= 1000) (total.toLong() * 9 / 10).toInt() else total
 ```
 
 ```csharp
@@ -447,16 +441,17 @@ using Xunit;
 public class DiscountTests
 {
     [Theory]
-    [InlineData(500, 500)]
+    [InlineData(999, 999)]
     [InlineData(1000, 900)]
-    [InlineData(1500, 1350)]
+    [InlineData(1001, 900)]
+    [InlineData(1_000_000_000, 900_000_000)]
     public void AppliesDiscount(int total, int expected)
     {
         Assert.Equal(expected, ApplyDiscount(total));
     }
 
     static int ApplyDiscount(int total) =>
-        total >= 1000 ? total * 90 / 100 : total;
+        total >= 1000 ? (int)((long)total * 9 / 10) : total;
 }
 ```
 
@@ -468,23 +463,35 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class DiscountTest {
     @ParameterizedTest
-    @CsvSource({"500,500", "1000,900", "1500,1350"})
+    @CsvSource({"999,999", "1000,900", "1001,900", "1000000000,900000000"})
     void appliesDiscount(int total, int expected) {
         assertEquals(expected, applyDiscount(total));
     }
 
     static int applyDiscount(int total) {
-        return total >= 1000 ? total * 90 / 100 : total;
+        return total >= 1000 ? (int)((long)total * 9 / 10) : total;
     }
 }
 ```
 
 ```go
+package cart
+
+import "testing"
+
+func ApplyDiscount(total int) int {
+    if total >= 1000 {
+        return int(int64(total) * 9 / 10)
+    }
+    return total
+}
+
 func TestApplyDiscount(t *testing.T) {
     tests := []struct {
         total, expected int
     }{
-        {500, 500}, {1000, 900}, {1500, 1350},
+        {999, 999}, {1000, 900}, {1001, 900},
+        {1_000_000_000, 900_000_000},
     }
     for _, tt := range tests {
         got := ApplyDiscount(tt.total)
@@ -671,7 +678,7 @@ import kotlin.test.assertEquals
 
 class OrderServiceTest {
     @Test
-    fun sendsNotificationAfterPayment() {
+    fun sendsNotificationForOrder() {
         val notifier = SpyNotifier()
         val service = OrderService(notifier)
 
@@ -708,7 +715,7 @@ class OrderService(private val notifier: Notifier) {
 создает зависимость через `new`, достает ее из Service Locator или читает глобальную конфигурацию, тесту трудно
 подставить управляемое поведение.
 
-Плохой вариант:
+Пусть операция возвращает квитанцию после успешной оплаты. Ошибка в сумме или отказ провайдера должны дойти до вызывающего кода. Сначала сервис сам выбирает сетевой шлюз.
 
 ```kotlin
 class CheckoutService {
@@ -736,10 +743,10 @@ classDiagram
         +charge(amount) Receipt
     }
     class RealPaymentGateway
-    class FakePaymentGateway
+    class StubPaymentGateway
     CheckoutService --> PaymentGateway
     RealPaymentGateway ..|> PaymentGateway
-    FakePaymentGateway ..|> PaymentGateway
+    StubPaymentGateway ..|> PaymentGateway
 ```
 
 ::: multi-code "DI делает сервис тестируемым" {playground=off}
@@ -810,13 +817,17 @@ class CheckoutService {
 ```
 
 ```go
+package checkout
+
+import "errors"
+
 type Receipt struct {
     ID     string
     Amount int
 }
 
 type PaymentGateway interface {
-    Charge(amount int) Receipt
+    Charge(amount int) (Receipt, error)
 }
 
 type CheckoutService struct {
@@ -827,9 +838,9 @@ func NewCheckoutService(gateway PaymentGateway) CheckoutService {
     return CheckoutService{gateway: gateway}
 }
 
-func (s CheckoutService) Checkout(amount int) Receipt {
+func (s CheckoutService) Checkout(amount int) (Receipt, error) {
     if amount <= 0 {
-        panic("amount must be positive")
+        return Receipt{}, errors.New("amount must be positive")
     }
     return s.gateway.Charge(amount)
 }
@@ -837,7 +848,10 @@ func (s CheckoutService) Checkout(amount int) Receipt {
 
 :::
 
-::: multi-code "Kotlin: fake gateway в unit-тесте"
+В этом тесте шлюз играет роль заглушки (stub). Он возвращает детерминированную квитанцию,
+чтобы мы могли проверить результат `checkout`. Сохранение платежей и работу сети здесь не моделируем.
+
+::: multi-code "Заглушка платёжного шлюза"
 
 ```kotlin
 import kotlin.test.Test
@@ -846,7 +860,7 @@ import kotlin.test.assertEquals
 class CheckoutServiceTest {
     @Test
     fun returnsReceiptFromPaymentGateway() {
-        val gateway = FakePaymentGateway()
+        val gateway = StubPaymentGateway()
         val service = CheckoutService(gateway)
 
         val receipt = service.checkout(1500)
@@ -855,7 +869,7 @@ class CheckoutServiceTest {
     }
 }
 
-class FakePaymentGateway : PaymentGateway {
+class StubPaymentGateway : PaymentGateway {
     override fun charge(amount: Int): Receipt = Receipt("test-receipt", amount)
 }
 ```
@@ -876,12 +890,12 @@ class CheckoutService(private val gateway: PaymentGateway) {
     }
 }
 
-class FakePaymentGateway : PaymentGateway {
+class StubPaymentGateway : PaymentGateway {
     override fun charge(amount: Int): Receipt = Receipt("test-receipt", amount)
 }
 
 fun main() {
-    val gateway = FakePaymentGateway()
+    val gateway = StubPaymentGateway()
     val service = CheckoutService(gateway)
 
     val receipt = service.checkout(1500)
@@ -899,16 +913,31 @@ public class CheckoutServiceTests
     [Fact]
     public void ReturnsReceiptFromPaymentGateway()
     {
-        var gateway = new FakePaymentGateway();
+        var gateway = new StubPaymentGateway();
         var service = new CheckoutService(gateway);
 
         var receipt = service.Checkout(1500);
 
         Assert.Equal(new Receipt("test-receipt", 1500), receipt);
     }
+
+    [Fact]
+    public void ReportsUnavailableGateway()
+    {
+        var service = new CheckoutService(new UnavailableGateway());
+
+        Assert.Throws<GatewayUnavailable>(() => service.Checkout(1500));
+    }
 }
 
-public class FakePaymentGateway : IPaymentGateway
+public sealed class GatewayUnavailable : System.Exception { }
+
+public sealed class UnavailableGateway : IPaymentGateway
+{
+    public Receipt Charge(int amount) => throw new GatewayUnavailable();
+}
+
+public class StubPaymentGateway : IPaymentGateway
 {
     public Receipt Charge(int amount) => new("test-receipt", amount);
 }
@@ -918,20 +947,31 @@ public class FakePaymentGateway : IPaymentGateway
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class CheckoutServiceTest {
     @Test
     void returnsReceiptFromPaymentGateway() {
-        PaymentGateway gateway = new FakePaymentGateway();
+        PaymentGateway gateway = new StubPaymentGateway();
         CheckoutService service = new CheckoutService(gateway);
 
         Receipt receipt = service.checkout(1500);
 
         assertEquals(new Receipt("test-receipt", 1500), receipt);
     }
+
+    @Test
+    void reportsUnavailableGateway() {
+        PaymentGateway unavailable = amount -> { throw new GatewayUnavailable(); };
+        CheckoutService service = new CheckoutService(unavailable);
+
+        assertThrows(GatewayUnavailable.class, () -> service.checkout(1500));
+    }
 }
 
-class FakePaymentGateway implements PaymentGateway {
+class GatewayUnavailable extends RuntimeException {}
+
+class StubPaymentGateway implements PaymentGateway {
     public Receipt charge(int amount) {
         return new Receipt("test-receipt", amount);
     }
@@ -941,38 +981,90 @@ class FakePaymentGateway implements PaymentGateway {
 ```go
 package checkout
 
-import "testing"
+import (
+    "errors"
+    "testing"
+)
 
 func TestReturnsReceiptFromPaymentGateway(t *testing.T) {
-    gateway := FakePaymentGateway{}
+    gateway := StubPaymentGateway{}
     service := NewCheckoutService(gateway)
 
-    receipt := service.Checkout(1500)
+    receipt, err := service.Checkout(1500)
+    if err != nil {
+        t.Fatal(err)
+    }
 
     if receipt != (Receipt{ID: "test-receipt", Amount: 1500}) {
         t.Fatalf("unexpected receipt: %+v", receipt)
     }
 }
 
-type FakePaymentGateway struct{}
+var errGatewayUnavailable = errors.New("gateway unavailable")
 
-func (FakePaymentGateway) Charge(amount int) Receipt {
-    return Receipt{ID: "test-receipt", Amount: amount}
+type UnavailableGateway struct{}
+
+func (UnavailableGateway) Charge(amount int) (Receipt, error) {
+    return Receipt{}, errGatewayUnavailable
+}
+
+func TestReportsUnavailableGateway(t *testing.T) {
+    service := NewCheckoutService(UnavailableGateway{})
+
+    _, err := service.Checkout(1500)
+    if !errors.Is(err, errGatewayUnavailable) {
+        t.Fatalf("expected unavailable gateway, got %v", err)
+    }
+}
+
+type StubPaymentGateway struct{}
+
+func (StubPaymentGateway) Charge(amount int) (Receipt, error) {
+    return Receipt{ID: "test-receipt", Amount: amount}, nil
 }
 ```
 
 :::
+
+Если шлюз недоступен, вызывающему коду нужна ошибка, а не подтверждение оплаты. Эту ветку можно воспроизвести заглушкой, которая при любом обращении сообщает о недоступности. Положительная сумма важна для эксперимента: с нулевой суммой сервис вернёт ошибку ещё до вызова шлюза.
+
+::: details Как воспроизвести отказ провайдера в Kotlin
+В Kotlin используйте те же `PaymentGateway` и `CheckoutService`, что в примере выше. Отдельный тип ошибки позволяет проверить, какая именно неудача дошла до клиента.
+
+```kotlin
+import kotlin.test.Test
+import kotlin.test.assertFailsWith
+
+class GatewayUnavailable : RuntimeException()
+
+class UnavailableGateway : PaymentGateway {
+    override fun charge(amount: Int): Receipt = throw GatewayUnavailable()
+}
+
+class CheckoutFailureTest {
+    @Test
+    fun reportsUnavailableGateway() {
+        val service = CheckoutService(UnavailableGateway())
+
+        assertFailsWith<GatewayUnavailable> { service.checkout(1500) }
+    }
+}
+```
+
+:::
+
+В Java и C# тест ожидает ошибку типа `GatewayUnavailable`, а в Go получает её вторым возвращаемым значением и проверяет через `errors.Is`. Узнать, как настоящий HTTP-адаптер разбирает ответ провайдера, можно отдельной проверкой адаптера.
 
 ## Test doubles: fake, stub, mock
 
 Тестовый двойник — объект, который заменяет настоящую зависимость в тесте. В разговоре часто говорят "мок" про любой
 двойник, но для точности полезно различать роли. Проще всего увидеть разницу через историю нарастающих потребностей:
 
-1. Сначала конструктор требует `Logger`, но в тесте логирование неважно. Нужен объект, который просто компилируется — это **dummy** (`NoOpLogger`).
+1. Сначала конструктор требует `Logger`, но в тесте логирование неважно. Нужен объект, который просто компилируется — это **dummy** (в этой ветке к переданному `Logger` никто не обращается).
 2. Потом тесту нужна валюта, но реальный API курсов недоступен. Нужен объект, который *отвечает заранее* — это **stub** (`StubExchangeRates(rate = 90)`).
 3. Тест становится сложнее: нужен полноценный репозиторий, который хранит и отдаёт данные, но без настоящей БД. Нужна *упрощённая рабочая реализация* — это **fake** (`InMemoryOrderRepository`).
 4. Теперь важно знать, *что именно* тестируемый код отправил во внешний сервис. Нужен объект, который *запоминает вызовы* — это **spy** (`SpyMailer` с полем `sent`).
-5. Наконец, нужно убедиться, что метод `send` был вызван *ровно один раз с конкретным аргументом*. Нужен объект, который *проверяет ожидание* — это **mock**.
+5. Если тест задаёт ожидаемый вызов `send` с аргументами, а двойник или библиотека сверяет его с фактическим вызовом, двойник играет роль **mock**. Ту же гарантию «одно письмо» можно проверить через spy, сравнив длину его журнала и содержимое записи.
 
 | Вид двойника | Что делает                                                                 | Пример                                                        |
 |--------------|----------------------------------------------------------------------------|---------------------------------------------------------------|
@@ -983,8 +1075,7 @@ func (FakePaymentGateway) Charge(amount int) Receipt {
 | Mock         | Проверяет ожидаемое взаимодействие                                         | "Метод `send` должен быть вызван один раз с таким сообщением" |
 
 Главное различие для этой лекции: stub помогает подготовить состояние мира, mock проверяет взаимодействие. Если тест
-падает из-за ответа stub, проблема обычно в проверяемой логике. Если тест падает из-за mock, проблема может быть как в
-логике, так и в слишком жестком ожидании внутреннего процесса.
+получил неожиданный результат, проверьте и расчёт, и данные заглушки. Если не выполнено ожидание mock, выясните, входил ли этот вызов в контракт.
 
 ::: multi-code "Stub и spy в одном сценарии"
 
@@ -1013,17 +1104,21 @@ class StubExchangeRates(private val rate: Int) : ExchangeRates {
     override fun usdToRub(): Int = rate
 }
 
-class SpyMailer {
+interface Mailer {
+    fun send(email: String, body: String)
+}
+
+class SpyMailer : Mailer {
     val sent = mutableListOf<String>()
 
-    fun send(email: String, body: String) {
+    override fun send(email: String, body: String) {
         sent += "$email:$body"
     }
 }
 
 class InvoiceService(
     private val rates: ExchangeRates,
-    private val mailer: SpyMailer
+    private val mailer: Mailer
 ) {
     fun sendInvoice(email: String, dollars: Int) {
         val rubles = dollars * rates.usdToRub()
@@ -1043,17 +1138,21 @@ class StubExchangeRates(private val rate: Int) : ExchangeRates {
     override fun usdToRub(): Int = rate
 }
 
-class SpyMailer {
+interface Mailer {
+    fun send(email: String, body: String)
+}
+
+class SpyMailer : Mailer {
     val sent = mutableListOf<String>()
 
-    fun send(email: String, body: String) {
+    override fun send(email: String, body: String) {
         sent += "$email:$body"
     }
 }
 
 class InvoiceService(
     private val rates: ExchangeRates,
-    private val mailer: SpyMailer
+    private val mailer: Mailer
 ) {
     fun sendInvoice(email: String, dollars: Int) {
         val rubles = dollars * rates.usdToRub()
@@ -1074,6 +1173,7 @@ fun main() {
 ```
 
 ```csharp
+using System.Collections.Generic;
 using Xunit;
 
 public class InvoiceServiceTests
@@ -1105,7 +1205,12 @@ public class StubExchangeRates : IExchangeRates
     public int UsdToRub() => rate;
 }
 
-public class SpyMailer
+public interface IMailer
+{
+    void Send(string email, string body);
+}
+
+public class SpyMailer : IMailer
 {
     public List<string> Sent { get; } = new();
 
@@ -1115,9 +1220,9 @@ public class SpyMailer
 public class InvoiceService
 {
     private readonly IExchangeRates rates;
-    private readonly SpyMailer mailer;
+    private readonly IMailer mailer;
 
-    public InvoiceService(IExchangeRates rates, SpyMailer mailer)
+    public InvoiceService(IExchangeRates rates, IMailer mailer)
     {
         this.rates = rates;
         this.mailer = mailer;
@@ -1166,10 +1271,14 @@ class StubExchangeRates implements ExchangeRates {
     }
 }
 
-class SpyMailer {
+interface Mailer {
+    void send(String email, String body);
+}
+
+class SpyMailer implements Mailer {
     private final List<String> sent = new java.util.ArrayList<>();
 
-    void send(String email, String body) {
+    public void send(String email, String body) {
         sent.add(email + ":" + body);
     }
 
@@ -1180,9 +1289,9 @@ class SpyMailer {
 
 class InvoiceService {
     private final ExchangeRates rates;
-    private final SpyMailer mailer;
+    private final Mailer mailer;
 
-    InvoiceService(ExchangeRates rates, SpyMailer mailer) {
+    InvoiceService(ExchangeRates rates, Mailer mailer) {
         this.rates = rates;
         this.mailer = mailer;
     }
@@ -1226,6 +1335,10 @@ func (r StubExchangeRates) UsdToRub() int {
     return r.Rate
 }
 
+type Mailer interface {
+    Send(email string, body string)
+}
+
 type SpyMailer struct {
     Sent []string
 }
@@ -1236,10 +1349,10 @@ func (m *SpyMailer) Send(email string, body string) {
 
 type InvoiceService struct {
     rates ExchangeRates
-    mailer *SpyMailer
+    mailer Mailer
 }
 
-func NewInvoiceService(rates ExchangeRates, mailer *SpyMailer) InvoiceService {
+func NewInvoiceService(rates ExchangeRates, mailer Mailer) InvoiceService {
     return InvoiceService{rates: rates, mailer: mailer}
 }
 
@@ -1285,9 +1398,10 @@ False negative опасен тем, что баг уходит дальше. Fal
 
 ```kotlin
 // Хрупко: тест знает порядок внутренних вызовов.
-verify(renderer).renderHeader(message)
-verify(renderer).renderBody(message)
-verify(renderer).renderFooter(message)
+val calls = inOrder(renderer)
+calls.verify(renderer).renderHeader(message)
+calls.verify(renderer).renderBody(message)
+calls.verify(renderer).renderFooter(message)
 ```
 
 Более устойчивый тест проверяет *результат*, а не *процесс*:
@@ -1336,7 +1450,7 @@ class MessageRendererTest {
 flowchart TD
     Tradeoff["Тесты всегда балансируют критерии"] --> Trivial["Тривиальные тесты<br/>быстрые и устойчивые<br/>но плохо ловят баги"]
     Tradeoff --> Brittle["Хрупкие тесты<br/>могут ловить баги<br/>но падают от рефакторинга"]
-    Tradeoff --> Functional["Функциональные тесты<br/>хорошо ловят баги<br/>но дают медленную обратную связь"]
+    Tradeoff --> Functional["Сквозные тесты<br/>хорошо ловят баги<br/>но дают медленную обратную связь"]
     Tradeoff --> Valuable["Ценные unit-тесты<br/>важная логика<br/>быстро<br/>без привязки к реализации"]
 ```
 
@@ -1361,7 +1475,7 @@ flowchart TD
     SimpleNoDeps["Простой код<br/>мало зависимостей"] -->|DTO, getter, setter| Skip["Часто не тестировать отдельно"]
     ComplexNoDeps["Сложная логика<br/>мало зависимостей"] -->|доменное правило| Unit["Идеально для unit-тестов"]
     SimpleManyDeps["Простая логика<br/>много зависимостей"] -->|controller, adapter| Integration["Чаще integration-тест"]
-    ComplexManyDeps["Сложная логика<br/>много зависимостей"] -->|god object| Refactor["Сначала рефакторить"]
+    ComplexManyDeps["Сложная логика<br/>много зависимостей"] -->|god object| Refactor["Зафиксировать поведение и разделить код"]
 ```
 
 | Тип кода                                  | Пример                                                 | Что делать                                                  |
@@ -1369,11 +1483,9 @@ flowchart TD
 | Простой код без зависимостей              | DTO, простые свойства, очевидный mapping               | Не тратить отдельный unit-тест без причины.                 |
 | Сложная логика без зависимостей           | Расчет скидки, правила допуска, переходы статусов      | Покрывать unit-тестами в первую очередь.                    |
 | Простой orchestration-код с зависимостями | Controller, handler, adapter                           | Проверять интеграционно или небольшими interaction-тестами. |
-| Сложный код с большим числом зависимостей | God object, толстый controller, сервис на тысячу строк | Сначала разделить ответственность, потом тестировать части. |
+| Сложный код с большим числом зависимостей | God object, толстый controller, сервис на тысячу строк | Зафиксировать важный сценарий, затем выделить и проверить правило отдельно. |
 
-Пример из практики: два модуля могут быть корректны по отдельности, но ломаться на границе. Один модуль считает высоту
-относительно уровня моря, другой - относительно поверхности. Или одна система передает сантиметры, другая ожидает дюймы.
-Такие ошибки не всегда ловятся unit-тестами отдельных классов: для границ нужны интеграционные проверки.
+Например, если `ReportGenerator` смешивает чтение файла с вычислением среднего, сначала зафиксируйте известный результат через его публичный метод. Затем выделяйте расчёт и повторяйте исходную проверку после каждого изменения. Если два компонента отдельно работают, остаётся проверить общую договорённость. Модуль, передающий сумму в рублях, и шлюз, принимающий копейки, способны успешно пройти собственные тесты и ошибиться при подключении.
 
 ## Humble Object
 
@@ -1401,27 +1513,28 @@ flowchart TD
     Service --> Rules[Бизнес-правила]
 ```
 
-Конкретный пример. До рефакторинга — метод читает файл И считает статистику:
+Пусть в каждой строке файла записано одно целое число. Отчёт показывает сумму и среднее с округлением к нулю. Пустой файл считается ошибкой входных данных. Сначала чтение и расчёт находятся в одном методе:
 
 ```kotlin
 class ReportGenerator {
     fun generate(path: String): String {
         val lines = File(path).readLines()         // I/O
-        val total = lines.sumOf { it.toInt() }     // logic
+        require(lines.isNotEmpty()) { "empty report" }
+        val total = lines.sumOf { it.toInt().toLong() }     // logic
         val avg = total / lines.size               // logic
         return "total=$total, avg=$avg"             // formatting
     }
 }
 ```
 
-Тестировать `generate` без настоящего файла невозможно. После рефакторинга — чистая функция отдельно, тонкая обёртка
-с I/O отдельно:
+Временный файл со строками `2` и `3` позволяет проверить `generate` ещё до рефакторинга. Ожидаем строку `total=5, avg=2`. Сохраним эту проверку и вынесем расчёт в отдельную функцию:
 
 ```kotlin
-data class Stats(val total: Int, val avg: Int)
+data class Stats(val total: Long, val avg: Long)
 
 fun computeStats(values: List<Int>): Stats {
-    val total = values.sum()
+    require(values.isNotEmpty()) { "empty report" }
+    val total = values.sumOf { it.toLong() }
     return Stats(total, total / values.size)
 }
 
@@ -1434,7 +1547,7 @@ class ReportGenerator {
 }
 ```
 
-Теперь `computeStats` тестируется мгновенно без файловой системы, а `ReportGenerator` — humble object, который только
+Теперь `computeStats(listOf(2, 3))` возвращает `Stats(5L, 2L)`, а пустой список приводит к `IllegalArgumentException`. Обе ветви можно проверить без файловой системы, а `ReportGenerator` — humble object, который только
 связывает I/O и логику.
 
 В MVC это проявляется естественно: controller не должен быть местом, где живет вся предметная область. Он связывает
@@ -1451,36 +1564,30 @@ unit-тестами.
 ::: discussion
 Вокруг моков есть несколько школ.
 
-London school чаще предлагает мокать изменяемые зависимости, чтобы тестировать объект почти полностью в изоляции. Это
-дает быстрые и точные unit-тесты, но повышает риск хрупкости.
+В лондонской школе участникам со значимым поведением часто задают ожидания. В примере с заказом можно потребовать, чтобы склад зарезервировал нужное количество товара. Изменение внутреннего протокола иногда потребует изменить и тест.
 
-Classic school чаще предлагает проверять реальные внутренние объекты вместе, а мокать только внешние процессы. Это
-делает тест ближе к поведению, но иногда усложняет setup.
+В классической школе для того же заказа можно взять настоящий небольшой склад в памяти и проверить остаток после операции. Двойник пригодится, если настоящий участник делает проверку дорогой или непредсказуемой.
 
 Подход, который популяризирует Владимир Хориков (Khorikov), предлагает смотреть не только на "внутреннее" и "внешнее",
 а на управляемость зависимости. Практичный компромисс формулируется так:
 
-- управляемая зависимость принадлежит вашему приложению, и ее состояние является частью вашей системы;
-- неуправляемая зависимость принадлежит внешнему миру, и вы не контролируете ее поведение.
+- управляемая зависимость доступна только через ваше приложение: например, его собственную БД не читают другие сервисы напрямую;
+- с неуправляемой зависимостью взаимодействуют и внешние потребители. Даже принадлежащая вашей команде очередь служит границей контракта, если её сообщения читает другой сервис.
 
-| Зависимость                      | Мокать в unit-тесте?                                                                | Чем проверять дополнительно                                   |
-|----------------------------------|-------------------------------------------------------------------------------------|---------------------------------------------------------------|
-| База данных приложения           | Обычно нет для проверки репозитория; да, если тестируем чистую доменную логику выше | Интеграционные тесты репозитория и транзакций                 |
-| Файловая система приложения      | Зависит от роли; часто лучше временная директория                                   | Интеграционные тесты работы с файлами                         |
-| Сторонний API оплаты             | Да                                                                                  | Contract/integration тесты адаптера с sandbox или fake server |
-| Message bus / внешняя очередь    | Да для unit-теста отправителя                                                       | Интеграционные тесты публикации события                       |
-| Clock/random                     | Подменять контролируемой абстракцией                                                | Unit-тесты граничных дат и случайных веток                    |
-| In-memory repository             | Можно использовать как fake                                                         | Unit-тесты сценариев, где не важны SQL и транзакции           |
-| Value object / доменная сущность | Не мокать                                                                           | Проверять настоящими unit-тестами                             |
+| Зависимость | Что использовать в тесте правила | Что требует отдельной проверки |
+|-------------|----------------------------------|--------------------------------|
+| Собственная БД | Расчёту цен БД не нужна. Для сценария сохранения можно взять репозиторий в памяти. | Настоящая БД проверяет запросы, ограничения и транзакции. |
+| Файловая система | Чистой функции передать готовый список чисел. | Временный файл проверяет чтение и разбор строк. |
+| Сторонний API оплаты | Заглушка отвечает успехом или отказом. Для подсчёта попыток списания подойдёт spy. | Тест с локальным HTTP-сервером проверяет запрос адаптера. Совместимость с провайдером подтверждают сверкой контракта с его стороной или проверкой в его тестовой среде. |
+| Внешняя очередь | Запись отправленных событий позволяет проверить содержание сообщения. | Интеграционная проверка с брокером подтверждает публикацию. |
+| Часы и генератор случайных чисел | Передать фиксированное время или последовательность значений. | Граничные даты и ветвления можно проверить без ожидания. |
+| Доменный объект | Создать экземпляр с нужным состоянием. | Операции объекта проверяются через его публичное поведение. |
 
-Для курса можно держаться такого правила: мокайте то, что находится за границей процесса или делает тест медленным,
-нестабильным и недетерминированным. Не мокайте собственную доменную модель ради "чистой изоляции": тогда тест начнет
-проверять договоренности между моками, а не бизнес-поведение.
+Чтобы воспроизвести отказ в оплате, задайте ответ шлюза через stub. Чтобы проверить отправку письма, запишите вызов через spy. Сохранение заказа в настоящей БД проверьте отдельно интеграционным тестом.
 :::
 
 ::: warning Мок - инструмент, а не цель
-Если тест проще и надежнее с настоящим объектом, используйте настоящий объект. Mock оправдан, когда без него тест
-становится медленным, недетерминированным или начинает трогать внешний мир.
+Если тест проще и надежнее с настоящим объектом, используйте настоящий объект. Mock пригодится, когда само взаимодействие входит в проверяемый контракт, например списание ровно одной суммы за заказ.
 :::
 
 ## Практический чеклист перед коммитом
@@ -1509,11 +1616,11 @@ Unit-тесты нужны не для красивого процента по�
 - unit-тест проверяет небольшую единицу поведения, а не обязательно один класс;
 - Arrange-Act-Assert делает тест читаемым;
 - output-based тесты обычно устойчивее interaction-based тестов;
-- DI и интерфейсы позволяют подставлять controlled dependencies в тестах;
+- через DI тест передаёт сервису фиксированный курс валют или регистратор отправленных писем;
 - stub, fake, spy и mock решают разные задачи;
 - хороший тест ловит реальные баги, быстро запускается, легко поддерживается и не ломается от рефакторинга;
-- сложный код с большим числом зависимостей сначала нужно разделить, а не героически покрывать моками;
-- неуправляемые внешние зависимости обычно мокают, собственную доменную модель обычно тестируют настоящей.
+- перед разделением сложного кода полезно зафиксировать важное поведение через доступную границу;
+- для ответа внешнего шлюза подходит stub, для наблюдаемого вызова — spy или mock, для доменного правила — настоящие объекты.
 
 На семинаре эти идеи обычно закрепляются через конкретный тестовый фреймворк: как создать тестовый проект, как запускать
 тесты автоматически и как постепенно довести тесты до CI/CD. Production-путь этих проверок вернется в
@@ -1529,6 +1636,10 @@ Unit-тесты нужны не для красивого процента по�
 - [Общие сведения о тестировании](https://habr.com/ru/articles/549054/) — более подробный обзор терминов и подходов.
 
 ### Unit-тестирование
+
+- [Martin Fowler, Mocks Aren’t Stubs](https://martinfowler.com/articles/mocksArentStubs.html) — один заказ и склад, два способа проверить выдачу товара.
+- [Vladimir Khorikov, When to Mock](https://enterprisecraftsmanship.com/posts/when-to-mock/) — как внешние потребители влияют на выбор границы теста.
+- [Go Wiki, TableDrivenTests](https://go.dev/wiki/TableDrivenTests) — как оформить вход и ожидаемый результат одной строкой таблицы.
 
 - [Знакомство с юнит-тестами](https://habr.com/ru/articles/169381/) — стартовая статья о назначении и устройстве unit-тестов.
 - [Принципы эффективного unit-тестирования](https://software-testing.ru/library/testing/testing-automation/3894-unit-tests1) — материал о качествах полезных unit-тестов.
@@ -1550,9 +1661,16 @@ Unit-тесты нужны не для красивого процента по�
 
 1. Выберите одно бизнес-правило заказа: скидка, минимальная сумма, запрет оплаты отмененного заказа или расчет доставки.
 2. Запишите один тест в формате Arrange-Act-Assert без привязки к конкретному фреймворку.
-3. Отдельно выпишите, какие зависимости в этом тесте будут настоящими объектами, какие fake, а какие mock.
+3. Для каждой зависимости выберите настоящий объект или двойник. Объясните, нужен ли вам известный ответ, журнал вызовов или упрощённая работающая реализация.
 4. Проверьте тест вопросом: "если я переименую private method или изменю порядок внутренних вызовов, тест должен упасть?"
 
 Если ответ на последний вопрос "да", тест, скорее всего, слишком сильно привязан к реализации. Вернитесь к разделу
 [Что именно проверяет тест](/lectures/03#что-именно-проверяет-тест) и переформулируйте assert через наблюдаемое
 поведение.
+
+::: details Как проверить своё решение
+Для правила скидки примеры «999 → 999» и «1000 → 900» различают две стороны порога. Замените
+`>=` на `>`: второй пример должен упасть. Верните правильное условие и вынесите расчёт в отдельную
+функцию: оба примера должны остаться зелёными. Для запрета оплаты отменённого заказа передайте
+сервису шлюз, записывающий списания. После отказа список списаний должен остаться пустым.
+:::
