@@ -1,4 +1,6 @@
 ---
+title: Лекция 7. Предметно-ориентированное проектирование
+order: 7
 recommends:
   - lecture: 1
     reason: "лекция продолжает идеи SOLID"
@@ -6,32 +8,21 @@ recommends:
     reason: "лекция продолжает идеи DI"
 ---
 
-# Лекция 7. Предметно-ориентированное программирование
+# Лекция 7. Предметно-ориентированное проектирование
 
-Domain-Driven Design, или **DDD**, - это подход к проектированию программ, в которых главная сложность находится не в
-фреймворке, базе данных или UI, а в правилах предметной области. В таких системах недостаточно "сохранить поля в
-таблицу": нужно выразить бизнес-смысл так, чтобы код помогал команде не нарушать правила.
+У Ады два завершённых заказа. Она оформила третий, но ещё не получила его. На сайте уже появилась скидка 10 %, а оператор поддержки видит 0 %. Чтобы исправить расхождение, сначала придётся договориться, какой заказ программа лояльности считает завершённым.
 
-Эта лекция не пытается заменить отдельный курс по DDD. Полный DDD включает стратегическое проектирование, карты
-контекстов, события, агрегаты, процесс работы с экспертами и много организационных практик. Здесь нас интересует
-практический минимум: как увидеть границы смысла, как назвать модель словами бизнеса и как написать доменные объекты,
-которые защищают свои инварианты.
+**Предметно-ориентированное проектирование** (*Domain-Driven Design*, DDD) строит программу вокруг модели, которую разработчики уточняют вместе со знатоками предметной области. В этой лекции проследим одну такую договорённость от разговора с экспертом до метода, теста и границы транзакции.
 
-::: tip Главная идея лекции
-DDD помогает выразить правила предметной области так, чтобы код не мог легко оказаться в недопустимом состоянии.
-:::
-
-::: tip Как работать с примерами
-Примеры даны на Kotlin, C#, Java и Go. В Kotlin там, где это полезно, есть две версии: короткая для чтения и отдельная
-запускаемая версия для Playground. В C#, Java и Go показан тот же дизайн в форме, естественной для языка.
+::: tip Как читать примеры
+Выберите Kotlin, C#, Java или Go. Короткие фрагменты показывают устройство модели. В запускаемых примерах Kotlin можно изменить входные данные и проверить, какое правило сработает.
 :::
 
 ## Сквозной сценарий
 
-Будем двигаться от обычного CRUD-сервиса лояльности. В первой версии есть таблица `customers`, поле `email`, поле
-`discountPercent` и сервис, который просто меняет значения. Потом появляются правила: email должен быть валиден, скидка
-не может быть отрицательной, VIP-статус зависит от истории заказов, а слово "клиент" в поддержке и продажах означает
-разные вещи. С этого момента "просто поля в таблице" перестают защищать бизнес.
+Начнём с обычной таблицы `customers`. В ней хранятся email, число завершённых заказов, статус и скидка. Эксперт программы лояльности уточняет правило. Оформление заказа само по себе ничего не меняет. Когда отдел продаж подтверждает завершение, Loyalty засчитывает заказ. Третий завершённый заказ даёт Silver и 10 %, десятый — Gold и 20 %. До третьего заказа действует Bronze и 0 %.
+
+В сквозном примере каждый завершённый заказ передаётся в модель ровно один раз. Это условие примера пригодится дальше, когда мы обсудим доставку событий.
 
 ```mermaid
 flowchart LR
@@ -44,12 +35,12 @@ flowchart LR
     Service --> Boundaries["Изоляция от инфраструктуры"]
 ```
 
-Эта лекция продолжает идеи [SOLID](/lectures/01#solid) и [DI](/lectures/02#dip-и-di), но меняет фокус. Раньше мы
-спрашивали, от каких классов зависит код. Теперь спрашиваем, выражает ли код смысл предметной области и может ли он сам
-защитить свои инварианты. Архитектурные границы, которые позволяют изолировать такую модель, подробно появятся в
+Раньше мы спрашивали, от каких классов зависит код. Теперь спрашиваем, выражает ли он смысл предметной области и какие правила модель сохраняет при каждом изменении. Такие правила называют **инвариантами**. Подробнее о зависимостях — в лекциях [о SOLID](/lectures/01#solid) и [о DI](/lectures/02#dip-и-di). Архитектурные границы, которые позволяют изолировать такую модель, подробно появятся в
 [Лекции 8](/lectures/08#ports-and-adapters).
 
-## Worked example: поле в таблице против доменного правила
+## Разбор на примере программы лояльности
+
+<a id="worked-example-поле-в-таблице-против-доменного-правила"></a>
 
 ### Ситуация
 
@@ -73,8 +64,7 @@ service будет "аккуратно" выставлять правильны�
 
 ### Почему это работает
 
-DDD переносит правило из "договоренности между слоями" в код, который невозможно обойти случайно. Модель не просто
-хранит данные, а защищает смысл предметной области.
+Теперь экран и выгрузка получают скидку из одного правила. Если у Ады два завершённых заказа, оба увидят 0 %. После регистрации третьего оба увидят 10 %. Прямой импорт в базу остаётся отдельным путём записи и тоже должен соблюдать это правило.
 
 ## Цели
 
@@ -88,16 +78,16 @@ DDD переносит правило из "договоренности меж�
 - объяснять bounded context и ubiquitous language;
 - понимать, почему доменная модель должна быть изолирована от инфраструктуры;
 - выбирать место для логики: value object, entity, domain service или application service;
-- видеть компромисс между инкапсуляцией, изоляцией и производительностью.
+- видеть компромисс между полнотой доменной модели, её изоляцией и стоимостью запросов.
 
 ## Зачем DDD
 
 Большинство приложений начинается одинаково: есть экран, форма, таблица в базе данных и несколько сервисов. Пока правила
 простые, такой подход кажется достаточным. Проблемы появляются позже: скидка зависит от статуса, статус зависит от
-истории заказов, email определяет принадлежность к компании, а разные отделы используют слово "клиент" в разных смыслах.
+истории заказов, у корпоративного адреса появляется собственное правило, а разные отделы используют слово "клиент" в разных смыслах.
 
 Если эти правила разложены по контроллерам, сервисам, хранимым процедурам и UI-валидации, разработчик не видит систему
-целиком. Чтобы понять, почему у клиента скидка 15%, приходится искать все места, где кто-то мог изменить поле
+целиком. Чтобы понять, почему у клиента скидка 10 %, приходится искать все места, где кто-то мог изменить поле
 `discount`.
 
 DDD нужен не для красивых диаграмм. Он нужен, чтобы сделать бизнес-правила видимыми и проверяемыми.
@@ -120,7 +110,7 @@ flowchart LR
 импортирует CSV или вызывает стандартный платежный шлюз, часто достаточно обычного процедурного или сервисного кода.
 DDD особенно полезен там, где бизнес отличается от конкурентов и где ошибка в правилах стоит дорого.
 
-## Стратегия И Тактика
+## Стратегия и тактика
 
 В DDD удобно разделять два уровня.
 
@@ -135,13 +125,11 @@ object, когда нужен domain service.
 | Стратегия | Где границы смысла?          | Sales, Support, Billing, Loyalty             |
 | Тактика   | Как выразить правила в коде? | `Email`, `Money`, `Customer`, `TransferService` |
 
-В расширенном DDD еще важны aggregates, aggregate roots, domain events, context mapping и event storming. В этой лекции
-мы упомянем aggregate только как термин: агрегат - группа связанных доменных объектов, у которой есть корневой объект и
-граница согласованности. Для текущей цели достаточно понять value object, entity, domain service и инварианты.
+Начнём со стратегии. Она подскажет, почему заказ может быть создан в Sales, хотя статус участника в Loyalty ещё прежний. Затем разберём, кто отвечает за изменение статуса и какие данные должны измениться вместе.
 
-## Ограниченный Контекст
+## Ограниченный контекст
 
-**Bounded context** - это граница, внутри которой модель и язык имеют один согласованный смысл. Один и тот же реальный
+**Ограниченный контекст** (*bounded context*) — граница, внутри которой модель и язык имеют один согласованный смысл. Один и тот же реальный
 объект может выглядеть по-разному в разных контекстах.
 
 Например, слово `Customer` кажется очевидным. Но в разных частях системы оно может означать разные вещи:
@@ -161,104 +149,85 @@ flowchart LR
     end
 
     subgraph Loyalty["Loyalty context"]
-      LoyaltyCustomer["Customer: loyalty member"]
+      Customer["Customer: loyalty member"]
     end
 
     SalesCustomer -. "same real person, different model" .- SupportCustomer
-    SupportCustomer -. "same id may be shared" .- LoyaltyCustomer
+    SupportCustomer -. "same id may be shared" .- Customer
 ```
 
 Плохое решение — создать один общий класс `Customer` и использовать его везде. Отдел продаж добавит `LTV`, поддержка —
-`LastTicketDate`, бухгалтерия — `TaxId`, маркетинг — `MarketingConsent`. Через несколько месяцев класс вырастет до 47
-полей и 12 зависимостей, а любое изменение будет затрагивать сразу несколько команд.
+`LastTicketDate`, бухгалтерия — `TaxId`, маркетинг — `MarketingConsent`. Теперь изменение правил поддержки придётся согласовывать даже с командами, которым обращения клиентов безразличны.
 
-Хорошее решение - разрешить разным контекстам иметь свои модели. Они могут ссылаться на один и тот же `CustomerId`, но
-должны явно договориться, кто этим идентификатором владеет, кто может его назначать и кто только читает.
+В нашем сценарии полезно разрешить разным контекстам иметь свои модели. Они могут ссылаться на один и тот же `CustomerId`, но
+должны явно договориться, кто этим идентификатором владеет, кто может его назначать и кто только читает. Например, Sales сообщает о завершении заказа с идентификатором покупателя, а Loyalty сопоставляет его с участником своей программы. Размер скидки вычисляет Loyalty. Обоим контекстам достаточно согласовать смысл сообщения и идентификаторов. Они могут даже жить в одном процессе.
 
 ::: warning Общая модель не всегда экономит код
 Повторить маленький тип в двух bounded context часто дешевле, чем держать один общий тип, который вынужден обслуживать
 несколько разных смыслов.
 :::
 
-## Core, Supporting, Generic Domain
+## Ядро и поддомены
 
-Не все части системы одинаково важны для бизнеса. DDD предлагает различать домены по их роли.
+<a id="core-supporting-generic-domain"></a>
 
-| Вид домена       | Смысл                              | Как проектировать                                      |
+Не все части системы одинаково важны для бизнеса. Поддомен — часть предметной области. Его роль зависит от задач организации. Ограниченный контекст, в свою очередь, задаёт границы конкретной модели этой работы.
+
+| Роль поддомена       | Смысл                              | Как проектировать                                      |
 |------------------|------------------------------------|--------------------------------------------------------|
 | Core domain      | То, что отличает бизнес            | Вкладывать максимум внимания, DDD особенно полезен     |
-| Supporting domain | Важен, но не уникален              | Проектировать аккуратно, без чрезмерной сложности      |
-| Generic domain   | Стандартная задача                 | Можно купить, взять готовую библиотеку или SaaS        |
+| Supporting subdomain | Важен, но не уникален              | Проектировать аккуратно, без чрезмерной сложности      |
+| Generic subdomain   | Стандартная задача                 | Можно купить, взять готовую библиотеку или SaaS        |
 
 Для интернет-магазина уникальная программа лояльности может быть core domain. Отправка email, хранение файлов и
-стандартная авторизация чаще являются generic domain. Внутренний каталог промокодов может быть supporting domain: он
+стандартная авторизация чаще являются generic subdomain. Внутренний каталог промокодов может быть supporting subdomain: он
 важен для работы, но не обязательно делает бизнес уникальным.
+
+В примере Эрика Эванса транспортная компания хочет надёжнее выполнять условия доставки. В ядро попадают маршрут и требования к доставке, а выставление счетов играет вспомогательную роль. Для сервиса выставления счетов приоритеты могли бы быть другими. [Эрик Эванс, пример грузоперевозок](https://hillside.net/plop/plop2002/final/DomainDrivenDesign_Excerpt_PLoP2002.pdf)
 
 Практическое следствие: богатую модель нужно в первую очередь строить там, где правила являются конкурентным преимуществом
 или источником риска. Не обязательно проектировать одинаково глубоко все модули.
 
-## Единый Язык
+## Единый язык
 
-**Ubiquitous language** - единый язык команды, кода и доменных экспертов. Это не просто словарь в Confluence. Слова из
+**Ubiquitous language** — единый язык разработчиков и экспертов внутри ограниченного контекста. Это не просто словарь в Confluence. Слова из
 бизнес-разговора должны попадать в требования, тесты, имена классов, методы и события.
 
-Если эксперт говорит "малооптовый клиент", код не должен внезапно называть его `SpecialCorporateUser`. Возможно, команда
-договорится на термин `WholesaleCustomer`, возможно - на другой термин. Важно, чтобы один смысл не расползался по системе
-под разными именами.
+В разговоре «клиент сделал заказ» звучит вполне понятно, пока команда не пытается посчитать скидку. Оформленный, оплаченный и завершённый заказы могут приходиться на разные дни. Мы спросили эксперта, какой из них засчитывается, и получили имя для операции.
 
-Рассмотрим фразу из медицинского домена:
-
-> Медсестры назначают вакцины от гриппа в стандартных дозах.
-
-Слабый код стирает смысл: непонятно, кто назначает, что назначает и почему количество именно такое. Код на едином языке
-повторяет фразу предметной области.
-
-::: multi-code "Единый язык в именах" {playground=off}
+::: multi-code "Какой заказ засчитывает Loyalty?" {playground=off}
 
 ```kotlin
-// Плохо: слова слишком общие.
-process(person, item, amount)
-
-// Лучше: код повторяет фразу доменного эксперта.
-nurse.prescribe(fluVaccine, Dose.standard())
+// Мы получили подтверждение завершения заказа.
+customer.registerCompletedOrder()
 ```
 
 ```csharp
-// Плохо: слова слишком общие.
-Process(person, item, amount);
-
-// Лучше: код повторяет фразу доменного эксперта.
-nurse.Prescribe(fluVaccine, Dose.Standard());
+customer.RegisterCompletedOrder();
 ```
 
 ```java
-// Плохо: слова слишком общие.
-process(person, item, amount);
-
-// Лучше: код повторяет фразу доменного эксперта.
-nurse.prescribe(fluVaccine, Dose.standard());
+customer.registerCompletedOrder();
 ```
 
 ```go
-// Плохо: слова слишком общие.
-Process(person, item, amount)
-
-// Лучше: код повторяет фразу доменного эксперта.
-nurse.Prescribe(fluVaccine, DoseStandard())
+err := customer.RegisterCompletedOrder()
 ```
 
 :::
 
-Единый язык живой. Его нужно чистить: переименовывать неточные классы, исправлять устаревшие термины, договариваться о
-словах между командами. Это особенно важно в core domain: там цена неправильного понимания выше.
+Теперь эксперт может проверить тест по названию: «Третий завершённый заказ даёт Silver». Если правила изменятся и статус станет зависеть от оплаты, название теста заставит нас обсудить и саму операцию.
 
-## Анемичная Модель
+Единый язык живой. Его нужно чистить: переименовывать неточные классы, исправлять устаревшие термины, договариваться о
+словах между командами. Это особенно важно в core domain: там ошибка в смысле слова меняет поведение продукта.
+
+## Анемичная модель
 
 Мы определили *где* границы (bounded context), *каким языком* говорим (ubiquitous language) и *что* является ядром бизнеса
 (core domain). Теперь — *как* внутри bounded context строить модель, которая сама защищает свои правила. Начнём с того,
 как выглядит модель, которая этого *не* делает.
 
-**Anemic domain model** - модель, в которой объект хранит данные, но не защищает свои правила. Обычно у нее публичные
+**Anemic domain model** — модель, в которой объект хранит данные, но не защищает свои правила. Обычно у нее публичные
 поля или сеттеры, а вся логика лежит во внешних сервисах.
 
 Такую модель легко создать из таблицы базы данных: взяли колонки, сделали поля, добавили getters/setters. Но объект
@@ -315,10 +284,10 @@ type Customer struct {
 
 Что здесь не так:
 
-- `email` - просто строка, туда можно записать `hello`;
-- `discountPercent` - любое число, включая `-10` и `150`;
+- `email` — просто строка, туда можно записать `hello`;
+- `discountPercent` — любое число, включая `-10` и `150`;
 - `status` можно назначить руками, не учитывая количество заказов;
-- `isEmployee` может разойтись с доменом email;
+- `isEmployee` смешивает два факта: адрес в домене компании и трудовые отношения. В нашей программе учитывается только первое;
 - любой сервис может поменять поле и забыть одно из правил.
 
 В такой системе нельзя посмотреть на `Customer` и понять, какие правила защищают клиента. Нужно искать все сервисы,
@@ -326,23 +295,23 @@ type Customer struct {
 
 ## Инварианты
 
-**Инвариант** - правило, которое должно оставаться истинным после создания объекта и после каждой операции над ним.
+**Инвариант** — правило, которое должно оставаться истинным после создания объекта и после каждой операции над ним.
 
-Примеры инвариантов:
+В нашей модели можно проверить следующие правила.
 
 - email должен быть валидным;
 - скидка находится в диапазоне от 0 до 100;
 - баланс счета не может стать отрицательным;
 - статус клиента соответствует количеству завершенных заказов;
-- employee определяется доменом корпоративной почты, а не отдельным флагом;
-- перевод денег возможен только в одной валюте.
+- признак корпоративного адреса вычисляется по доменной части email;
+- оба баланса после перевода сохраняют свои валюты, а сумма остатков при переводе внутри одной валюты сохраняется. Совпадение валют — предусловие операции.
 
 ```mermaid
 flowchart TD
     Method["Публичный метод"] --> Check["Проверка правил"]
     Check -->|ok| Change["Изменение состояния"]
     Check -->|error| Reject["Отказ изменить объект"]
-    Change --> Valid["Объект снова валиден"]
+    Change --> Valid["Инварианты сохранены"]
 ```
 
 Главный прием богатой модели: внешний код не должен менять важные поля напрямую. Он должен вызвать метод предметной
@@ -356,10 +325,9 @@ flowchart TD
 ## Value Object
 
 Email — не просто `String`. Money — не просто `Double`. Percentage — не просто `Int`. Когда вы храните скидку как `Int`,
-ничто не мешает поставить `-50` или `300`. Когда email — строка, `"hello"` проходит компиляцию. Value Object делает
-невалидное значение невозможным.
+ничто не мешает поставить `-50` или `300`. Когда email — строка, `"hello"` проходит компиляцию. Отдельный тип даёт проверке одно имя и одно место. Насколько надёжно она защищает модель, зависит от того, как язык позволяет создать значение.
 
-**Value object** - объект-значение. Он описывает значение в предметной области, не имеет собственной идентичности и
+**Value object** — объект-значение. Он описывает значение в предметной области, не имеет собственной идентичности и
 сравнивается по содержимому.
 
 Типичные признаки value object:
@@ -375,42 +343,46 @@ Email — не просто `String`. Money — не просто `Double`. Perc
 |----------|-------------------|---------------------------------------------------------|
 | `String` | `Email`           | Есть формат, локальная часть и доменная часть           |
 | `Int`    | `DiscountPercent` | Есть диапазон и смысл процента                          |
-| `Decimal` | `Money`          | Есть валюта, округление и запрет отрицательных значений |
+| `Decimal` | `Money`          | Сумма и валюта образуют значение. Правила знака и масштаба задаёт контекст |
 | `String` | `CustomerId`      | Нельзя перепутать с `OrderId`                           |
 
-Проблема, которую решает value object, часто называется **primitive obsession** или в контексте строк - "string typing".
+Проблема, которую решает value object, часто называется **primitive obsession** или в контексте строк — *stringly typed*.
 Если все является строкой, компилятор не помогает отличить email от id заказа, а доменные проверки легко забыть.
 
+Для учебной формы договоримся о небольшом формате. Слева от единственной `@` разрешим латинские буквы, цифры и символы `._+-`. Справа ждём две или более части из латинских букв и цифр, разделённые точкой. Регистр домена при создании приводим к нижнему, регистр левой части сохраняем. Это правило нашей программы. Доставку почты и принадлежность адреса человеку проверяют отдельным подтверждением.
+
 ::: only kotlin
-В Kotlin для маленьких доменных значений хорошо подходят `value class` и `data class`. `value class` снижает runtime-цену
-обертки, но все равно дает отдельный тип в API.
+`value class` даёт адресу отдельный тип. Фабрика проверяет текст и сохраняет адрес в принятой форме. JVM может упаковывать такие значения, например в обобщённой коллекции.
 :::
 
 ::: only csharp
-В C# value object часто делают через `record` или `readonly record struct`. Важно не только сгенерировать сравнение по
-значению, но и не пропустить валидацию в момент создания.
+Для `Email` используем ссылочный `record` со сравнением по значению. У структуры `default(Email)` мог бы обойти конструктор. Для процента нулевое значение подходит, поэтому здесь удобен `readonly record struct`.
 :::
 
 ::: only java
-В Java современный вариант для простых неизменяемых значений - `record`. Если нужна сложная валидация или инварианты,
-ее лучше держать в каноническом конструкторе или фабрике, а не размазывать по сервисам.
+Компактный конструктор `record` может проверить и нормализовать параметры до присваивания полям. Сгенерированное сравнение затем работает с сохранённым адресом.
 :::
 
 ::: only go
-В Go отдельный тип вроде `type Email string` уже защищает от случайной подстановки обычной строки в API. Если нужна
-валидация, чаще используют конструктор `NewEmail`, потому что сам alias не может запретить некорректное значение.
+Объявление `type Email string` создаёт именованный тип, однако явное преобразование допускает произвольную строку. Структура с неэкспортируемым полем ограничивает запись границами пакета. Значение `Email{}` всё равно возможно, поэтому при приёме адреса в модель проверяем, что он задан.
 :::
 
 ::: multi-code "Value Object: Email и DiscountPercent"
 
 ```kotlin
 @JvmInline
-value class Email(val value: String) {
-    init {
-        require(value.contains("@")) { "Invalid email: $value" }
-    }
+value class Email private constructor(val value: String) {
+    fun domain(): String = value.substringAfter('@')
 
-    fun domain(): String = value.substringAfter("@")
+    companion object {
+        private val format = Regex("[A-Za-z0-9._+-]+@[A-Za-z0-9]+([.][A-Za-z0-9]+)+")
+
+        fun parse(raw: String): Email {
+            require(format.matches(raw)) { "Invalid email" }
+            val domain = raw.substringAfter('@').lowercase()
+            return Email(raw.substringBefore('@') + "@" + domain)
+        }
+    }
 }
 
 @JvmInline
@@ -423,12 +395,18 @@ value class DiscountPercent(val value: Int) {
 
 ```kotlin playground
 @JvmInline
-value class Email(val value: String) {
-    init {
-        require(value.contains("@")) { "Invalid email: $value" }
-    }
+value class Email private constructor(val value: String) {
+    fun domain(): String = value.substringAfter('@')
 
-    fun domain(): String = value.substringAfter("@")
+    companion object {
+        private val format = Regex("[A-Za-z0-9._+-]+@[A-Za-z0-9]+([.][A-Za-z0-9]+)+")
+
+        fun parse(raw: String): Email {
+            require(format.matches(raw)) { "Invalid email" }
+            val domain = raw.substringAfter('@').lowercase()
+            return Email(raw.substringBefore('@') + "@" + domain)
+        }
+    }
 }
 
 @JvmInline
@@ -439,13 +417,18 @@ value class DiscountPercent(val value: Int) {
 }
 
 fun main() {
-    val email = Email("ada@company.com")
-    val discount = DiscountPercent(15)
+    val email = Email.parse("ada@company.com")
+    val discount = DiscountPercent(10)
 
     println("Email domain: ${email.domain()}")
     println("Discount: ${discount.value}%")
 
-    val invalidEmail = runCatching { Email("not-an-email") }
+    check(email == Email.parse("ada@COMPANY.COM"))
+    for (bad in listOf("@", "a@@b.com", "ada@", "a b@company.com")) {
+        check(runCatching { Email.parse(bad) }.isFailure)
+    }
+    check(DiscountPercent(0).value == 0 && DiscountPercent(100).value == 100)
+    val invalidEmail = runCatching { Email.parse("not-an-email") }
     val invalidDiscount = runCatching { DiscountPercent(150) }
 
     println("Invalid email accepted: ${invalidEmail.isSuccess}")
@@ -454,19 +437,19 @@ fun main() {
 ```
 
 ```csharp
-public readonly record struct Email
+public sealed record Email
 {
     public string Value { get; }
-
     public Email(string value)
     {
-        if (!value.Contains('@'))
-            throw new ArgumentException($"Invalid email: {value}");
-
-        Value = value;
+        if (value is null || !System.Text.RegularExpressions.Regex.IsMatch(
+                value, @"\A[A-Za-z0-9._+-]+@[A-Za-z0-9]+([.][A-Za-z0-9]+)+\z"))
+            throw new ArgumentException("Invalid email");
+        var at = value.IndexOf('@');
+        Value = value[..(at + 1)] + value[(at + 1)..].ToLowerInvariant();
     }
 
-    public string Domain() => Value.Split('@')[1];
+    public string Domain() => Value[(Value.IndexOf('@') + 1)..];
 }
 
 public readonly record struct DiscountPercent
@@ -486,9 +469,11 @@ public readonly record struct DiscountPercent
 ```java
 public record Email(String value) {
     public Email {
-        if (!value.contains("@")) {
-            throw new IllegalArgumentException("Invalid email: " + value);
+        if (value == null || !value.matches("[A-Za-z0-9._+-]+@[A-Za-z0-9]+([.][A-Za-z0-9]+)+")) {
+            throw new IllegalArgumentException("Invalid email");
         }
+        int at = value.indexOf('@');
+        value = value.substring(0, at + 1) + value.substring(at + 1).toLowerCase(java.util.Locale.ROOT);
     }
 
     public String domain() {
@@ -511,22 +496,26 @@ package main
 import (
     "fmt"
     "strings"
+    "regexp"
 )
 
 type Email struct {
     value string
 }
 
+var emailFormat = regexp.MustCompile(`^[A-Za-z0-9._+-]+@[A-Za-z0-9]+([.][A-Za-z0-9]+)+$`)
+
 func NewEmail(value string) (Email, error) {
-    if !strings.Contains(value, "@") {
-        return Email{}, fmt.Errorf("invalid email: %s", value)
+    if !emailFormat.MatchString(value) {
+        return Email{}, fmt.Errorf("invalid email")
     }
-    return Email{value: value}, nil
+    local, domain, _ := strings.Cut(value, "@")
+    return Email{value: local + "@" + strings.ToLower(domain)}, nil
 }
 
 func (email Email) Domain() string {
-    parts := strings.SplitN(email.value, "@", 2)
-    return parts[1]
+    _, domain, _ := strings.Cut(email.value, "@")
+    return domain
 }
 
 type DiscountPercent struct {
@@ -543,19 +532,13 @@ func NewDiscountPercent(value int) (DiscountPercent, error) {
 
 :::
 
-Value object не обязан быть большим. Часто это маленький тип на 10-20 строк, который убирает десятки повторных проверок
-по проекту.
-
-::: only go
-В Go нет конструкторов и private record-полей как в C# или Java, поэтому инвариант обычно защищают через private поля и
-функции `New...`. Если поле экспортировано, внешний код снова может обойти проверку.
-:::
+Попробуйте создать два адреса `ada@company.com` и `ada@COMPANY.COM`. Они равны по принятому правилу. Адрес `a@@b.com` и скидка 150 % будут отклонены при создании. Проценты 0 и 100 допустимы.
 
 ## Entity
 
-**Entity** - доменный объект с идентичностью. Его состояние может меняться, но он остается тем же объектом.
+**Entity** (сущность) — доменный объект с идентичностью. Его состояние может меняться, но он остается тем же объектом.
 
-`Email("ada@company.com")` и еще один `Email("ada@company.com")` - это одно и то же значение. А `Customer` с тем же
+`Email.parse("ada@company.com")` и еще один `Email.parse("ada@company.com")` — это одно и то же значение. А `Customer` с тем же
 `CustomerId`, но другим email, может быть тем же клиентом в другой момент времени.
 
 | Признак           | Value Object                         | Entity                                      |
@@ -569,12 +552,41 @@ Value object не обязан быть большим. Часто это мал
 Entity не должна превращаться в объект с публичными сеттерами. Если состояние меняется, изменение должно проходить через
 метод предметной области.
 
-::: multi-code "Entity: Customer с идентичностью"
+Ада сменила адрес. В Sales и в Loyalty это по-прежнему покупатель с тем же идентификатором внутри соответствующего контекста. Два экземпляра класса, загруженные в разные моменты, могут представлять одного клиента и содержать разные снимки его состояния. В коде ниже для такого сравнения берём `CustomerId` явно.
+
+`CustomerId` здесь оборачивает уже выданный идентификатор. Уникальность выдачи обеспечивает источник идентификаторов. Перейдём к поведению той же сущности.
+
+## Богатая доменная модель
+
+**Rich domain model** — модель, где данные и операции, защищающие эти данные, находятся рядом. Это не значит, что вся
+логика обязана быть внутри одного класса. Это значит, что изменение состояния не должно происходить в обход объекта,
+который владеет этим состоянием.
+
+```mermaid
+flowchart LR
+    Request["Завершён заказ"] --> App["Прикладной сервис"]
+    App -->|загружает и сохраняет| Repo["Репозиторий клиентов"]
+    App -->|регистрирует завершение| Customer["Customer"]
+    Customer --> Count["Число завершений"]
+    Count --> Status["Статус"]
+    Status --> Discount["Скидка"]
+```
+
+Переход от анемичной модели к богатой обычно выглядит так:
+
+| Было                         | Стало                                                |
+|------------------------------|------------------------------------------------------|
+| `customer.discount = 150`    | `DiscountPercent` не создастся                       |
+| `customer.status = "Gold"`   | `customer.registerCompletedOrder()` сам пересчитает статус    |
+| `service` меняет поля        | `service` вызывает доменный метод                    |
+| `isEmployee` хранится отдельно | Признак корпоративной почты вычисляется по `Email.domain()`             |
+| `email` — строка             | `Email` валидирует формат и предоставляет `domain()` |
+
+После двух завершений у Ады Bronze. Третье меняет вычисляемый статус на Silver. Данные заказа и список покупок для этого не нужны.
+
+::: multi-code "Богатая модель: заказ меняет статус клиента"
 
 ```kotlin
-@JvmInline
-value class CustomerId(val value: String)
-
 class Customer(
     val id: CustomerId,
     val email: Email
@@ -585,8 +597,11 @@ class Customer(
     val status: CustomerStatus
         get() = CustomerStatus.fromOrders(completedOrders)
 
-    fun registerOrder() {
-        completedOrders += 1
+    val discount: DiscountPercent
+        get() = DiscountPercent(status.discountPercent)
+
+    fun registerCompletedOrder() {
+        completedOrders = Math.incrementExact(completedOrders)
     }
 }
 ```
@@ -596,9 +611,24 @@ class Customer(
 value class CustomerId(val value: String)
 
 @JvmInline
-value class Email(val value: String) {
+value class Email private constructor(val value: String) {
+    fun domain(): String = value.substringAfter('@')
+
+    companion object {
+        private val format = Regex("[A-Za-z0-9._+-]+@[A-Za-z0-9]+([.][A-Za-z0-9]+)+")
+
+        fun parse(raw: String): Email {
+            require(format.matches(raw)) { "Invalid email" }
+            val domain = raw.substringAfter('@').lowercase()
+            return Email(raw.substringBefore('@') + "@" + domain)
+        }
+    }
+}
+
+@JvmInline
+value class DiscountPercent(val value: Int) {
     init {
-        require(value.contains("@")) { "Invalid email: $value" }
+        require(value in 0..100) { "Discount must be from 0 to 100" }
     }
 }
 
@@ -626,35 +656,38 @@ class Customer(
     val status: CustomerStatus
         get() = CustomerStatus.fromOrders(completedOrders)
 
-    val discountPercent: Int
-        get() = status.discountPercent
+    val discount: DiscountPercent
+        get() = DiscountPercent(status.discountPercent)
 
-    fun registerOrder() {
-        completedOrders += 1
+    val hasCorporateEmail: Boolean
+        get() = email.domain() == "company.com"
+
+    fun registerCompletedOrder() {
+        completedOrders = Math.incrementExact(completedOrders)
     }
 }
 
 fun main() {
-    val customer = Customer(CustomerId("c-1"), Email("ada@example.com"))
+    val customer = Customer(CustomerId("c-7"), Email.parse("ada@company.com"))
 
-    repeat(4) { customer.registerOrder() }
-
-    println("Customer id: ${customer.id.value}")
-    println("Orders: ${customer.completedOrders}")
-    println("Status: ${customer.status}")
-    println("Discount: ${customer.discountPercent}%")
+    println("${customer.status}: ${customer.discount.value}%")
+    repeat(2) { customer.registerCompletedOrder() }
+    check(customer.status == CustomerStatus.Bronze && customer.discount.value == 0)
+    customer.registerCompletedOrder()
+    check(customer.status == CustomerStatus.Silver && customer.discount.value == 10)
+    println("${customer.status}: ${customer.discount.value}%")
+    repeat(6) { customer.registerCompletedOrder() }
+    check(customer.status == CustomerStatus.Silver)
+    customer.registerCompletedOrder()
+    check(customer.status == CustomerStatus.Gold && customer.discount.value == 20)
+    println("${customer.status}: ${customer.discount.value}%")
+    println("Corporate email: ${customer.hasCorporateEmail}")
 }
 ```
 
 ```csharp
 public readonly record struct CustomerId(string Value);
-
-public enum CustomerStatus
-{
-    Bronze,
-    Silver,
-    Gold
-}
+public enum CustomerStatus { Bronze, Silver, Gold }
 
 public sealed class Customer
 {
@@ -669,22 +702,24 @@ public sealed class Customer
         _ => CustomerStatus.Bronze
     };
 
-    public int DiscountPercent => Status switch
+    public DiscountPercent Discount => new(Status switch
     {
         CustomerStatus.Gold => 20,
         CustomerStatus.Silver => 10,
         _ => 0
-    };
+    });
+
+    public bool HasCorporateEmail => Email.Domain() == "company.com";
 
     public Customer(CustomerId id, Email email)
     {
         Id = id;
-        Email = email;
+        Email = email ?? throw new ArgumentNullException(nameof(email));
     }
 
-    public void RegisterOrder()
+    public void RegisterCompletedOrder()
     {
-        CompletedOrders++;
+        CompletedOrders = checked(CompletedOrders + 1);
     }
 }
 ```
@@ -722,11 +757,7 @@ public final class Customer {
 
     public Customer(CustomerId id, Email email) {
         this.id = id;
-        this.email = email;
-    }
-
-    public CustomerId id() {
-        return id;
+        this.email = java.util.Objects.requireNonNull(email);
     }
 
     public int completedOrders() {
@@ -737,13 +768,22 @@ public final class Customer {
         return CustomerStatus.fromOrders(completedOrders);
     }
 
-    public void registerOrder() {
-        completedOrders++;
+    public DiscountPercent discount() {
+        return new DiscountPercent(status().discountPercent());
+    }
+
+    public boolean hasCorporateEmail() {
+        return email.domain().equals("company.com");
+    }
+
+    public void registerCompletedOrder() {
+        completedOrders = Math.incrementExact(completedOrders);
     }
 }
 ```
 
 ```go
+// В этом фрагменте используются пакеты fmt и math.
 type CustomerID string
 
 type CustomerStatus string
@@ -760,12 +800,19 @@ type Customer struct {
     completedOrders int
 }
 
-func NewCustomer(id CustomerID, email Email) Customer {
-    return Customer{id: id, email: email}
+func NewCustomer(id CustomerID, email Email) (*Customer, error) {
+    if email.value == "" {
+        return nil, fmt.Errorf("email is required")
+    }
+    return &Customer{id: id, email: email}, nil
 }
 
-func (customer *Customer) RegisterOrder() {
+func (customer *Customer) RegisterCompletedOrder() error {
+    if customer.email.value == "" || customer.completedOrders == math.MaxInt {
+        return fmt.Errorf("invalid customer or order count limit reached")
+    }
     customer.completedOrders++
+    return nil
 }
 
 func (customer Customer) Status() CustomerStatus {
@@ -779,231 +826,7 @@ func (customer Customer) Status() CustomerStatus {
     }
 }
 
-func (customer Customer) CompletedOrders() int {
-    return customer.completedOrders
-}
-```
-
-:::
-
-У entity есть жизненный цикл. Клиент создается, меняет email, делает заказы, получает новый статус. Но все эти изменения
-должны проходить через доменные операции, иначе объект снова становится анемичным.
-
-## Богатая Доменная Модель
-
-**Rich domain model** - модель, где данные и операции, защищающие эти данные, находятся рядом. Это не значит, что вся
-логика обязана быть внутри одного класса. Это значит, что изменение состояния не должно происходить в обход объекта,
-который владеет этим состоянием.
-
-```mermaid
-flowchart LR
-    subgraph Anemic["Анемичная модель"]
-        AC[Controller] --> AS[Service] --> AE["entity.setField()"] --> AR[Repository]
-    end
-```
-
-```mermaid
-flowchart LR
-    subgraph Rich["Богатая модель"]
-        RC[Controller] --> RS[AppService] --> RE["entity.doAction()"] --> RR[Repository]
-    end
-```
-
-Переход от анемичной модели к богатой обычно выглядит так:
-
-| Было                         | Стало                                                |
-|------------------------------|------------------------------------------------------|
-| `customer.discount = 150`    | `DiscountPercent` не создастся                       |
-| `customer.status = "Gold"`   | `customer.registerOrder()` сам пересчитает статус    |
-| `service` меняет поля        | `service` вызывает доменный метод                    |
-| `isEmployee` хранится отдельно | Вычисляется из `Email` и `CompanyDomain`             |
-| `email` - строка             | `Email` валидирует формат и предоставляет `domain()` |
-
-::: multi-code "Богатая модель: заказ меняет статус клиента"
-
-```kotlin
-class LoyaltyCustomer(
-    val id: CustomerId,
-    val email: Email
-) {
-    var completedOrders: Int = 0
-        private set
-
-    val status: CustomerStatus
-        get() = CustomerStatus.fromOrders(completedOrders)
-
-    val discount: DiscountPercent
-        get() = DiscountPercent(status.discountPercent)
-
-    fun registerCompletedOrder() {
-        completedOrders += 1
-    }
-}
-```
-
-```kotlin playground
-@JvmInline
-value class CustomerId(val value: String)
-
-@JvmInline
-value class Email(val value: String) {
-    init {
-        require(value.contains("@")) { "Invalid email: $value" }
-    }
-
-    fun domain(): String = value.substringAfter("@")
-}
-
-@JvmInline
-value class DiscountPercent(val value: Int) {
-    init {
-        require(value in 0..100) { "Discount must be from 0 to 100" }
-    }
-}
-
-enum class CustomerStatus(val discountPercent: Int) {
-    Bronze(0),
-    Silver(10),
-    Gold(20);
-
-    companion object {
-        fun fromOrders(orders: Int): CustomerStatus = when {
-            orders >= 10 -> Gold
-            orders >= 3 -> Silver
-            else -> Bronze
-        }
-    }
-}
-
-class LoyaltyCustomer(
-    val id: CustomerId,
-    val email: Email
-) {
-    var completedOrders: Int = 0
-        private set
-
-    val status: CustomerStatus
-        get() = CustomerStatus.fromOrders(completedOrders)
-
-    val discount: DiscountPercent
-        get() = DiscountPercent(status.discountPercent)
-
-    val isEmployee: Boolean
-        get() = email.domain() == "company.com"
-
-    fun registerCompletedOrder() {
-        completedOrders += 1
-    }
-}
-
-fun main() {
-    val customer = LoyaltyCustomer(CustomerId("c-7"), Email("ada@company.com"))
-
-    println("${customer.status}: ${customer.discount.value}%")
-    repeat(3) { customer.registerCompletedOrder() }
-    println("${customer.status}: ${customer.discount.value}%")
-    repeat(7) { customer.registerCompletedOrder() }
-    println("${customer.status}: ${customer.discount.value}%")
-    println("Employee: ${customer.isEmployee}")
-}
-```
-
-```csharp
-public sealed class LoyaltyCustomer
-{
-    public CustomerId Id { get; }
-    public Email Email { get; }
-    public int CompletedOrders { get; private set; }
-
-    public CustomerStatus Status => CompletedOrders switch
-    {
-        >= 10 => CustomerStatus.Gold,
-        >= 3 => CustomerStatus.Silver,
-        _ => CustomerStatus.Bronze
-    };
-
-    public DiscountPercent Discount => new(Status switch
-    {
-        CustomerStatus.Gold => 20,
-        CustomerStatus.Silver => 10,
-        _ => 0
-    });
-
-    public bool IsEmployee => Email.Domain() == "company.com";
-
-    public LoyaltyCustomer(CustomerId id, Email email)
-    {
-        Id = id;
-        Email = email;
-    }
-
-    public void RegisterCompletedOrder()
-    {
-        CompletedOrders++;
-    }
-}
-```
-
-```java
-public final class LoyaltyCustomer {
-    private final CustomerId id;
-    private final Email email;
-    private int completedOrders;
-
-    public LoyaltyCustomer(CustomerId id, Email email) {
-        this.id = id;
-        this.email = email;
-    }
-
-    public int completedOrders() {
-        return completedOrders;
-    }
-
-    public CustomerStatus status() {
-        return CustomerStatus.fromOrders(completedOrders);
-    }
-
-    public DiscountPercent discount() {
-        return new DiscountPercent(status().discountPercent());
-    }
-
-    public boolean isEmployee() {
-        return email.domain().equals("company.com");
-    }
-
-    public void registerCompletedOrder() {
-        completedOrders++;
-    }
-}
-```
-
-```go
-type LoyaltyCustomer struct {
-    id              CustomerID
-    email           Email
-    completedOrders int
-}
-
-func NewLoyaltyCustomer(id CustomerID, email Email) LoyaltyCustomer {
-    return LoyaltyCustomer{id: id, email: email}
-}
-
-func (customer *LoyaltyCustomer) RegisterCompletedOrder() {
-    customer.completedOrders++
-}
-
-func (customer LoyaltyCustomer) Status() CustomerStatus {
-    switch {
-    case customer.completedOrders >= 10:
-        return Gold
-    case customer.completedOrders >= 3:
-        return Silver
-    default:
-        return Bronze
-    }
-}
-
-func (customer LoyaltyCustomer) Discount() (DiscountPercent, error) {
+func (customer Customer) Discount() (DiscountPercent, error) {
     switch customer.Status() {
     case Gold:
         return NewDiscountPercent(20)
@@ -1014,7 +837,7 @@ func (customer LoyaltyCustomer) Discount() (DiscountPercent, error) {
     }
 }
 
-func (customer LoyaltyCustomer) IsEmployee() bool {
+func (customer Customer) HasCorporateEmail() bool {
     return customer.email.Domain() == "company.com"
 }
 ```
@@ -1025,80 +848,50 @@ func (customer LoyaltyCustomer) IsEmployee() bool {
 скидка являются следствием количества завершенных заказов. Это и есть защита инварианта.
 
 ::: only kotlin
-Kotlin `sealed interface` идеально подходит для моделирования состояний агрегата — *make illegal states
-unrepresentable*:
-
-```kotlin
-sealed interface OrderState {
-    data class Draft(val items: List<OrderItem>) : OrderState
-    data class Confirmed(val items: List<OrderItem>, val confirmedAt: Instant) : OrderState
-    data class Shipped(val trackingId: String) : OrderState
-    data object Cancelled : OrderState
-}
-```
-
-Компилятор заставит обработать все варианты в `when`, а невалидный переход (например, `Cancelled → Shipped`) просто не
-будет иметь ветки.
+Для состояний с разными данными может пригодиться `sealed interface`. Например, у отправленного заказа есть трек-номер, у черновика — позиции. Исчерпывающий `when` помогает обработать все формы состояния. Допустимость перехода проверяет операция заказа: попытка отправить отменённый заказ должна завершиться отказом.
 :::
 
 ::: only go
-В Go нет конструкторов — структурные литералы обходят валидацию. `NewEmail()` — единственная защита инварианта Value
-Object. Это требует дисциплины, но делает точку валидации явной и легко находимой через grep.
+Метод регистрации получает указатель на `Customer`, чтобы обновить ту же сущность. Фабрика возвращает указатель, а метод проверяет и пустой экземпляр, который Go разрешает создать без фабрики.
 :::
 
-## Где Должна Жить Логика
+## Где должна жить логика
 
 Не вся логика должна быть внутри entity. Важно выбрать правильный уровень.
 
 | Логика                         | Где держать                         | Почему                                      |
 |--------------------------------|-------------------------------------|---------------------------------------------|
-| Проверка email                 | `Email` value object                | Это правило значения                        |
+| Проверка формата email         | `Email` value object                | Это правило значения                        |
 | Добавление заказа клиенту      | `Customer` entity                   | Операция меняет состояние клиента           |
-| Перевод между двумя счетами    | Domain service                      | Операция затрагивает несколько entity       |
-| Загрузка клиента из БД         | Repository/application layer        | Это инфраструктура                          |
-| Проверка прав пользователя     | Application service                 | Это сценарий приложения, а не свойство entity |
+| Перевод между двумя счетами | Доменный сервис | Операция имеет предметное имя и не принадлежит одному счёту |
+| Загрузка клиента из БД | Прикладной сервис вызывает репозиторий | Реализация доступа к БД живёт в инфраструктуре                          |
+| Проверка доступа к сценарию | Прикладной сервис | Предметные ограничения, например лимит перевода, по-прежнему проверяет домен |
 | Отрисовка ошибки               | UI/controller                       | Это представление                           |
 
-**Application service** координирует сценарий приложения: загрузить данные, проверить права, открыть транзакцию,
+**Прикладной сервис** (*application service*) координирует сценарий приложения: загрузить данные, проверить права, открыть транзакцию,
 вызвать доменную операцию, сохранить результат. Он не должен решать, какая скидка положена клиенту.
 
-```kotlin
-// ❌ Логика в AppService — решает за entity
-class PromoteService(private val repo: CustomerRepository) {
-    fun promote(id: CustomerId) {
-        val c = repo.findById(id)
-        if (c.completedOrders >= 10) c.status = "Gold"   // бизнес-правило снаружи
-        if (c.status == "Gold") c.discountPercent = 15    // ещё одно
-        repo.save(c)
-    }
-}
+Представьте два обработчика. Первый принимает HTTP-запросы, второй обрабатывает данные при импорте. Если каждый из них решает, когда поставить Gold, очередное изменение порога придётся вносить дважды. В рабочем варианте оба вызывают один сценарий. Репозиторий здесь означает интерфейс загрузки и сохранения клиента. Фрагмент показывает тело операции внутри транзакции.
 
-// ✅ Логика в entity — AppService только координирует
-class PromoteService(private val repo: CustomerRepository) {
-    fun onOrderCompleted(id: CustomerId) {
-        val c = repo.findById(id)
-        c.registerCompletedOrder()   // entity сама решает статус и скидку
-        repo.save(c)
-    }
+```kotlin
+fun onOrderCompleted(id: CustomerId) {
+    val customer = repo.findById(id)
+    customer.registerCompletedOrder()
+    repo.save(customer)
 }
 ```
 
-**Domain service** выражает доменную операцию, которая не принадлежит естественно одному entity или value object.
+Если два заказа могут завершиться одновременно, сохранение должно учитывать версию клиента или блокировать его запись. Иначе оба обработчика могут прочитать 2 и записать 3, хотя Ада завершила уже четыре заказа.
+
+**Доменный сервис** (*domain service*) выражает доменную операцию, которую по смыслу нельзя отнести к одной сущности или одному объекту-значению.
 
 ## Domain Service
 
-Не вся бизнес-логика помещается в одну entity. Перевод денег между двумя счетами — чья ответственность? Ни одного из
-счетов. Для таких операций существует domain service.
+В программе лояльности у изменения статуса есть естественный владелец — участник. У перевода между счетами два участника с разными ролями. Назовём операцию `transfer` и отдадим её доменному сервису. Счёт отвечает за свой баланс, сервис — за результат перевода целиком.
 
-Классический пример - перевод денег. Есть счет отправителя, счет получателя и сумма. Если поместить метод перевода в
-счет отправителя, он начнет слишком много знать о получателе. Если поместить в счет получателя, проблема симметрична.
-Поэтому сама координация может жить в domain service.
+Договоримся о правилах примера. Поддерживаются USD и EUR. Число в `Money` — целое количество центов: `Money(100, "USD")` означает один доллар. Нулевой баланс допустим. Перевод возможен между разными счетами в одной валюте на положительную сумму в пределах остатка. Обмена валют и комиссий здесь нет.
 
-При этом инварианты баланса остаются внутри `Account`: нельзя списать больше, чем есть, и нельзя смешивать валюты.
-Перевод должен сохранять и общий инвариант: либо изменились оба счёта, либо ни один. Если зачисление
-завершится ошибкой после списания, сервис должен восстановить оба исходных баланса. В учебном примере
-ниже для этого сохраняются снимки значений `Money`; служебный метод восстановления
-имеет ограниченную видимость.
+Пусть у отправителя 100 центов USD, а у получателя 25 центов EUR. После успешного списания 40 центов получатель откажет в зачислении. Сервис хранит исходные значения обоих балансов и при отказе восстанавливает их. Для двух счетов USD результат успешного перевода был бы 60 и 65 центов.
 
 ```mermaid
 flowchart LR
@@ -1114,6 +907,7 @@ flowchart LR
 ```kotlin
 class MoneyTransferService {
     fun transfer(from: Account, to: Account, amount: Money) {
+        require(from.id != to.id && amount.amount > 0) { "Invalid transfer" }
         val fromBefore = from.balance()
         val toBefore = to.balance()
         try {
@@ -1132,7 +926,7 @@ class MoneyTransferService {
 data class Money(val amount: Int, val currency: String) {
     init {
         require(amount >= 0) { "Money cannot be negative" }
-        require(currency.isNotBlank()) { "Currency is required" }
+        require(currency == "USD" || currency == "EUR") { "Unsupported currency" }
     }
 }
 
@@ -1156,12 +950,13 @@ class Account(
 
     fun deposit(amount: Money) {
         require(amount.currency == balance.currency) { "Currency mismatch" }
-        balance = Money(balance.amount + amount.amount, balance.currency)
+        balance = Money(Math.addExact(balance.amount, amount.amount), balance.currency)
     }
 }
 
 class MoneyTransferService {
     fun transfer(from: Account, to: Account, amount: Money) {
+        require(from.id != to.id && amount.amount > 0) { "Invalid transfer" }
         val fromBefore = from.balance()
         val toBefore = to.balance()
         try {
@@ -1182,6 +977,9 @@ fun main() {
 
     service.transfer(sender, recipient, Money(40, "USD"))
 
+    check(sender.balance() == Money(60, "USD") && recipient.balance() == Money(65, "USD"))
+    check(runCatching { service.transfer(sender, sender, Money(1, "USD")) }.isFailure)
+    check(runCatching { service.transfer(sender, recipient, Money(0, "USD")) }.isFailure)
     println("Sender: ${sender.balance().amount}")
     println("Recipient: ${recipient.balance().amount}")
 
@@ -1214,17 +1012,17 @@ fun main() {
 ```
 
 ```csharp
-public readonly record struct Money
+public sealed record Money
 {
-    public decimal Amount { get; }
+    public int Amount { get; }
     public string Currency { get; }
 
-    public Money(decimal amount, string currency)
+    public Money(int amount, string currency)
     {
         if (amount < 0)
             throw new ArgumentOutOfRangeException(nameof(amount));
-        if (string.IsNullOrWhiteSpace(currency))
-            throw new ArgumentException("Currency is required");
+        if (currency != "USD" && currency != "EUR")
+            throw new ArgumentException("Unsupported currency");
 
         Amount = amount;
         Currency = currency;
@@ -1239,7 +1037,7 @@ public sealed class Account
     public Account(string id, Money initialBalance)
     {
         Id = id;
-        Balance = initialBalance;
+        Balance = initialBalance ?? throw new ArgumentNullException(nameof(initialBalance));
     }
 
     internal void RestoreBalance(Money snapshot)
@@ -1259,7 +1057,7 @@ public sealed class Account
     public void Deposit(Money amount)
     {
         EnsureSameCurrency(amount);
-        Balance = new Money(Balance.Amount + amount.Amount, Balance.Currency);
+        Balance = new Money(checked(Balance.Amount + amount.Amount), Balance.Currency);
     }
 
     private void EnsureSameCurrency(Money amount)
@@ -1273,6 +1071,8 @@ public sealed class MoneyTransferService
 {
     public void Transfer(Account from, Account to, Money amount)
     {
+        if (from.Id == to.Id || amount.Amount <= 0)
+            throw new ArgumentException("Invalid transfer");
         var fromBefore = from.Balance;
         var toBefore = to.Balance;
         try
@@ -1291,15 +1091,13 @@ public sealed class MoneyTransferService
 ```
 
 ```java
-import java.math.BigDecimal;
-
-public record Money(BigDecimal amount, String currency) {
+public record Money(int amount, String currency) {
     public Money {
-        if (amount.signum() < 0) {
+        if (amount < 0) {
             throw new IllegalArgumentException("Money cannot be negative");
         }
-        if (currency == null || currency.isBlank()) {
-            throw new IllegalArgumentException("Currency is required");
+        if (!"USD".equals(currency) && !"EUR".equals(currency)) {
+            throw new IllegalArgumentException("Unsupported currency");
         }
     }
 }
@@ -1310,8 +1108,10 @@ public final class Account {
 
     public Account(String id, Money initialBalance) {
         this.id = id;
-        this.balance = initialBalance;
+        this.balance = java.util.Objects.requireNonNull(initialBalance);
     }
+
+    public String id() { return id; }
 
     public Money balance() {
         return balance;
@@ -1323,15 +1123,15 @@ public final class Account {
 
     public void withdraw(Money amount) {
         ensureSameCurrency(amount);
-        if (balance.amount().compareTo(amount.amount()) < 0) {
+        if (balance.amount() < amount.amount()) {
             throw new IllegalStateException("Not enough money");
         }
-        balance = new Money(balance.amount().subtract(amount.amount()), balance.currency());
+        balance = new Money(balance.amount() - amount.amount(), balance.currency());
     }
 
     public void deposit(Money amount) {
         ensureSameCurrency(amount);
-        balance = new Money(balance.amount().add(amount.amount()), balance.currency());
+        balance = new Money(Math.addExact(balance.amount(), amount.amount()), balance.currency());
     }
 
     private void ensureSameCurrency(Money amount) {
@@ -1343,6 +1143,9 @@ public final class Account {
 
 public final class MoneyTransferService {
     public void transfer(Account from, Account to, Money amount) {
+        if (java.util.Objects.equals(from.id(), to.id()) || amount.amount() <= 0) {
+            throw new IllegalArgumentException("Invalid transfer");
+        }
         Money fromBefore = from.balance();
         Money toBefore = to.balance();
         try {
@@ -1360,21 +1163,24 @@ public final class MoneyTransferService {
 ```go
 package main
 
-import "fmt"
+import (
+    "fmt"
+    "math"
+)
 
 type Money struct {
-    Amount   int
-    Currency string
+    amount   int32
+    currency string
 }
 
-func NewMoney(amount int, currency string) (Money, error) {
+func NewMoney(amount int32, currency string) (Money, error) {
     if amount < 0 {
         return Money{}, fmt.Errorf("money cannot be negative")
     }
-    if currency == "" {
-        return Money{}, fmt.Errorf("currency is required")
+    if currency != "USD" && currency != "EUR" {
+        return Money{}, fmt.Errorf("unsupported currency")
     }
-    return Money{Amount: amount, Currency: currency}, nil
+    return Money{amount: amount, currency: currency}, nil
 }
 
 type Account struct {
@@ -1382,8 +1188,11 @@ type Account struct {
     balance Money
 }
 
-func NewAccount(id string, initialBalance Money) Account {
-    return Account{id: id, balance: initialBalance}
+func NewAccount(id string, initialBalance Money) (*Account, error) {
+    if initialBalance.currency == "" {
+        return nil, fmt.Errorf("initial balance currency is required")
+    }
+    return &Account{id: id, balance: initialBalance}, nil
 }
 
 func (account *Account) restoreBalance(snapshot Money) {
@@ -1391,21 +1200,24 @@ func (account *Account) restoreBalance(snapshot Money) {
 }
 
 func (account *Account) Withdraw(amount Money) error {
-    if amount.Currency != account.balance.Currency {
+    if amount.currency == "" || amount.currency != account.balance.currency {
         return fmt.Errorf("currency mismatch")
     }
-    if account.balance.Amount < amount.Amount {
+    if account.balance.amount < amount.amount {
         return fmt.Errorf("not enough money")
     }
-    account.balance.Amount -= amount.Amount
+    account.balance.amount -= amount.amount
     return nil
 }
 
 func (account *Account) Deposit(amount Money) error {
-    if amount.Currency != account.balance.Currency {
+    if amount.currency == "" || amount.currency != account.balance.currency {
         return fmt.Errorf("currency mismatch")
     }
-    nextBalance, err := NewMoney(account.balance.Amount + amount.Amount, account.balance.Currency)
+    if amount.amount > math.MaxInt32 - account.balance.amount {
+        return fmt.Errorf("recipient balance overflow")
+    }
+    nextBalance, err := NewMoney(account.balance.amount + amount.amount, account.balance.currency)
     if err != nil {
         return err
     }
@@ -1416,6 +1228,9 @@ func (account *Account) Deposit(amount Money) error {
 type MoneyTransferService struct{}
 
 func (service MoneyTransferService) Transfer(from *Account, to *Account, amount Money) error {
+    if from == nil || to == nil || from.id == to.id || amount.amount <= 0 {
+        return fmt.Errorf("invalid transfer")
+    }
     fromBefore, toBefore := from.balance, to.balance
     if err := from.Withdraw(amount); err != nil {
         return err
@@ -1431,79 +1246,71 @@ func (service MoneyTransferService) Transfer(from *Account, to *Account, amount 
 
 :::
 
-Domain service не должен становиться "богатым сервисом", который забирает у entity все правила. Его роль - собрать
-несколько доменных объектов в одну операцию, сохранив инварианты внутри объектов.
+Запустите пример. При нехватке средств отказ происходит до списания. При несовпадении валюты получателя с валютой перевода и при переполнении баланса получателя — после списания. Во всех трёх случаях проверьте **оба** остатка. Суммировать остатки в разных валютах нельзя.
 
-Здесь откат работает для последовательного выполнения в памяти: восстановление снимка — простое присваивание
-без новых проверок и побочных эффектов. Это не замена транзакции хранилища: при работе с БД application service
-должен выполнять загрузку и сохранение обоих счетов в одной транзакции с нужной изоляцией. Иначе параллельный
-перевод или сбой процесса может нарушить согласованность, даже если исключения перехватываются.
+В последовательном примере в памяти деньги — неизменяемые значения, а восстановление снимка сводится к присваиванию. При параллельном доступе старый снимок мог бы затереть успешную чужую запись. При хранении обоих счетов в одной БД прикладной сервис открывает транзакцию, защищает обе записи от конкурирующего изменения (например, блокирует их в устойчивом порядке), загружает балансы, вызывает доменную операцию и сохраняет оба результата. При ошибке вся транзакция откатывается. [Пример перевода в документации PostgreSQL](https://www.postgresql.org/docs/current/tutorial-transactions.html)
 
-### Агрегатный корень
+## Агрегат и его корень
 
-Aggregate root — единственная точка входа к группе связанных объектов. Внешний код не работает с дочерними entity
-напрямую — только через корень, который гарантирует согласованность:
+<a id="агрегатный-корень"></a>
+
+Вернёмся в Sales. Заказ в USD может содержать несколько позиций. Количество в каждой положительно, все цены выражены в валюте заказа. При добавлении позиции оба условия должны выполняться сразу. Это и есть подсказка для выбора границы.
+
+**Агрегат** (*aggregate*) объединяет сущности и объекты-значения, согласованность которых нужно поддерживать при одном изменении. Корень агрегата (*aggregate root*) — сущность, через которую внешний код обращается к этому целому. У нас это `Order`. В другой задаче агрегат может состоять из единственной сущности. Вон Вернон показывает цену слишком широкой границы на примере продукта и его бэклога: независимые изменения начинают конфликтовать при сохранении. [Vaughn Vernon, Effective Aggregate Design, часть I](https://www.dddcommunity.org/wp-content/uploads/files/pdf_articles/Vernon_2011_1.pdf)
+
+Фрагмент использует тот же `Money(amount, currency)` с целыми центами, что и перевод. Начальный итог пустого заказа задаёт валюту. Сделаем итог доступным для чтения. При добавлении проверим всё до того, как изменить позиции.
 
 ```kotlin
-class Order(val id: OrderId) {
-    private val _lines = mutableListOf<OrderLine>()
-    val lines: List<OrderLine> get() = _lines
+@JvmInline value class OrderId(val value: String)
+@JvmInline value class ProductId(val value: String)
+data class OrderLine(val product: ProductId, val quantity: Int, val price: Money)
+
+class Order(val id: OrderId, currency: String) {
+    private val items = mutableListOf<OrderLine>()
+    val lines: List<OrderLine> get() = items.toList()
+    var total: Money = Money(0, currency)
+        private set
 
     fun addLine(product: ProductId, quantity: Int, price: Money) {
-        require(quantity > 0)
-        _lines += OrderLine(product, quantity, price)
-    }
-
-    fun removeLine(product: ProductId) {
-        _lines.removeAll { it.product == product }
-    }
-
-    fun total(): Money = _lines.fold(Money.ZERO) { acc, line ->
-        acc + line.price * line.quantity
+        require(quantity > 0 && price.currency == total.currency)
+        val lineCost = Math.multiplyExact(price.amount, quantity)
+        val next = Money(Math.addExact(total.amount, lineCost), total.currency)
+        items.add(OrderLine(product, quantity, price))
+        total = next
     }
 }
-
-data class OrderLine(val product: ProductId, val quantity: Int, val price: Money)
 ```
 
-`OrderLine` не имеет собственного репозитория — она живёт и умирает вместе с `Order`.
+Пустой заказ в USD имеет итог 0 центов USD. Две единицы товара по 125 центов дают 250 центов USD. Попытка добавить товар за 125 евроцентов оставляет одну строку и прежний итог. Снаружи можно прочитать снимок позиций. Любое изменение сохранённого заказа проходит через корень; отдельный репозиторий позиций здесь не нужен.
 
-### Domain Events
+## Доменные события
 
-Domain event фиксирует факт, который произошёл в предметной области. Это мостик к [асинхронному
-взаимодействию](/lectures/11) и [отказоустойчивости](/lectures/12):
+<a id="domain-events"></a>
+
+Когда у Ады стало три завершённых заказа, программа повысила её до Silver. «Участник повышен до Silver» — **доменное событие** (*domain event*), факт в прошедшем времени, который интересует других участников процесса. Команда `registerCompletedOrder` просит выполнить действие. Событие `CustomerPromoted` сообщает, чем оно закончилось.
+
+Ниже вариант метода из `Customer`. Он возвращает событие вызывающему коду только в момент смены статуса. Время передаёт прикладной сервис. Чтобы воспроизвести переход, тест может передать фиксированное значение.
 
 ```kotlin
-sealed interface DomainEvent
-
 data class CustomerPromoted(
     val customerId: CustomerId,
     val newStatus: CustomerStatus,
-    val at: Instant
-) : DomainEvent
-```
+    val at: java.time.Instant
+)
 
-Entity *поднимает* события, а application service *публикует* их:
-
-```kotlin
-class LoyaltyCustomer(val id: CustomerId, val email: Email) {
-    private val _events = mutableListOf<DomainEvent>()
-    val domainEvents: List<DomainEvent> get() = _events
-
-    fun registerCompletedOrder(now: Instant) {
-        completedOrders += 1
-        val newStatus = CustomerStatus.fromOrders(completedOrders)
-        if (newStatus != previousStatus) {
-            _events += CustomerPromoted(id, newStatus, now)
-        }
-    }
+// Метод внутри Customer, у которого status вычисляется по completedOrders.
+fun registerCompletedOrder(at: java.time.Instant): CustomerPromoted? {
+    val previous = status
+    completedOrders = Math.incrementExact(completedOrders)
+    return if (status != previous) CustomerPromoted(id, status, at) else null
 }
 ```
 
-## Изоляция Доменной Модели
+Третье завершение даёт одно событие Silver, четвёртое — ни одного, десятое — одно событие Gold. Внутренний обработчик может использовать событие в том же процессе. Если о повышении нужно сообщить другой системе, опасно сначала послать сообщение, а потом пытаться сохранить клиента. Один вариант — записать изменение клиента и исходящее сообщение в одной транзакции, после фиксации отправить сообщение из этой записи. Такой способ называется *transactional outbox*. Если внешняя система получит сообщение о повышении дважды, обработчик может записать идентификатор события вместе с назначением награды в одной локальной транзакции. Повтор той же доставки тогда оставит одну награду. Такое же правило нужно на входе в Loyalty: повтор сообщения Sales об одном заказе не должен увеличивать счётчик второй раз. [Обмен сообщениями](/lectures/11) и [исходящие сообщения в транзакции](/lectures/12#transaction-outbox).
 
-Доменная модель должна быть изолирована от внешнего мира: SQL, HTTP, ORM, контроллеров, файловой системы, текущего
-времени и случайных чисел. Инфраструктура может зависеть от домена, но домен не должен зависеть от инфраструктуры.
+## Изоляция доменной модели
+
+Чтобы проверить правило скидки, должно быть достаточно числа завершённых заказов. Соединение с БД, сеть и системные часы понадобятся прикладному коду, который получает входные данные и сохраняет результат. Инфраструктура может зависеть от домена, но домен не должен зависеть от инфраструктуры.
 
 ```mermaid
 flowchart TD
@@ -1511,14 +1318,15 @@ flowchart TD
     Application --> Domain["Domain model"]
     Infrastructure["Infrastructure: DB, HTTP, files"] --> Application
     Infrastructure --> Domain
-    Domain -. "не зависит от" .-> Infrastructure
 ```
+
+Стрелка на схеме показывает зависимость кода. Например, адаптер хранения реализует интерфейс репозитория, которым пользуется приложение.
 
 Active Record удобен в маленьких приложениях: объект сам знает, как сохранить себя в базу. Но для сложного core domain
 это смешивает бизнес-правила и persistence. Если `Customer.save()` содержит SQL, доменная модель уже знает про способ
 хранения и хуже тестируется.
 
-Отдельная ловушка - скрытые зависимости вроде `now()` внутри entity. Если метод сам берет текущее время, его результат
+Отдельная ловушка — скрытые зависимости вроде `now()` внутри entity. Если метод сам берет текущее время, его результат
 зависит от внешнего мира. В доменном коде лучше принимать время как значение.
 
 ::: multi-code "Время как значение, а не скрытая зависимость"
@@ -1536,13 +1344,13 @@ class Subscription {
 ```
 
 ```kotlin playground
-data class Moment(val value: String)
+import java.time.Instant
 
 class Subscription {
-    var activatedAt: Moment? = null
+    var activatedAt: Instant? = null
         private set
 
-    fun activate(now: Moment) {
+    fun activate(now: Instant) {
         require(activatedAt == null) { "Already activated" }
         activatedAt = now
     }
@@ -1550,13 +1358,15 @@ class Subscription {
 
 fun main() {
     val subscription = Subscription()
-    subscription.activate(Moment("2026-07-05T12:00:00Z"))
+    subscription.activate(Instant.parse("2026-07-05T12:00:00Z"))
 
-    println("Activated at: ${subscription.activatedAt?.value}")
+    println("Activated at: ${subscription.activatedAt}")
 
     val secondActivation = runCatching {
-        subscription.activate(Moment("2026-07-06T12:00:00Z"))
+        subscription.activate(Instant.parse("2026-07-06T12:00:00Z"))
     }
+    check(secondActivation.isFailure)
+    check(subscription.activatedAt == Instant.parse("2026-07-05T12:00:00Z"))
     println("Second activation accepted: ${secondActivation.isSuccess}")
 }
 ```
@@ -1590,7 +1400,7 @@ public final class Subscription {
         if (activatedAt != null) {
             throw new IllegalStateException("Already activated");
         }
-        activatedAt = now;
+        activatedAt = java.util.Objects.requireNonNull(now);
     }
 }
 ```
@@ -1615,8 +1425,11 @@ func (subscription *Subscription) Activate(now time.Time) error {
     return nil
 }
 
-func (subscription Subscription) ActivatedAt() *time.Time {
-    return subscription.activatedAt
+func (subscription Subscription) ActivatedAt() (time.Time, bool) {
+    if subscription.activatedAt == nil {
+        return time.Time{}, false
+    }
+    return *subscription.activatedAt, true
 }
 ```
 
@@ -1630,116 +1443,75 @@ Application service может вызвать системные часы, по�
 Иногда правило нельзя проверить только локальным состоянием одного объекта. Например: "email клиента должен быть
 уникален". Чтобы это узнать, нужно посмотреть на других клиентов или на индекс в базе данных.
 
-Здесь возникает компромисс между тремя желаниями:
+Владимир Хориков разбирает именно смену email, когда для решения нужны сведения о других клиентах. Его «трилемма» описывает компромисс между полнотой модели (все бизнес-решения собраны в домене), её чистотой (домен не обращается за пределы процесса) и стоимостью внешних обращений. [Владимир Хориков, Domain model purity vs. domain model completeness](https://enterprisecraftsmanship.com/posts/domain-model-purity-completeness/)
 
-- полная инкапсуляция: решение принимает доменный объект;
-- полная изоляция: доменный объект не знает про repository и базу;
-- максимальная производительность: не загружать лишние данные.
+| Как узнать, свободен ли адрес | Что получает команда | Цена решения |
+|---|---|---|
+| Сущность запрашивает репозиторий | Решение целиком в домене, возможен точечный поиск | Вызов метода теперь зависит от внешнего чтения |
+| Прикладной сервис сам решает, можно ли менять адрес | Чистая сущность, возможен точечный поиск | Правило распределено между слоями |
+| Сущности передают всех остальных клиентов | Все данные для решения уже в памяти | Ради одного адреса приходится загружать большой набор |
 
-| Подход                                             | Инкапсуляция | Изоляция       | Производительность | Минус                                      |
-|----------------------------------------------------|--------------|----------------|--------------------|--------------------------------------------|
-| Entity принимает repository                        | Высокая      | Низкая         | Высокая            | Домен зависит от инфраструктуры            |
-| Application service проверяет repository           | Средняя      | Высокая        | Высокая            | Часть бизнес-решения находится снаружи     |
-| Entity получает готовый набор доменных данных      | Высокая      | Высокая        | Ниже               | Нужно заранее загрузить данные             |
-| Доменная политика получает минимальный read model  | Компромисс   | Средняя/высокая | Высокая            | Сложнее объяснить и поддерживать           |
+Идти за всеми клиентами нет нужды, если запрос заранее известен. Прикладной сервис может найти владельца **конкретного** адреса. Передадим в домен проверенный адрес и идентификатор найденного владельца. В одном вызове нельзя случайно применить результат поиска одного адреса к другому. Владелец вправе оставить себе свой адрес.
 
-В учебном коде часто выбирают идеальный с точки зрения домена вариант: передать в доменную операцию готовые доменные
-данные. В промышленном коде чаще нужен компромисс: application service получает из repository минимальный факт, например
-`emailAlreadyTaken`, и передает его в доменную операцию или доменную политику.
-
-::: warning Не передавайте repository в entity по умолчанию
-Repository - это граница с инфраструктурой. Если entity начинает вызывать repository, доменный объект становится зависим
-от внешнего мира. Иногда команды сознательно идут на такой компромисс, но это должно быть инженерное решение, а не
-случайность.
-:::
-
-Пример решения без repository внутри entity:
-
-::: multi-code "Проверка уникальности через доменный факт" {playground=off}
+::: multi-code "Смена email по результату поиска владельца" {playground=off}
 
 ```kotlin
-class Customer(
-    val id: CustomerId,
-    email: Email
-) {
-    var email: Email = email
-        private set
+data class EmailLookup(val candidate: Email, val owner: CustomerId?)
 
-    fun changeEmail(newEmail: Email, uniqueness: EmailUniqueness) {
-        require(uniqueness.isUnique) { "Email is already taken" }
-        email = newEmail
-    }
+// Вариант Customer, в котором email имеет закрытый setter.
+fun changeEmail(lookup: EmailLookup) {
+    require(lookup.owner == null || lookup.owner == id) { "Email is already taken" }
+    email = lookup.candidate
 }
-
-data class EmailUniqueness(val isUnique: Boolean)
 ```
 
 ```csharp
-public readonly record struct EmailUniqueness(bool IsUnique);
+public sealed record EmailLookup(Email Candidate, CustomerId? Owner);
 
-public sealed class Customer
+// Метод Customer. У свойства Email закрытый setter.
+public void ChangeEmail(EmailLookup lookup)
 {
-    public CustomerId Id { get; }
-    public Email Email { get; private set; }
-
-    public Customer(CustomerId id, Email email)
-    {
-        Id = id;
-        Email = email;
-    }
-
-    public void ChangeEmail(Email newEmail, EmailUniqueness uniqueness)
-    {
-        if (!uniqueness.IsUnique)
-            throw new InvalidOperationException("Email is already taken");
-
-        Email = newEmail;
-    }
+    if (lookup.Owner is not null && lookup.Owner != Id)
+        throw new InvalidOperationException("Email is already taken");
+    Email = lookup.Candidate ?? throw new ArgumentNullException(nameof(lookup.Candidate));
 }
 ```
 
 ```java
-public record EmailUniqueness(boolean unique) {
-}
+public record EmailLookup(Email candidate, java.util.Optional<CustomerId> owner) {}
 
-public final class Customer {
-    private final CustomerId id;
-    private Email email;
-
-    public Customer(CustomerId id, Email email) {
-        this.id = id;
-        this.email = email;
+// Метод Customer. Поле email в этом варианте может меняться.
+public void changeEmail(EmailLookup lookup) {
+    if (lookup.owner().isPresent() && !lookup.owner().get().equals(id)) {
+        throw new IllegalStateException("Email is already taken");
     }
-
-    public void changeEmail(Email newEmail, EmailUniqueness uniqueness) {
-        if (!uniqueness.unique()) {
-            throw new IllegalStateException("Email is already taken");
-        }
-        email = newEmail;
-    }
+    email = java.util.Objects.requireNonNull(lookup.candidate());
 }
 ```
 
 ```go
-type EmailUniqueness struct {
-    IsUnique bool
+type EmailLookup struct {
+    Candidate Email
+    Owner     *CustomerID
 }
 
-func (customer *Customer) ChangeEmail(newEmail Email, uniqueness EmailUniqueness) error {
-    if !uniqueness.IsUnique {
+func (customer *Customer) ChangeEmail(lookup EmailLookup) error {
+    if lookup.Candidate.value == "" {
+        return fmt.Errorf("email is required")
+    }
+    if lookup.Owner != nil && *lookup.Owner != customer.id {
         return fmt.Errorf("email is already taken")
     }
-    customer.email = newEmail
+    customer.email = lookup.Candidate
     return nil
 }
 ```
 
 :::
 
-Application service в таком дизайне проверит repository, получит факт уникальности и передаст его в доменную модель.
-Домен по-прежнему не знает, откуда пришел факт: из базы, кэша, внешнего сервиса или тестового набора данных.
+Между чтением и записью адрес может занять другой участник. Если два участника одновременно выбирают `ada@company.com`, оба поиска могут вернуть «свободен». Предварительная проверка даёт понятную ошибку в обычном случае. Гарантию при гонке обеспечивает уникальное ограничение на обязательный нормализованный ключ адреса в Loyalty. Правило сравнения ключа в БД должно совпадать с правилом `Email`. При конфликте сохранения одна транзакция откатывается, прикладной сервис сообщает «адрес уже занят» и отбрасывает несохранённую изменённую копию клиента. После повторной загрузки у него прежний адрес. [PostgreSQL, проверка уникальности при записи](https://www.postgresql.org/docs/current/index-unique-checks.html)
 
-## Практический Алгоритм Проектирования
+## Практический алгоритм проектирования
 
 Когда вы начинаете проектировать доменную модель, двигайтесь не от таблиц, а от смысла.
 
@@ -1751,7 +1523,7 @@ Application service в таком дизайне проверит repository, п
 6. Записать инварианты для каждого важного объекта.
 7. Закрыть сеттеры и публичные mutable-поля.
 8. Перенести операции, меняющие состояние, в entity.
-9. Оставить сервисам координацию и сценарии приложения.
+9. Выделить предметные операции без естественного владельца в доменные сервисы. Загрузку, транзакцию и сохранение поручить прикладному сервису.
 10. Проверить, не зависит ли домен от SQL, HTTP, ORM, часов и файловой системы.
 
 ```mermaid
@@ -1772,7 +1544,7 @@ flowchart TD
 
 В контексте этой лекции особенно опасны:
 
-- primitive obsession и string typing: все выражено строками, числами и bool;
+- primitive obsession и stringly typed API: все выражено строками, числами и bool;
 - anemic domain model: объект хранит данные, но не защищает правила;
 - business logic in controllers: контроллер начинает решать, какая скидка положена;
 - business logic in stored procedures: ключевые правила спрятаны в базе;
@@ -1792,66 +1564,72 @@ flowchart TD
 
 - DDD начинается с языка и границ, а не с классов.
 - Bounded context защищает модель от смешения разных смыслов.
-- Core domain требует больше внимания, чем generic domain.
+- Core domain требует больше внимания, чем generic subdomain.
 - Ubiquitous language связывает разговоры, требования, тесты и код.
 - Value object убирает primitive obsession и валидирует значение при создании.
 - Entity защищает идентичность, жизненный цикл и инварианты.
 - Rich domain model не дает объекту легко перейти в невалидное состояние.
-- Domain service координирует несколько доменных объектов, но не забирает у них инварианты.
+- Domain service выражает предметную операцию без естественного владельца. За загрузку и фиксацию отвечает прикладной сервис.
 - Инфраструктура должна зависеть от домена, а не домен от инфраструктуры.
-- Иногда приходится выбирать компромисс между инкапсуляцией, изоляцией и производительностью.
+- Иногда приходится выбирать компромисс между полнотой доменной модели, её изоляцией и стоимостью запросов.
 
-Следующий шаг - защитить такую модель на уровне приложения. Если домен выражен хорошо, но контроллеры, ORM и HTTP-клиенты
+Следующий шаг — защитить такую модель на уровне приложения. Если домен выражен хорошо, но контроллеры, ORM и HTTP-клиенты
 все равно прорастают внутрь бизнес-правил, инварианты снова становятся хрупкими. Поэтому дальше мы переходим к
 [enterprise-архитектурам](/lectures/08#поворот-ddd-domain-first): слоям, Ports and Adapters, Onion и Clean Architecture.
 
 ## Дополнительное чтение
 
-Эти материалы помогают закрепить стратегические и тактические идеи DDD: язык, границы, моделирование и цену подхода.
+### Моделирование и границы
 
-### Основы DDD
+- [Эрик Эванс. Domain-Driven Design Reference](https://www.domainlanguage.com/wp-content/uploads/2016/05/DDD_Reference_2015-03.pdf) — справочник по языку, контекстам, сущностям, значениям и агрегатам.
+- [Мартин Фаулер. Bounded Context](https://martinfowler.com/bliki/BoundedContext.html) — как один «счётчик» в энергокомпании обозначает и физический прибор, и точку подключения.
+- [Мартин Фаулер. Value Object](https://martinfowler.com/bliki/ValueObject.html) — равенство координат и денежных сумм по значению.
+- [Мартин Фаулер. Anemic Domain Model](https://martinfowler.com/bliki/AnemicDomainModel.html) — почему прикладной слой может оставаться тонким поверх богатой модели.
+- [Вон Вернон. Effective Aggregate Design, часть I](https://www.dddcommunity.org/wp-content/uploads/files/pdf_articles/Vernon_2011_1.pdf) — как независимые изменения продукта обнаруживают неверную границу агрегата.
+- [Владимир Хориков. DDD Trilemma](https://enterprisecraftsmanship.com/posts/domain-model-purity-completeness/) — три способа проверить уникальность email и цена каждого.
+- [Microsoft. Domain events: Design and implementation](https://learn.microsoft.com/en-us/dotnet/architecture/microservices/microservice-ddd-cqrs-patterns/domain-events-design-implementation) — обработка события внутри приложения и передача факта другой системе.
 
-- [Что такое DDD](https://www.youtube.com/watch?v=pMuiVlnGqjk) — вводное видео по предметно-ориентированному проектированию.
+### Видеозаписи из лекции
+
+<a id="основы-ddd"></a>
+
+- [Эрик Эванс. What is DDD](https://www.youtube.com/watch?v=pMuiVlnGqjk) — вводное видео по предметно-ориентированному проектированию.
 - [Ограниченные контексты](https://www.youtube.com/watch?v=am-HXycfalo) — видео о bounded contexts.
 - [Пример моделирования DDD](https://www.youtube.com/watch?v=T29WzvaPNc8&t=1718s) — разбор моделирования на практическом примере.
 
 ### Статьи и заметки
 
-- [Статьи на русском по основным принципам DDD, часть 1](https://habr.com/ru/post/316438/) — обзор базовых понятий DDD.
-- [Статьи на русском по основным принципам DDD, часть 2](https://habr.com/ru/post/316890/) — продолжение обзора.
-- [Что такое DDD?](https://blog-programmista.ru/post/132-ddd-what-is-it.html) — короткая заметка для первичного знакомства.
-- [Почему вы должны заботиться о каком-то DDD?](https://habr.com/ru/post/497656/) — мотивация и практический смысл подхода.
+- [Стратегическое проектирование](https://habr.com/ru/articles/316438/) — обзор базовых понятий DDD.
+- [Тактическое проектирование](https://habr.com/ru/articles/316890/) — продолжение обзора.
+- [Что такое DDD?](https://habr.com/ru/articles/497656/) — мотивация и практический смысл подхода.
 
 ## Вопросы для самопроверки
 
-1. Чем value object отличается от entity?
-2. Почему `Email` лучше, чем `String`, если в домене есть правила email?
-3. Где должен проверяться диапазон скидки от 0 до 100?
-4. Почему один общий `Customer` на Sales, Support и Loyalty может стать проблемой?
-5. Когда логика должна жить в domain service?
-6. Почему repository внутри entity ухудшает изоляцию доменной модели?
-7. Что такое инвариант?
-8. Чем rich domain model отличается от anemic domain model?
-9. Что должно оставаться в application service?
-10. В каком случае можно не строить богатую доменную модель?
+1. Ада меняет адрес. Какой объект-значение заменяется? По чему мы узнаём ту же сущность?
+2. Как Sales и Loyalty понимают «заказ»? Какую информацию нужно передать через границу контекстов?
+3. После завершения четвёртого заказа статус остался Silver. Какие данные меняются? Нужно ли событие повышения?
+4. У отправителя USD, у получателя EUR. За какую гарантию отвечает счёт, за какую — доменный сервис, за какую при сохранении — прикладной сервис и БД?
+5. Почему закрытый список позиций заказа помогает защитить валюту итога? Почему возвращать исходный изменяемый список опасно?
+6. Почему два запроса могут одновременно получить ответ «email свободен»? Как узнать, какой из них получил адрес?
+7. В какой момент для справочника с одной операцией редактирования окупится отдельная доменная модель?
 
 ## Мини-практика
 
-Спроектируйте модель программы лояльности:
+Реализуйте участника программы лояльности с устойчивым `CustomerId`, проверяемым `Email` и операцией регистрации завершённого заказа. Статус и скидку внешний код только читает. В тестах последовательно завершайте заказы для одного участника и фиксируйте событие, которое вернула именно последняя операция. Начните с двух завершений. Предскажите статус и скидку после третьего, затем проверьте прогноз вызовом метода. Повторите опыт на переходе с девяти заказов на десять.
 
-> Клиент получает статус Bronze, Silver или Gold по количеству завершенных заказов. Скидка зависит от статуса. Email
-> должен быть валидным. Статус нельзя назначить руками.
+::: details Сверить границы статусов
 
-Ожидаемые элементы решения:
+| Завершённых заказов | Статус | Скидка | Событие последней операции |
+|---:|---|---:|---|
+| 0 | Bronze | 0 % | Событий ещё нет |
+| 2 | Bronze | 0 % | Нет |
+| 3 | Silver | 10 % | Повышение до Silver |
+| 4 | Silver | 10 % | Нет |
+| 9 | Silver | 10 % | Нет |
+| 10 | Gold | 20 % | Повышение до Gold |
+| 11 | Gold | 20 % | Нет |
+:::
 
-- `CustomerId`;
-- `Email`;
-- `CompletedOrderCount`;
-- `CustomerStatus`;
-- `DiscountPercent`;
-- `Customer.registerCompletedOrder(...)`;
-- запрет публичного изменения `discount` и `status`;
-- вычисление `status` и `discount` из состояния клиента.
+Проверьте ещё два изменения. Замена `ada@company.com` на свободный `ada@example.org` сохраняет идентификатор и статус. Попытка задать `ada@@example.org` или адрес другого участника оставляет прежнюю почту.
 
-Проверьте себя: если внешний сервис может написать `customer.status = Gold`, модель все еще анемична. Если статус
-становится Gold только через доменную операцию и проверяемые правила, модель уже движется в сторону DDD.
+**Задача со звёздочкой.** Sales может повторить сообщение о завершении. Подайте два сообщения о завершении с разными идентификаторами сообщений, но с одним идентификатором заказа, начиная с двух завершений. После обработки ожидаются три завершения, Silver и одно событие повышения. Объясните, где хранится отметка об обработанном заказе и почему она должна фиксироваться вместе с изменением клиента.
