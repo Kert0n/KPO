@@ -3,11 +3,15 @@ layout: KpoHome
 sidebar: false
 ---
 
-:::: multi-code "Первые темы курса"
+:::: multi-code "Темы первых трёх лекций"
 
 ```kotlin
 fun main() {
-    val topics = listOf("SOLID", "DI", "Тесты")
+    val topics = listOf(
+        "Введение в КПО",
+        "Внедрение зависимостей",
+        "Юнит-тесты",
+    )
     for ((index, topic) in topics.withIndex()) {
         println("Лекция ${index + 1}: $topic")
     }
@@ -16,7 +20,12 @@ fun main() {
 
 ```kotlin playground
 fun main() {
-    val topics = listOf("SOLID", "DI", "Тесты")
+    val topics = listOf(
+        "Введение в КПО",
+        "Внедрение зависимостей",
+        "Юнит-тесты",
+        // Добавьте сюда строку "Порождающие паттерны",
+    )
     for ((index, topic) in topics.withIndex()) {
         println("Лекция ${index + 1}: $topic")
     }
@@ -24,7 +33,14 @@ fun main() {
 ```
 
 ```csharp
-var topics = new[] { "SOLID", "DI", "Тесты" };
+using System;
+
+var topics = new[]
+{
+    "Введение в КПО",
+    "Внедрение зависимостей",
+    "Юнит-тесты"
+};
 for (var i = 0; i < topics.Length; i++)
 {
     Console.WriteLine($"Лекция {i + 1}: {topics[i]}");
@@ -36,7 +52,11 @@ import java.util.List;
 
 public class Main {
     public static void main(String[] args) {
-        var topics = List.of("SOLID", "DI", "Тесты");
+        var topics = List.of(
+            "Введение в КПО",
+            "Внедрение зависимостей",
+            "Юнит-тесты"
+        );
         for (int i = 0; i < topics.size(); i++) {
             System.out.println("Лекция " + (i + 1) + ": " + topics.get(i));
         }
@@ -50,10 +70,14 @@ package main
 import "fmt"
 
 func main() {
-    topics := []string{"SOLID", "DI", "Тесты"}
-    for i, topic := range topics {
-        fmt.Printf("Лекция %d: %s\n", i+1, topic)
-    }
+	topics := []string{
+		"Введение в КПО",
+		"Внедрение зависимостей",
+		"Юнит-тесты",
+	}
+	for i, topic := range topics {
+		fmt.Printf("Лекция %d: %s\n", i+1, topic)
+	}
 }
 ```
 
