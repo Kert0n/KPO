@@ -1,19 +1,17 @@
 ---
 requires:
   - lecture: 1
-    reason: "DIP — принцип, который DI превращает в код"
+    reason: "DIP и направление зависимостей между модулями"
 ---
 
 # Лекция 2. Внедрение зависимостей
 
-Зависимость в коде - это любой внешний объект, функция, сервис, источник данных или инфраструктурная деталь, без которой
-класс не может выполнить свою работу. В первой лекции мы говорили о DIP: высокоуровневый код должен зависеть от
-абстракций, а не от конкретных реализаций. Во второй лекции нужен следующий шаг: понять, как эти абстракции попадают в
-объекты на практике.
+Нужно проверить, что заказ на 100 рублей передаётся в оплату с правильной суммой. Но при создании
+`OrderService` открывается соединение с базой, а при вызове метода запрос уходит платёжному провайдеру.
+Как проверить расчёт на ноутбуке без доступа к этим системам?
 
-Эта статья написана как самостоятельный материал. Если вы пропустили занятие, начните отсюда: к концу вы должны видеть,
-где код связан с конкретикой, чем DIP отличается от DI, почему конструктор обычно лучше сеттера, где опасен
-Service Locator, что делает DI-контейнер и почему все это важно для тестирования.
+База и платёжный шлюз — зависимости сервиса. Чтобы выбрать их учебные или рабочие реализации при запуске,
+передадим готовые объекты в сервис. Такой приём называется внедрением зависимостей (Dependency Injection, DI).
 
 ::: tip Главная идея лекции
 DIP говорит, от чего должен зависеть код. DI показывает, как передать эту зависимость в объект. DI-контейнер
@@ -22,14 +20,13 @@ DIP говорит, от чего должен зависеть код. DI по�
 
 ::: tip Как работать с Kotlin-примерами
 В Kotlin-вкладках статический код оставлен коротким. Если включен Playground, некоторые примеры запускаются как
-отдельные
-маленькие программы: можно менять реализацию зависимости, порядок вызовов и lifecycle, чтобы увидеть проблему в выводе.
+отдельные маленькие программы: можно менять реализацию зависимости, порядок вызовов и lifecycle, чтобы увидеть проблему в выводе.
 :::
 
 ## Сквозной сценарий
 
 Учебный пример `Car` и `Engine` намеренно маленький: он убирает шум фреймворков и показывает саму связь. Но держите в
-голове реальное приложение. В нем `OrderService` должен сохранить заказ, списать оплату, записать лог, отправить событие
+голове реальное приложение. В нем `OrderService` должен сохранить заказ, списать оплату, отправить событие
 и получить текущее время. Если сервис сам создает `PostgresOrderRepository`, `StripePaymentGateway`, `SystemClock` и
 `KafkaPublisher`, он становится трудно тестируемым и плохо переносимым между production, staging и локальным запуском.
 
@@ -53,10 +50,10 @@ flowchart LR
     Root --> Service
 ```
 
-Поэтому лекция движется от маленького `Car` к главному практическому правилу: бизнес-класс должен получать зависимости
-явно, а выбор инфраструктуры должен происходить на верхнем уровне приложения.
+Стрелки из `Composition Root` показывают, кто создаёт экземпляры. Стрелки от репозитория, шлюза, часов и издателя событий к сервису
+показывают, какие объекты получает его конструктор.
 
-## Worked example: микромодель и production-аналог
+## Разбор на примере машины и сервиса заказов {#worked-example-микромодель-и-production-аналог}
 
 ### Ситуация
 
@@ -70,13 +67,13 @@ flowchart LR
 
 ### Что ломается
 
-Тест с fake engine или fake payment gateway становится трудным. Локальный запуск требует production-like зависимостей.
-Замена Stripe на sandbox или Postgres на in-memory storage превращается в изменение бизнес-класса.
+Хотим дважды запустить один и тот же тест. Шлюз оплаты запрашивает сеть, а база сохраняет заказ после первого запуска.
+Чтобы проверить правило с локальным хранилищем и тестовым шлюзом, приходится менять сам сервис.
 
 ### Улучшение
 
-Передать зависимости через constructor injection, а выбор конкретных реализаций вынести в composition root. В маленькой
-программе это `main`, во фреймворке - startup/module/application context.
+Передадим хранилище и шлюз через конструктор. Выберем реализации там, где запускается приложение.
+Это место сборки называют *Composition Root*. В маленькой программе его роль обычно выполняет `main`.
 
 ### Почему это работает
 
@@ -134,18 +131,20 @@ flowchart TD
     Container["DI-контейнер"] --> Assembly["Собрать объектный граф"]
 ```
 
-DIP - принцип проектирования. Он говорит: бизнес-логика не должна зависеть от деталей вроде консоли, базы данных,
-файловой системы, HTTP-клиента или конкретного двигателя.
+DIP (Dependency Inversion Principle, принцип инверсии зависимостей) описывает направление зависимостей в исходном коде.
+Сервису заказа нужен контракт «принять оплату». Адаптер конкретного провайдера реализует этот контракт.
+Сервис и адаптер зависят от одного соглашения, которое выражает потребности сервиса.
 
-DI - способ выполнить этот принцип в коде. Вместо того чтобы создавать зависимость внутри класса, мы передаем уже
-созданный объект снаружи.
+DI описывает передачу объекта. В конструктор `Car(engine: GasEngine)` двигатель уже внедряется извне,
+но тип параметра по-прежнему связывает машину с бензиновым двигателем. Сигнатура `Car(engine: Engine)`
+сохраняет тот же способ передачи и позволяет выбрать другую реализацию.
 
-DI-контейнер - инструмент, который автоматизирует этот процесс: регистрирует реализации, создает объекты и передает их в
-конструкторы. Контейнер помогает, но плохую декомпозицию он не исправит.
+DI-контейнер собирает объекты по правилам, заданным приложением. Ручной вызов `Car(GasEngine())` в точке
+сборки даёт тот же результат.
 
 ## Первый пример
 
-Начнем с правильной формы: `Car` знает только контракт `Engine`. Конкретная реализация выбирается снаружи.
+Цель здесь — менять тип двигателя при сборке машины. Для этого `Car` достаточно знать операцию запуска из контракта `Engine`.
 
 :::: multi-code "Car зависит от Engine"
 
@@ -326,12 +325,10 @@ func NewCar() Car {
 становится доступной, и по тому, насколько явно она видна в API класса. Выбор способа определяет, можно ли создать
 объект в невалидном состоянии и насколько просто будет подставить тестовую реализацию.
 
-Зависимость можно передать в объект несколькими способами. Они не равнозначны.
-
 | Способ                | Когда использовать                          | Риск                                               |
 |-----------------------|---------------------------------------------|----------------------------------------------------|
-| Constructor injection | Обязательные зависимости                    | Длинный конструктор показывает перегруженный класс |
-| Method injection      | Зависимость нужна только для одной операции | Зависимость не часть состояния объекта             |
+| Constructor injection | Обязательные зависимости                    | Длинный список параметров требует проверки обязанностей |
+| Method injection      | Зависимость нужна только для одной операции | Повторяется параметр, если сервис нужен везде             |
 | Setter injection      | Опциональная или поздняя зависимость        | Объект может быть использован до настройки         |
 | Property injection    | Иногда во фреймворках                       | Скрытая обязательность, null-состояния             |
 | Interface injection   | Legacy/редкий случай                        | Зависимость плохо видна из API                     |
@@ -340,8 +337,8 @@ func NewCar() Car {
 
 ## Конструктор
 
-Constructor injection - вариант по умолчанию. Объект нельзя создать без обязательных зависимостей, а список зависимостей
-виден сразу в API класса.
+Constructor injection - вариант по умолчанию. Сигнатура конструктора перечисляет обязательные зависимости. В языках, допускающих
+`null` или `nil`, при необходимости добавьте проверку значения на границе создания объекта.
 
 ```mermaid
 flowchart LR
@@ -373,7 +370,7 @@ class GasEngine : Engine {
     override fun start() = "real engine started"
 }
 
-class FakeEngine(private val result: String) : Engine {
+class StubEngine(private val result: String) : Engine {
     override fun start() = result
 }
 
@@ -383,7 +380,7 @@ class Car(private val engine: Engine) {
 
 fun main() {
     val productionCar = Car(GasEngine())
-    val testCar = Car(FakeEngine("fake engine for test"))
+    val testCar = Car(StubEngine("ready for test"))
 
     println(productionCar.start())
     println(testCar.start())
@@ -403,7 +400,15 @@ public sealed class Car
     public string Start() => engine.Start();
 }
 
-var car = new Car(new GasEngine());
+// Сборка выполняется в точке входа приложения.
+public static class Program
+{
+    public static void Main()
+    {
+        var car = new Car(new GasEngine());
+        System.Console.WriteLine(car.Start());
+    }
+}
 ```
 
 ```java
@@ -419,7 +424,12 @@ final class Car {
     }
 }
 
-var car = new Car(new GasEngine());
+class App {
+    public static void main(String[] args) {
+        var car = new Car(new GasEngine());
+        System.out.println(car.start());
+    }
+}
 ```
 
 ```go
@@ -431,13 +441,14 @@ func NewCar(engine Engine) Car {
     return Car{engine: engine}
 }
 
-car := NewCar(GasEngine{})
+func assembleCar() Car {
+    return NewCar(GasEngine{})
+}
 ```
 
 ::::
 
-В playground видно, что тестовая машина получает `FakeEngine`, а промышленный код получает `GasEngine`. `Car` не знает,
-какая реализация передана.
+В Playground первая машина выводит `Car: real engine started`. Вторая получает заглушку `StubEngine` с заранее заданным ответом `ready for test`. Для обеих подходит один метод `Car.start`.
 
 ## Метод
 
@@ -607,7 +618,7 @@ func (c *Car) SetEngine(engine Engine) {
 
 ::::
 
-Если dependency обязательна, setter заставляет писать защитный код и помнить порядок вызовов. Поэтому setter injection
+Если зависимость обязательна, setter заставляет писать защитный код и помнить порядок вызовов. Поэтому setter injection
 лучше оставлять для зависимостей, отсутствие которых действительно допустимо.
 
 ## Свойство (property injection)
@@ -692,17 +703,21 @@ val service = OrderService(
 
 ::: only kotlin
 В Kotlin без фреймворка composition root часто выглядит как обычная функция `main`, которая создает реализации и
-передает их в конструкторы. В серверных фреймворках эту роль может выполнять модуль DI, например Koin:
+передает их в конструкторы. В серверных фреймворках эту роль выполняет код запуска, который подключает описания зависимостей. Например, в Koin объявим часы общим объектом, а их потребителя будем создавать заново при каждом запросе:
 
 ```kotlin
+class ReceiptClock(val clock: Clock)
+
 val appModule = module {
     single<Clock> { SystemClock() }
-    single<OrderRepository> { PostgresOrderRepository(get()) }
-    factory { OrderService(get(), get()) }
+    factory { ReceiptClock(get()) }
 }
 
 fun main() {
-    startKoin { modules(appModule) }
+    val app = startKoin { modules(appModule) }
+    val first = app.koin.get<ReceiptClock>()
+    val second = app.koin.get<ReceiptClock>()
+    check(first !== second && first.clock === second.clock)
 }
 ```
 
@@ -715,11 +730,11 @@ fun main() {
 val heavyService: HeavyService by lazy { HeavyService(config) }
 ```
 
-Объект будет создан при первом обращении. Это удобно для lifecycle management без контейнера.
+Значение вычисляется при первом обращении к свойству и сохраняется этим делегатом. Два владельца с отдельными делегатами могут создать два экземпляра. Такая локальная ленивость сама по себе не задаёт общую область контейнера.
 :::
 
 ::: only csharp
-В ASP.NET Core composition root обычно находится в `Program.cs`. Полный пример регистрации и использования:
+В ASP.NET Core зависимости обычно регистрируют в `Program.cs`. Фрагмент показывает регистрации сервиса заказа и четырёх его зависимостей. Параметры подключения адаптеров задаются отдельно.
 
 ```csharp
 var builder = WebApplication.CreateBuilder(args);
@@ -727,6 +742,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddSingleton<IClock, SystemClock>();
 builder.Services.AddScoped<IOrderRepository, PostgresOrderRepository>();
 builder.Services.AddScoped<IPaymentGateway, StripePaymentGateway>();
+builder.Services.AddScoped<IEventPublisher, KafkaPublisher>();
 builder.Services.AddTransient<OrderService>();
 
 var app = builder.Build();
@@ -744,10 +760,10 @@ var app = builder.Build();
 
 ::: only go
 В Go чаще встречается manual wiring: функция `main` создает реализации и передает их в конструкторы вроде
-`NewOrderService(repo, gateway, clock)`. Это многословнее контейнера, зато зависимости видны как обычный код и проще
+`NewOrderService(repo, gateway, clock, publisher)`. Это многословнее контейнера, зато зависимости видны как обычный код и проще
 отлаживаются.
 
-Для опциональных зависимостей в Go используют паттерн **functional options** — главную Go-идиому для DI:
+Для необязательных настроек и зависимостей в Go применяют **functional options**. Здесь сервер получает готовый журнал по умолчанию, а вызывающий код может передать свой.
 
 ```go
 type Server struct {
@@ -774,8 +790,8 @@ func NewServer(opts ...Option) *Server {
 }
 ```
 
-Конструктор принимает произвольный набор опций, каждая настраивает одну зависимость. Это заменяет и setter injection, и
-builder pattern — без мутабельного промежуточного состояния.
+Каждая опция меняет создаваемый сервер до его возврата вызывающему коду. `WithLogger` передаёт зависимость,
+а `WithTimeout` задаёт числовую настройку. Вызов `NewServer()` сохраняет оба значения по умолчанию.
 :::
 
 ## Service Locator
@@ -808,7 +824,7 @@ flowchart TD
 ```kotlin
 class OrderProcessor {
     fun process(orderId: String): String {
-        val validator = ServiceLocator.validator()
+        val validator = ServiceLocator.validator
         return validator.validate(orderId)
     }
 }
@@ -888,9 +904,7 @@ Playground показывает неприятный эффект: тестов�
 ## Где можно
 
 Service Locator не обязан быть катастрофой, если он ограничен верхним уровнем приложения. Если локатор используется
-только в Composition Root для создания объектов, а дальше зависимости передаются через конструкторы, доменный код
-остается
-чистым.
+только в Composition Root для создания объектов, дальше зависимости можно передавать через конструкторы. Тогда по сигнатуре бизнес-класса видно, какие сервисы ему нужны.
 
 ```mermaid
 flowchart LR
@@ -927,9 +941,9 @@ DI-контейнер автоматизирует сборку объектно
 | Service Locator | Сам объект просит локатор                      | Скрыта внутри метода          |
 | DI-контейнер    | Composition Root просит контейнер собрать граф | В регистрации и конструкторах |
 
-DI-контейнер может быть реализован через идеи Service Locator внутри себя. Это нормально: пользователю контейнера не
-дают обращаться к внутреннему локатору из любого места. Опасность начинается, когда контейнер передают в доменные классы
-и используют как `resolve` внутри бизнес-методов.
+У контейнера обычно есть операция получения готового объекта. Приложение может вызвать её в точке сборки. Если передать сам контейнер в бизнес-класс и вызвать там `resolve`, то для этого класса контейнер станет локатором, а список необходимых ему сервисов окажется скрыт.
+
+Для короткого примера оставим сервису одну обязанность — регистрировать заказы в памяти. После регистрации `ORD-1` и `ORD-2` отчёт должен перечислить оба номера.
 
 :::: multi-code "Ручная сборка графа"
 
@@ -990,11 +1004,11 @@ service := NewOrderService(repository)
 
 ::::
 
-Ручная сборка полезна для понимания. DI-контейнер делает то же самое, только автоматически и централизованно.
+В этом фрагменте `main` сам передаёт репозиторий в сервис. При сборке контейнером тот же конструктор получит реализацию по правилам регистрации.
 
 ## Lifecycle
 
-Контейнер не только создает зависимости. Он еще решает, сколько живет созданный объект.
+При регистрации задают, когда контейнер создаёт новый экземпляр и когда возвращает уже созданный. Если передать объект другому владельцу, тот может удерживать ссылку дольше. Это особенно важно для ресурсов, которые освобождаются при закрытии области.
 
 ```mermaid
 flowchart TD
@@ -1008,26 +1022,34 @@ flowchart TD
 
 | Lifecycle | Что означает                        | Когда подходит                              |
 |-----------|-------------------------------------|---------------------------------------------|
-| Transient | Каждый запрос получает новый объект | Легкие stateless-сервисы                    |
-| Singleton | Один объект на приложение           | Конфигурация, кеши, общие read-only сервисы |
-| Scoped    | Один объект на область              | Web-request, транзакция, единица работы     |
+| Transient | Новое разрешение зависимости даёт новый экземпляр | Легкие stateless-сервисы                    |
+| Singleton | Один экземпляр на регистрацию в контейнере           | Конфигурация, кеши, общие read-only сервисы |
+| Scoped    | Один объект на область              | Например, одна область на HTTP-запрос     |
 
 Singleton опасен, если объект хранит изменяемое пользовательское состояние. Transient может быть дорогим, если объект
 тяжело создавать. Scoped нужен там, где несколько сервисов в рамках одной операции должны разделять общий контекст.
 
-::: warning Captive dependency — классический баг lifecycle
-Singleton-сервис получает scoped `DbContext` через конструктор. Поскольку singleton живёт вечно, он держит один и тот же
-`DbContext` для всех запросов. Результат: разные пользователи видят данные друг друга, соединение к БД не возвращается
-в пул, а спустя тысячу запросов приложение падает с `ObjectDisposedException`. Правило: зависимость не должна жить
-дольше, чем объект, который её использует.
+::: warning Когда singleton удерживает зависимость из короткой области
+В ASP.NET Core один экземпляр фонового сервиса может пережить тысячи HTTP-запросов. Если передать ему
+scoped `DbContext` через конструктор, проверка областей при её включении отклонит такую сборку.
+Без проверки контекст, полученный из корневого контейнера, может остаться общим для разных операций.
+Он хранит отслеживаемые изменения и не поддерживает параллельное использование.
+
+Фоновому сервису передают `IServiceScopeFactory`. Для каждой операции он открывает область, получает в ней
+`DbContext` и завершает работу с ним до закрытия области. Обратная комбинация допустима — сервис одного
+запроса может пользоваться общими часами, зарегистрированными как singleton.
 :::
 
 :::: multi-code "Transient и singleton"
 
 ```kotlin
-class Counter {
-    val id: Int = nextId()
-}
+// container уже содержит две регистрации Counter.
+val a = container.resolve<Counter>("transientCounter")
+val b = container.resolve<Counter>("transientCounter")
+check(a !== b)
+
+val shared = container.resolve<Counter>("singletonCounter")
+check(shared === container.resolve<Counter>("singletonCounter"))
 ```
 
 ```kotlin playground
@@ -1100,13 +1122,12 @@ container.RegisterScoped("unitOfWork", NewUnitOfWork)
 ::::
 
 В playground transient-объекты получают разные `id`, а singleton возвращает один и тот же объект. Это простая модель
-того,
-что делает реальный контейнер.
+того, что делает реальный контейнер. Вкладки Java и Go показывают условный API, вкладка C# — методы стандартного контейнера .NET.
 
 ## DI и тесты
 
-DI напрямую связан с тестированием. Unit-тест должен проверять маленький кусок логики без реальной базы данных, HTTP,
-файловой системы или платежного шлюза. Если зависимости передаются извне, их можно заменить fake-реализациями.
+Проверим, какую сумму сервис передал в оплату. Ответ платёжного провайдера и его доступность этой проверке не нужны.
+Для этого запуска подставим шлюз, который ведёт сумму списаний по каждому заказу в памяти. Такой упрощённый рабочий аналог называют *fake*. Здесь выделен только шаг оплаты из исходного сценария. Результат двух списаний на 60 и 40 рублей для одного заказа должен быть 100, у другого заказа — 0.
 
 Эта связь подробно раскрывается в [Лекции 3](/lectures/03#тестируемость-кода-и-зависимости). Сейчас важно увидеть
 механику: DI не пишут "ради тестов", но хороший DI делает тесты естественным следствием дизайна. Если тесту приходится
@@ -1124,91 +1145,185 @@ flowchart LR
 :::: multi-code "Fake для теста"
 
 ```kotlin
+interface PaymentGateway {
+    fun charge(orderId: String, amount: Int)
+}
+
 class OrderService(private val payment: PaymentGateway) {
-    fun pay(orderId: String, amount: Int): String {
-        return payment.charge(orderId, amount)
+    fun pay(orderId: String, amount: Int) = payment.charge(orderId, amount)
+}
+
+class FakePaymentGateway : PaymentGateway {
+    private val totals = mutableMapOf<String, Int>()
+
+    fun totalFor(orderId: String): Int = totals[orderId] ?: 0
+
+    override fun charge(orderId: String, amount: Int) {
+        totals[orderId] = totalFor(orderId) + amount
     }
+}
+
+fun checkPayments() {
+    val gateway = FakePaymentGateway()
+    val service = OrderService(gateway)
+
+    service.pay("ORD-42", 60)
+    service.pay("ORD-42", 40)
+
+    check(gateway.totalFor("ORD-42") == 100)
+    check(gateway.totalFor("ORD-43") == 0)
 }
 ```
 
 ```kotlin playground
 interface PaymentGateway {
-    fun charge(orderId: String, amount: Int): String
-}
-
-class HttpPaymentGateway : PaymentGateway {
-    override fun charge(orderId: String, amount: Int): String {
-        return "real HTTP payment for $orderId: $amount"
-    }
-}
-
-class FakePaymentGateway : PaymentGateway {
-    val charged = mutableListOf<String>()
-
-    override fun charge(orderId: String, amount: Int): String {
-        charged += "$orderId:$amount"
-        return "fake payment accepted"
-    }
+    fun charge(orderId: String, amount: Int)
 }
 
 class OrderService(private val payment: PaymentGateway) {
-    fun pay(orderId: String, amount: Int): String {
-        require(amount > 0) { "amount must be positive" }
-        return payment.charge(orderId, amount)
+    fun pay(orderId: String, amount: Int) = payment.charge(orderId, amount)
+}
+
+class FakePaymentGateway : PaymentGateway {
+    private val totals = mutableMapOf<String, Int>()
+
+    fun totalFor(orderId: String): Int = totals[orderId] ?: 0
+
+    override fun charge(orderId: String, amount: Int) {
+        totals[orderId] = totalFor(orderId) + amount
     }
 }
 
 fun main() {
-    val fake = FakePaymentGateway()
-    val service = OrderService(fake)
+    val gateway = FakePaymentGateway()
+    val service = OrderService(gateway)
 
-    println(service.pay("ORD-42", 100))
-    println("captured calls: ${fake.charged}")
+    service.pay("ORD-42", 60)
+    service.pay("ORD-42", 40)
+
+    check(gateway.totalFor("ORD-42") == 100)
+    check(gateway.totalFor("ORD-43") == 0)
+    println("ORD-42: ${gateway.totalFor("ORD-42")} руб.")
 }
 ```
 
 ```csharp
-public sealed class OrderService
+using System.Collections.Generic;
+using Xunit;
+
+public interface IPaymentGateway
 {
-    private readonly IPaymentGateway payment;
+    void Charge(string orderId, int amount);
+}
 
-    public OrderService(IPaymentGateway payment)
-    {
-        this.payment = payment;
-    }
+public sealed class OrderService(IPaymentGateway gateway)
+{
+    public void Pay(string orderId, int amount) => gateway.Charge(orderId, amount);
+}
 
-    public string Pay(string orderId, int amount)
+public sealed class FakePaymentGateway : IPaymentGateway
+{
+    private readonly Dictionary<string, int> totals = new();
+
+    public int TotalFor(string orderId) => totals.GetValueOrDefault(orderId);
+
+    public void Charge(string orderId, int amount) =>
+        totals[orderId] = TotalFor(orderId) + amount;
+}
+
+public class OrderTests
+{
+    [Fact]
+    public void PaymentsAccumulateForOneOrder()
     {
-        return payment.Charge(orderId, amount);
+        var gateway = new FakePaymentGateway();
+        var service = new OrderService(gateway);
+
+        service.Pay("ORD-42", 60);
+        service.Pay("ORD-42", 40);
+
+        Assert.Equal(100, gateway.TotalFor("ORD-42"));
+        Assert.Equal(0, gateway.TotalFor("ORD-43"));
     }
 }
 ```
 
 ```java
-final class OrderService {
-    private final PaymentGateway payment;
+import java.util.HashMap;
+import java.util.Map;
+import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
-    OrderService(PaymentGateway payment) {
-        this.payment = payment;
+interface PaymentGateway {
+    void charge(String orderId, int amount);
+}
+
+record OrderService(PaymentGateway gateway) {
+    void pay(String orderId, int amount) {
+        gateway.charge(orderId, amount);
+    }
+}
+
+class FakePaymentGateway implements PaymentGateway {
+    private final Map<String, Integer> totals = new HashMap<>();
+
+    int totalFor(String orderId) {
+        return totals.getOrDefault(orderId, 0);
     }
 
-    String pay(String orderId, int amount) {
-        return payment.charge(orderId, amount);
+    public void charge(String orderId, int amount) {
+        totals.merge(orderId, amount, Integer::sum);
+    }
+}
+
+class OrderTest {
+    @Test
+    void paymentsAccumulateForOneOrder() {
+        var gateway = new FakePaymentGateway();
+        var service = new OrderService(gateway);
+
+        service.pay("ORD-42", 60);
+        service.pay("ORD-42", 40);
+
+        assertEquals(100, gateway.totalFor("ORD-42"));
+        assertEquals(0, gateway.totalFor("ORD-43"));
     }
 }
 ```
 
 ```go
+package order
+
+import "testing"
+
+type PaymentGateway interface {
+    Charge(orderID string, amount int)
+}
+
 type OrderService struct {
-    payment PaymentGateway
+    gateway PaymentGateway
 }
 
-func NewOrderService(payment PaymentGateway) OrderService {
-    return OrderService{payment: payment}
+func (s OrderService) Pay(orderID string, amount int) {
+    s.gateway.Charge(orderID, amount)
 }
 
-func (s OrderService) Pay(orderID string, amount int) string {
-    return s.payment.Charge(orderID, amount)
+type FakePaymentGateway map[string]int
+
+func (g FakePaymentGateway) Charge(orderID string, amount int) {
+    g[orderID] += amount
+}
+
+func TestPaymentsAccumulateForOneOrder(t *testing.T) {
+    gateway := make(FakePaymentGateway)
+    service := OrderService{gateway: gateway}
+
+    service.Pay("ORD-42", 60)
+    service.Pay("ORD-42", 40)
+
+    if gateway["ORD-42"] != 100 || gateway["ORD-43"] != 0 {
+        t.Fatalf("unexpected totals: %v", gateway)
+    }
 }
 ```
 
@@ -1243,7 +1358,7 @@ class OrderService {
 
 Тест не может подменить `TimeProvider.current` без глобальной мутации. Решение: передать `Clock` через конструктор.
 
-**Constructor over-injection** — конструктор с 8+ зависимостями:
+**Constructor over-injection** — у конструктора так много параметров, что стоит проверить обязанности класса. В примере их восемь.
 
 ```kotlin
 class OrderService(
@@ -1258,8 +1373,8 @@ class OrderService(
 )
 ```
 
-Это не проблема DI — это сигнал нарушения SRP. Класс координирует слишком много. Решение: разделить ответственности
-(например, вынести `OrderPricingService` и `OrderNotificationService`).
+Посмотрите, какие зависимости используются вместе. Если правила цены меняются независимо от рассылки уведомлений,
+расчёт можно вынести в отдельный сервис. Само число параметров ещё не обосновывает такое разделение.
 
 ## Чеклист
 
@@ -1290,8 +1405,8 @@ flowchart TD
 - DIP задает направление зависимости: высокоуровневый код зависит от абстракций.
 - DI передает зависимость извне, вместо создания внутри класса.
 - Constructor injection обычно лучший вариант для обязательных зависимостей.
-- Setter и property injection требуют осторожности, потому что создают неполное состояние.
-- Service Locator опасен скрытыми зависимостями и глобальным состоянием.
+- Setter и property injection могут оставить объект без обязательной зависимости до первого обращения.
+- Service Locator скрывает запрашиваемые сервисы от читателя конструктора. Общий изменяемый локатор дополнительно связывает тесты.
 - DI-контейнер полезен в Composition Root, но не должен протекать в доменную логику.
 - Lifecycle влияет на поведение программы: transient, singleton и scoped дают разные гарантии.
 - DI делает тестирование естественным, потому что реальные реализации можно заменить fake или mock.
@@ -1302,11 +1417,15 @@ flowchart TD
 
 ### DI и Service Locator
 
+- [Martin Fowler, Inversion of Control Containers and the Dependency Injection pattern](https://martinfowler.com/articles/injection.html) — на одном сервисе поиска фильмов сравниваются внедрение и самостоятельный запрос к локатору.
+
 - [Внедрение зависимостей](https://topjava.ru/blog/back-to-basics-dependency-injection) — базовое объяснение dependency injection.
 - [Service Locator](https://sergeyteplyakov.blogspot.com/2013/03/di-service-locator.html) — разбор подхода и его последствий для дизайна.
 - [Отличие Dependency Injection от Service Locator](https://habr.com/ru/articles/465395/) — сравнение двух способов получения зависимостей.
 
 ### Жизненный цикл зависимостей
+
+- [Microsoft Learn, Service lifetimes](https://learn.microsoft.com/en-us/dotnet/core/extensions/dependency-injection/service-lifetimes) — правила доступа к scoped-сервису и явная область для фоновой операции.
 
 - [Жизненный цикл зависимостей](https://metanit.com/sharp/dotnet/1.3.php) — singleton, scoped и transient на примере .NET.
 
@@ -1319,9 +1438,9 @@ flowchart TD
 5. Чем setter injection опасен для обязательных зависимостей?
 6. Почему property injection может скрывать ошибку настройки объекта?
 7. Что такое Composition Root?
-8. Почему Service Locator похож на глобальный объект?
+8. Какие зависимости скрывает даже локатор, переданный через конструктор? Что изменится, если сделать его глобальным?
 9. Чем DI-контейнер отличается от прямого Service Locator в бизнес-коде?
-10. Чем transient отличается от singleton?
+10. Получат ли два потребителя одного HTTP-запроса один `DbContext`, если он зарегистрирован как scoped? А два разных запроса?
 11. Почему singleton опасен для изменяемого состояния?
 12. Как DI помогает писать unit tests?
 
@@ -1339,7 +1458,7 @@ flowchart TD
 
 Стартовый вариант намеренно плохой:
 
-:::: multi-code "Мини-практика: исходный код"
+:::: multi-code "Мини-практика: исходный код" {playground=off}
 
 ```kotlin
 class ReportService {
@@ -1376,13 +1495,13 @@ type ReportService struct {
 
 ::::
 
-Цель упражнения - не написать больше интерфейсов, а переместить выбор инфраструктурных деталей из бизнес-класса в точку
-сборки приложения.
+Проверьте решение на одном запуске. Пусть `generate("ORD-42")` записывает одну строку вида
+`<время> <номер заказа>`. Передайте часы с фиксированным ответом `10:00`, журнал без вывода
+и writer, сохраняющий строки в памяти. После вызова список должен содержать ровно одну запись
+`10:00 ORD-42`. Затем замените writer в точке сборки на файловый. Код `generate` должен подойти для обоих запусков.
 
 ## Переход к следующей лекции
 
-На этой странице мы увидели, как `FakeEngine` подменяет настоящий двигатель, а `FakePaymentGateway` — реальный
-платёжный шлюз. Это были тестовые двойники (test doubles). Но мы ещё не обсуждали, как *правильно* их использовать:
-когда fake лучше mock, почему spy надёжнее verify-цепочки, и как написать тест, который переживёт рефакторинг без
-поломки. Именно эти вопросы раскрывает [Лекция 3 про юнит-тестирование](/lectures/03#тестируемость-кода-и-зависимости) —
-DI делает код тестируемым, но качество тестов определяет уже другая дисциплина.
+В Playground шлюз в памяти позволил проверить сумму списания по заказу. Другому тесту может понадобиться только
+заранее известный ответ или запись отправленных сообщений. [Лекция 3](/lectures/03#тестируемость-кода-и-зависимости)
+разбирает, как выбрать двойник под конкретный вопрос и какую проверку сохранить при рефакторинге.
